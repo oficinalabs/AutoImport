@@ -19,6 +19,13 @@ Importar carros para Portugal muitas vezes compensa, mas é difícil e trabalhos
 - **Primeiro mês grátis** para experimentar.
 - Go-to-market: visita presencial a stands.
 
+## Referências / Fontes a estudar
+
+- **[ImportRust](https://www.importrust.com/)** — referência de serviço de importação de carros para PT (comparação de custos, impostos, benchmark de UX).
+- **[mobile.de](https://www.mobile.de/)** — maior marketplace de automóveis da Alemanha; fonte de preços/stock do estrangeiro.
+- **[AutoScout24](https://www.autoscout24.com/)** — marketplace pan-europeu; fonte de preços/stock do estrangeiro.
+- **[OParking](https://www.oparking.pt/)** — plataforma portuguesa; referência de preços/mercado nacional (PT).
+
 ## Estado
 
 🌱 Fase inicial — a definir fontes de dados de preços (PT e estrangeiro) e cálculo de impostos de importação.
