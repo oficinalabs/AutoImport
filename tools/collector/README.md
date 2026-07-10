@@ -80,17 +80,51 @@ Exemplo real recolhido:
   "detail_url":"https://www.theparking.eu/used-cars-detail/.../A25BLZZZ.html","image":"https://…jpg" }
 ```
 
+## AutoTrader.nl (segundo coletor)
+
+Marketplace primário holandês (~233 mil anúncios de dealers), na **stack Scout24** (molde
+para a família AutoScout24). Investigação: [`../../research/autotrader-investigacao.md`](../../research/autotrader-investigacao.md).
+
+- **Fonte = `__NEXT_DATA__` (SSR)**, não a API interna (que é robots-disallowed sob `/api/`).
+  Dados muito ricos por anúncio (preço, veículo, localização, dealer, potência kW, CO2, imagens).
+- **Sem anti-bot** (nginx/CloudFront); HTTP puro. 20/página, paginação `?page=N`, cap 200 págs.
+
+```bash
+# batch
+node run-autotrader.mjs --max-pages 3            # amostra
+node run-autotrader.mjs --make 13 --max-pages 5  # só uma marca (mmvmk0; BMW=13)
+node run-autotrader.mjs --full --max-pages 200   # cobertura por faixas de preço
+node run-autotrader.mjs --resume
+
+# recolha contínua (1 min)
+node watch-autotrader.mjs                         # contínuo
+node watch-autotrader.mjs --interval 60 --pages 2
+```
+
+Saída: `autotrader-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`autotrader-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)).
+
+> ⚠️ **Recência:** o AutoTrader (Scout24) **não** tem ordenação por data de publicação. O watch
+> usa `sort=age&desc=1` (1ª-registo mais recente) como **proxy** — a captura exaustiva de novos
+> anúncios depende do re-crawl batch periódico.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
-run-theparking.mjs        CLI: flags, resolução de países, resumo
-theparking/
+lib/                      genérico, partilhado por todos os coletores
   http.mjs                cliente HTTP (UA browser, cookies, rate-limit, retry, guarda robots)
-  parse.mjs               extrai JSON-LD Vehicle + fonte por card; junta por ID
-  schema.mjs              schema-alvo + normalizadores + mapa JSON-LD→schema
-  sitemap.mjs             enumera slugs de modelo (modo --full)
-  crawl.mjs               plano de queries, paginação, dedupe, checkpoint, NDJSON
+  normalize.mjs           schema-alvo comum + normalizadores (toInt, cleanStr)
+  sink.mjs                a costura para a DB (upsert isolado; hoje NDJSON de eventos)
+theparking/               JSON-LD Vehicle (agregador, multi-país)
+  http · parse · schema · sitemap · crawl · watch · sink   (wrappers finos + específicos)
+autotrader/               __NEXT_DATA__ SSR (marketplace NL, stack Scout24)
+  http · parse · schema · crawl · watch
+run-theparking.mjs / watch-theparking.mjs      CLIs
+run-autotrader.mjs / watch-autotrader.mjs      CLIs
 ```
+Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
+(URLs, parse da fonte, mapeamento de campos).
 
 - **HTTP puro, sem browser** — a investigação confirmou que um GET com UA de browser
   passa o Cloudflare (200). Sem Playwright → rápido (66 anúncios em ~4s) e barato.

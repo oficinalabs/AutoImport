@@ -9,30 +9,9 @@
 // com os campos extra que o JSON-LD do theparking.eu oferece de graça (engine, color,
 // doors, category, region, postalCode, image).
 
-// Campos do registo normalizado (ordem canónica, útil para exportar CSV mais tarde).
-export const CAMPOS = [
-  'make', 'model', 'variant', 'year', 'km', 'fuel', 'gearbox', 'engine',
-  'color', 'doors', 'category', 'price', 'currency', 'country', 'region',
-  'postalCode', 'source', 'detail_url', 'image', 'collected_at',
-];
-
-// --- normalizadores ------------------------------------------------------
-
-// toInt: extrai o inteiro de uma string com ruído ("121985", " 121 985 km", "5 Doors").
-// Devolve null se não houver dígitos — preferimos null a 0 para não falsear estatísticas.
-export function toInt(v) {
-  if (v == null) return null;
-  const digits = String(v).replace(/[^\d]/g, '');
-  return digits ? Number(digits) : null;
-}
-
-// cleanStr: trim + colapso de espaços/quebras internas. Devolve null se ficar vazio.
-// Necessário porque os valores do theparking.eu vêm com espaços e newlines dispersos.
-export function cleanStr(v) {
-  if (v == null) return null;
-  const s = String(v).replace(/\s+/g, ' ').trim();
-  return s || null;
-}
+// Normalizadores e campos-base comuns vêm do lib/ partilhado.
+import { CAMPOS_BASE as CAMPOS, toInt, cleanStr } from '../lib/normalize.mjs';
+export { CAMPOS, toInt, cleanStr };
 
 // --- mapeamento JSON-LD Vehicle -> registo normalizado -------------------
 //
