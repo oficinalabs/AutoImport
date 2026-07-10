@@ -40,11 +40,11 @@
 
 *JSON-LD/SSR estruturado, sem anti-bot ativo, robots tolerante. Prioridade de arranque — reutilizar o padrão JSON-LD já validado no coletor do OParking.*
 
-**Progresso:** 0/13 a recolher.
+**Progresso:** 1/13 a recolher.
 
 | Site | País | Método | Estado | Coletor | Notas |
 |---|---|---|---|---|---|
-| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟡 Em progresso | — | ✅ Investigado a fundo → [`theparking-investigacao.md`](theparking-investigacao.md). GET puro pagina; fonte por card; falta construir coletor |
+| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟢 A recolher | [`tools/collector/run-theparking.mjs`](../tools/collector/run-theparking.mjs) | ✅ Coletor construído e verificado (HTTP puro, ~66 anúncios/4s). Schema completo (20 campos), fonte por card, dedupe+resume, `--full` p/ cobertura por país×modelo. Investigação: [`theparking-investigacao.md`](theparking-investigacao.md) |
 | AutoTrader.nl | Holanda | JSON-LD (stack Scout24) | 🔴 Por fazer | — | ~210k; sem anti-bot |
 | Autocasión | Espanha | JSON-LD `Car`+`EngineSpecification` | 🔴 Por fazer | — | ~60k; zero fricção |
 | OcasionPlus | Espanha | JSON-LD `Vehicle` (o mais rico) | 🔴 Por fazer | — | ~20k stock próprio |
@@ -113,4 +113,5 @@
 
 ## Changelog
 
+- **2026-07-10** — **theparking.eu 🟢 a recolher.** Coletor construído (`tools/collector/`, HTTP puro sem deps) e verificado ponta-a-ponta: amostra Bélgica/BMW = 66 anúncios em 4s, 20 campos por registo (incl. país/região/CP e fonte original), dedupe+resume validados, multi-país OK. Traz stock de fontes que nos bloqueiam diretamente (gocar.be, marktplaats.nl, autowereld.nl). Secção 2: 1/13.
 - **2026-07-10** — Doc inicial. Tracker das 4 categorias em foco; tudo 🔴/⏸️/⚫ (nenhum coletor estrangeiro construído ainda).
