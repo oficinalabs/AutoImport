@@ -5,3 +5,5 @@ __pycache__/
 *.pyc
 dist/
 build/
+tools/net-capture/node_modules
+tools/net-capture/out/

@@ -44,7 +44,7 @@
 
 | Site | País | Método | Estado | Coletor | Notas |
 |---|---|---|---|---|---|
-| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🔴 Por fazer | — | O mais completo: inclui morada/CP; Cloudflare passivo |
+| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟡 Em progresso | — | ✅ Investigado a fundo → [`theparking-investigacao.md`](theparking-investigacao.md). GET puro pagina; fonte por card; falta construir coletor |
 | AutoTrader.nl | Holanda | JSON-LD (stack Scout24) | 🔴 Por fazer | — | ~210k; sem anti-bot |
 | Autocasión | Espanha | JSON-LD `Car`+`EngineSpecification` | 🔴 Por fazer | — | ~60k; zero fricção |
 | OcasionPlus | Espanha | JSON-LD `Vehicle` (o mais rico) | 🔴 Por fazer | — | ~20k stock próprio |
