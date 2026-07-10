@@ -26,6 +26,22 @@ Importar carros para Portugal muitas vezes compensa, mas é difícil e trabalhos
 - **[AutoScout24](https://www.autoscout24.com/)** — marketplace pan-europeu; fonte de preços/stock do estrangeiro.
 - **[OParking](https://www.oparking.pt/)** — plataforma portuguesa; referência de preços/mercado nacional (PT).
 
+## Desenvolvimento
+
+Frontend em Next.js (App Router) já implementado, a correr sobre uma **camada de
+dados mock**. Backend a ligar por cima (divisão de trabalho: frontend / backend).
+
+```bash
+pnpm install
+pnpm dev          # http://localhost:3000
+```
+
+- **Estrutura e decisões:** [`docs/`](docs) (00–06) — identidade, design, stack.
+- **Ligar o backend:** [`docs/07-FRONTEND-HANDOFF.md`](docs/07-FRONTEND-HANDOFF.md) — o
+  único sítio a mexer é [`lib/data.ts`](lib/data.ts); o contrato está em [`lib/types.ts`](lib/types.ts).
+- **Design de referência:** [`design/`](design).
+- **Investigação:** [`research/`](research) — países viáveis e fontes de anúncios.
+
 ## Estado
 
-🌱 Fase inicial — a definir fontes de dados de preços (PT e estrangeiro) e cálculo de impostos de importação.
+🌱 Frontend implementado (mock). A ligar backend (auth, dados reais, email mascarado, Polar).

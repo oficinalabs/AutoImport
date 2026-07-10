@@ -1,0 +1,201 @@
+"use client";
+
+import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import { CarCard } from "@/components/car-card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { COUNTRY_LIST } from "@/lib/countries";
+import type { CountryCode, Listing } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+type Sort = "savings" | "recent" | "price";
+
+export function SearchView({
+  listings,
+  initialCountry,
+}: {
+  listings: Listing[];
+  initialCountry?: CountryCode;
+}) {
+  const router = useRouter();
+  const [query, setQuery] = useState("");
+  const [countries, setCountries] = useState<CountryCode[]>(
+    initialCountry ? [initialCountry] : [],
+  );
+  const [onlyOpps, setOnlyOpps] = useState(false);
+  const [sort, setSort] = useState<Sort>("savings");
+  const [selected, setSelected] = useState<string[]>([]);
+
+  function toggleCountry(code: CountryCode) {
+    setCountries((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
+    );
+  }
+
+  function toggleSelect(id: string) {
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : prev.length < 4 ? [...prev, id] : prev,
+    );
+  }
+
+  const results = useMemo(() => {
+    let out = [...listings];
+    if (query) {
+      const q = query.toLowerCase();
+      out = out.filter((l) => l.title.toLowerCase().includes(q));
+    }
+    if (countries.length) out = out.filter((l) => countries.includes(l.country));
+    if (onlyOpps) out = out.filter((l) => l.verdict === "compensa");
+    out.sort((a, b) =>
+      sort === "price"
+        ? a.cost.totalPt - b.cost.totalPt
+        : sort === "recent"
+          ? b.seenAt.localeCompare(a.seenAt)
+          : b.savings - a.savings,
+    );
+    return out;
+  }, [listings, query, countries, onlyOpps, sort]);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Pesquisar</h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            <span className="tnum">{results.length}</span> anúncios · custo final já com ISV
+          </p>
+        </div>
+      </div>
+
+      {/* Pesquisa + país */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Marca ou modelo (ex.: Golf, BMW…)"
+            className="max-w-xs"
+          />
+          <label
+            className={cn(
+              "flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border px-3 text-sm font-medium transition-colors",
+              onlyOpps
+                ? "border-good bg-good-soft text-good"
+                : "border-line-strong text-ink-soft hover:text-ink",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={onlyOpps}
+              onChange={(e) => setOnlyOpps(e.target.checked)}
+              className="sr-only"
+            />
+            Só oportunidades
+          </label>
+          <button
+            type="button"
+            className="flex h-10 items-center gap-1.5 rounded-[6px] border border-line-strong px-3 text-sm text-ink-soft hover:text-ink"
+          >
+            <SlidersHorizontal className="size-4" /> Mais filtros
+          </button>
+          <div className="ml-auto">
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="h-10 rounded-[6px] border border-line-strong bg-surface px-3 text-sm"
+              aria-label="Ordenar"
+            >
+              <option value="savings">Maior poupança</option>
+              <option value="recent">Mais recentes</option>
+              <option value="price">Preço mais baixo</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Chips de país */}
+        <div className="flex flex-wrap gap-2">
+          {COUNTRY_LIST.map((c) => {
+            const active = countries.includes(c.code);
+            return (
+              <button
+                key={c.code}
+                type="button"
+                onClick={() => toggleCountry(c.code)}
+                aria-pressed={active}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "border-petrol bg-petrol text-white"
+                    : "border-line-strong text-ink-soft hover:text-ink",
+                )}
+              >
+                <span aria-hidden>{c.flag}</span>
+                {c.name}
+              </button>
+            );
+          })}
+          {countries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCountries([])}
+              className="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-ink-soft hover:text-ink"
+            >
+              <X className="size-3.5" /> limpar
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Resultados */}
+      {results.length === 0 ? (
+        <div className="rounded-[10px] border border-dashed border-line-strong py-16 text-center text-sm text-ink-soft">
+          Nenhum anúncio com estes filtros.
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {results.map((l) => (
+            <div key={l.id} className="relative">
+              <label className="absolute left-2 top-2 z-10 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(l.id)}
+                  onChange={() => toggleSelect(l.id)}
+                  className="accent-petrol"
+                />
+                Comparar
+              </label>
+              <CarCard listing={l} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Barra de comparação */}
+      {selected.length > 0 && (
+        <div className="sticky bottom-4 z-20 mx-auto flex w-fit items-center gap-3 rounded-full border border-line-strong bg-surface px-4 py-2.5 shadow-lg">
+          <span className="text-sm font-medium">
+            <span className="tnum">{selected.length}</span> selecionado(s)
+          </span>
+          <Button
+            variant="accent"
+            size="sm"
+            disabled={selected.length < 2}
+            onClick={() => router.push(`/comparar?ids=${selected.join(",")}`)}
+          >
+            <GitCompareArrows className="size-4" /> Comparar
+          </Button>
+          <button
+            type="button"
+            onClick={() => setSelected([])}
+            aria-label="Limpar seleção"
+            className="text-ink-soft hover:text-ink"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,128 @@
+@import "tailwindcss";
+
+/* Dark mode via classe (next-themes attribute="class") */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────────────────────────────────────────
+   Tokens — ver docs/01-DESIGN.md
+   Sistema visual: Petróleo + Âmbar.
+   O acento âmbar é SÓ para ação/oportunidade.
+   O veredito (compensa/marginal/não-compensa) é
+   cor semântica, separada do acento.
+   ─────────────────────────────────────────────── */
+:root {
+  --paper: #f3f5f5;
+  --surface: #ffffff;
+  --surface-2: #fafbfb;
+  --ink: #0d1c22;
+  --ink-soft: #5b6b71;
+  --line: #dbe2e3;
+  --line-strong: #c3ced0;
+
+  --petrol: #0e3b4a;
+  --petrol-ink: #0e3b4a;
+  --steel: #3e6b79;
+  --amber: #e8930c;
+  --amber-ink: #9a6200;
+
+  --good: #1e9e57;
+  --good-soft: #e4f3ea;
+  --warn: #c2410c;
+  --bad: #d1403a;
+  --bad-soft: #f7e3e1;
+  --neutral-soft: #e7eced;
+
+  --radius: 6px;
+}
+
+.dark {
+  --paper: #0b1a20;
+  --surface: #10262e;
+  --surface-2: #0e222a;
+  --ink: #e7ecec;
+  --ink-soft: #93a3a8;
+  --line: #21323a;
+  --line-strong: #2c424b;
+
+  --petrol: #0e3b4a;
+  --petrol-ink: #5fbdd0;
+  --steel: #6c9ba8;
+  --amber: #f0a929;
+  --amber-ink: #f0a929;
+
+  --good: #37b36c;
+  --good-soft: #123026;
+  --warn: #e08c4a;
+  --bad: #e5675e;
+  --bad-soft: #35201e;
+  --neutral-soft: #1b2f37;
+}
+
+/* Mapeia os tokens para o tema do Tailwind (bg-surface, text-ink, …) */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-petrol: var(--petrol);
+  --color-petrol-ink: var(--petrol-ink);
+  --color-steel: var(--steel);
+  --color-amber: var(--amber);
+  --color-amber-ink: var(--amber-ink);
+
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-neutral-soft: var(--neutral-soft);
+
+  --font-display: var(--font-archivo), system-ui, sans-serif;
+  --font-sans: var(--font-plex-sans), system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-token: var(--radius);
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  /* Algarismos alinhados em qualquer sítio com dados numéricos */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
