@@ -39,6 +39,29 @@ Flags: `--country <slug|nome-pt>` (repetível), `--make <slug>`, `--max-pages <n
 - `theparking-summary.json` — contagens (total, por país, por fonte), preços, duração.
 - `theparking-checkpoint.json` — progresso + dedupe (permite `--resume`).
 
+### Recolha contínua (polling de recentes) — `watch-theparking.mjs`
+
+Para manter os dados frescos, faz poll da **página de anúncios mais recentes** (página 1,
+que já vem ordenada por data) de X em X tempo, detetando **anúncios novos** e **mudanças
+de preço**. Tudo pronto para produção **exceto o envio para a base de dados** — esse é o
+único ponto a implementar, isolado em [`theparking/sink.mjs`](theparking/sink.mjs)
+(marcado `>>> AQUI ENTRA A BASE DE DADOS <<<`).
+
+```bash
+node watch-theparking.mjs                          # 1 em 1 min, DE/NL/BE/FR (contínuo)
+node watch-theparking.mjs --country belgium --make bmw
+node watch-theparking.mjs --interval 60 --pages 1  # intervalo em segundos
+node watch-theparking.mjs --interval 15 --cycles 3 # teste: 3 ciclos e sai
+```
+
+- **Estado** (`theparking-state.json`): a "tabela" atual `id → última linha` (dedupe +
+  preço), persistida entre reinícios. É o que faríamos upsert numa DB.
+- **Eventos** (`theparking-events.ndjson`): stream append-only de `{event:'new'|'price_change', …registo, id, first_seen, last_seen}`.
+- Emite só **novos** e **preço alterado**; anúncios inalterados só atualizam `last_seen`.
+- ⚠️ **Cadência:** o theparking.eu é agregador (atualiza ~4×/dia), por isso 1 min é
+  conservador — não traz dados mais frescos do que a fonte. Só detetar **remoções** (stock
+  vendido) exigiria um re-crawl periódico mais fundo (fora do âmbito do poller de recentes).
+
 ### Schema de cada registo
 `make, model, variant, year, km, fuel, gearbox, engine, color, doors, category,
 price, currency, country, region, postalCode, source, detail_url, image, collected_at`.

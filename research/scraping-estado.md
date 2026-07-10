@@ -44,7 +44,7 @@
 
 | Site | País | Método | Estado | Coletor | Notas |
 |---|---|---|---|---|---|
-| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟢 A recolher | [`tools/collector/run-theparking.mjs`](../tools/collector/run-theparking.mjs) | ✅ Coletor construído e verificado (HTTP puro, ~66 anúncios/4s). Schema completo (20 campos), fonte por card, dedupe+resume, `--full` p/ cobertura por país×modelo. Investigação: [`theparking-investigacao.md`](theparking-investigacao.md) |
+| theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟢 A recolher | [`tools/collector/`](../tools/collector/) | ✅ Coletor batch (`run-theparking.mjs`) + **recolha contínua** (`watch-theparking.mjs`, poll 1min de recentes, deteta novos + preço alterado). HTTP puro, 20 campos, fonte por card, dedupe+resume. Pronto exceto envio p/ DB (isolado em `theparking/sink.mjs`). Investigação: [`theparking-investigacao.md`](theparking-investigacao.md) |
 | AutoTrader.nl | Holanda | JSON-LD (stack Scout24) | 🔴 Por fazer | — | ~210k; sem anti-bot |
 | Autocasión | Espanha | JSON-LD `Car`+`EngineSpecification` | 🔴 Por fazer | — | ~60k; zero fricção |
 | OcasionPlus | Espanha | JSON-LD `Vehicle` (o mais rico) | 🔴 Por fazer | — | ~20k stock próprio |
@@ -113,5 +113,6 @@
 
 ## Changelog
 
+- **2026-07-10** — **Recolha contínua theparking.eu.** Adicionado modo `watch` (poll de 1min à página de recentes) que deteta anúncios novos + mudanças de preço e emite eventos; estado persistido (`id→linha`). Tudo pronto exceto o upsert na DB, isolado em `theparking/sink.mjs`. Verificado: 3 ciclos, dedup contínuo OK.
 - **2026-07-10** — **theparking.eu 🟢 a recolher.** Coletor construído (`tools/collector/`, HTTP puro sem deps) e verificado ponta-a-ponta: amostra Bélgica/BMW = 66 anúncios em 4s, 20 campos por registo (incl. país/região/CP e fonte original), dedupe+resume validados, multi-país OK. Traz stock de fontes que nos bloqueiam diretamente (gocar.be, marktplaats.nl, autowereld.nl). Secção 2: 1/13.
 - **2026-07-10** — Doc inicial. Tracker das 4 categorias em foco; tudo 🔴/⏸️/⚫ (nenhum coletor estrangeiro construído ainda).
