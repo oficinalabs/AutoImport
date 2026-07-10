@@ -58,9 +58,14 @@ node watch-theparking.mjs --interval 15 --cycles 3 # teste: 3 ciclos e sai
   preço), persistida entre reinícios. É o que faríamos upsert numa DB.
 - **Eventos** (`theparking-events.ndjson`): stream append-only de `{event:'new'|'price_change', …registo, id, first_seen, last_seen}`.
 - Emite só **novos** e **preço alterado**; anúncios inalterados só atualizam `last_seen`.
-- ⚠️ **Cadência:** o theparking.eu é agregador (atualiza ~4×/dia), por isso 1 min é
-  conservador — não traz dados mais frescos do que a fonte. Só detetar **remoções** (stock
-  vendido) exigiria um re-crawl periódico mais fundo (fora do âmbito do poller de recentes).
+- ⚠️ **Cadência:** medição (2026-07-10) dos timestamps de upload das imagens na página de
+  recentes mostra **ingestão em lotes a intervalos irregulares** (de ~1 min a várias horas
+  entre lotes; vários anúncios partilham o mesmo minuto), com o anúncio mais recente ~2-3h
+  atrasado — **não** os "4x/dia" que fontes secundárias afirmavam, nem tempo-real. Fazemos
+  poll de **1 em 1 min** (teto de segurança): apanha os lotes cedo; a maioria dos ciclos
+  encontra 0 novos, o que é esperado.
+- Detetar **remoções** (stock vendido) exigiria um re-crawl periódico mais fundo (fora do
+  âmbito do poller de recentes).
 
 ### Schema de cada registo
 `make, model, variant, year, km, fuel, gearbox, engine, color, doors, category,
