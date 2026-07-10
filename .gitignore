@@ -7,3 +7,4 @@ dist/
 build/
 tools/net-capture/node_modules
 tools/net-capture/out/
+tools/net-capture/package-lock.json
