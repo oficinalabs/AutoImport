@@ -139,6 +139,43 @@ Saída: `autoboerse-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
 ([`lib/sink.mjs`](lib/sink.mjs)). O `--full` fatia por marca (`/fahrzeugsuche/{marca}`); marcas
 densas (VW/Mercedes/BMW/Audi) podem saturar o cap de paginação — corte fino futuro por modelo/preço.
 
+## autocasion.com (quarto coletor)
+
+Marketplace espanhol do grupo **Sumauto** (parceiro da AutoScout24), **~122.700 anúncios**,
+tecnicamente limpo. Segue o **molde theparking** (JSON-LD + extras do card, juntos por ID), não o
+`__NEXT_DATA__`. Investigação: [`../../research/autocasion-investigacao.md`](../../research/autocasion-investigacao.md).
+
+- **Fonte = 1 bloco `application/ld+json` por página = array de 26 `Product`**; cada um traz
+  `offers.itemOffered` = `Car` com `EngineSpecification` (make/model/variant/year/km/gearbox/
+  potência BHP/color/doors/bodyType/price/url/image/identifier).
+- **Faltam ao JSON-LD `fuel`, região e dealer** → vêm do **card HTML** (`<article class="anuncio">`:
+  `<ul>` [ano, combustível, km, província] + `<div class="concesionario">` nome/rating). Junta-se
+  card↔JSON-LD pelo `identifier` (= o `ref…` do URL / o `data-product-key` do card).
+- **Anti-bot Cloudflare passivo** (200 sem challenge com UA de browser). HTTP puro; rate-limit + retry.
+- **Paginação `?page=N`**; rota `/coches-ocasion`. O `--full` fatia por marca via páginas SEO
+  `/coches-segunda-mano/{marca}-ocasion` (slugs descobertos na 1ª página, ~115).
+
+```bash
+# batch
+node run-autocasion.mjs --max-pages 3                 # amostra
+node run-autocasion.mjs --brand audi --max-pages 2    # só uma marca (SEO /…-ocasion)
+node run-autocasion.mjs --full --max-pages 500        # cobertura fatiada por marca
+node run-autocasion.mjs --resume
+
+# recolha contínua (1 min)
+node watch-autocasion.mjs                              # contínuo
+node watch-autocasion.mjs --interval 60 --pages 2
+```
+
+Saída: `autocasion-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`autocasion-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). Extras próprios no registo: `source_site`, `id`, `dealer`,
+`dealer_rating`, `power_hp`, `condition`, `certified`.
+
+> ⚠️ **Recência (como o AutoTrader):** o "Ordenar" só tem Relevancia + Preço — **sem sort por data**.
+> O watch usa a ordem default (Relevancia) da página 1 como **proxy** e loga o `max(identifier)`
+> (id crescente = mais recente) como sinal; a captura exaustiva de novos depende do re-crawl batch.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -152,9 +189,12 @@ autotrader/               __NEXT_DATA__ SSR (marketplace NL, stack Scout24)
   http · parse · schema · crawl · watch
 autoboerse/               __NEXT_DATA__ SSR (marketplace DE, ~263k, recência real via createdAt)
   http · parse · schema · crawl · watch
+autocasion/               JSON-LD Product+Car + card (marketplace ES, ~122k, molde theparking)
+  http · parse · schema · crawl · watch
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
 run-autoboerse.mjs / watch-autoboerse.mjs      CLIs
+run-autocasion.mjs / watch-autocasion.mjs      CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
