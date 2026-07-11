@@ -40,19 +40,18 @@
 
 *JSON-LD/SSR estruturado, sem anti-bot ativo, robots tolerante. Prioridade de arranque — reutilizar o padrão JSON-LD já validado no coletor do OParking.*
 
-**Progresso:** 2/13 a recolher.
+**Progresso:** 3/13 a recolher.
 
 | Site | País | Método | Estado | Coletor | Notas |
 |---|---|---|---|---|---|
 | AutoTrader.nl | Holanda | `__NEXT_DATA__` SSR (20/página) | 🟢 A recolher | [`tools/collector/run-autotrader.mjs`](../tools/collector/run-autotrader.mjs) | ✅ Coletor batch + contínuo (1min). Stack Scout24 (molde p/ AutoScout24). ~233k NL, sem anti-bot, robots-clean. `--full` fatia por faixa de preço. Watch usa `sort=age` (proxy de recência — sem sort por data). Investigação: [`autotrader-investigacao.md`](autotrader-investigacao.md) |
 | theparking.eu | BE + multi-país | JSON-LD `Vehicle` (27/página) | 🟢 A recolher | [`tools/collector/`](../tools/collector/) | ✅ Coletor batch (`run-theparking.mjs`) + **recolha contínua** (`watch-theparking.mjs`, poll 1min de recentes, deteta novos + preço alterado). HTTP puro, 20 campos, fonte por card, dedupe+resume. Pronto exceto envio p/ DB (isolado em `theparking/sink.mjs`). Investigação: [`theparking-investigacao.md`](theparking-investigacao.md) |
-| AutoTrader.nl | Holanda | JSON-LD (stack Scout24) | 🔴 Por fazer | — | ~210k; sem anti-bot |
+| autoboerse.de | Alemanha | `__NEXT_DATA__` SSR (18/página) | 🟢 A recolher | [`tools/collector/run-autoboerse.mjs`](../tools/collector/run-autoboerse.mjs) | ✅ Coletor batch + contínuo (1min). ~263k DE, Incapsula passivo, robots-clean. `--full` fatia por marca (`/fahrzeugsuche/{marca}`). **Recência REAL**: `?orderBy=date` (default) + `createdAt` por anúncio. Dados riquíssimos (potência kW/PS, CO2 WLTP, TÜV, dono/acidentes, dealer, cidade/CP). Investigação: [`autoboerse-investigacao.md`](autoboerse-investigacao.md) |
 | Autocasión | Espanha | JSON-LD `Car`+`EngineSpecification` | 🔴 Por fazer | — | ~60k; zero fricção |
 | OcasionPlus | Espanha | JSON-LD `Vehicle` (o mais rico) | 🔴 Por fazer | — | ~20k stock próprio |
 | Flexicar | Espanha | JSON-LD `Vehicle` | 🔴 Por fazer | — | rede de concessionários |
 | Aramisauto | França | JSON-LD `Car`/`Offer` | 🔴 Por fazer | — | robots permite (crawl-delay 5) |
 | Trovit (autos/voiture/coches) | DE·FR·ES | JSON-LD `Car`+`Offer` (25/página) | 🔴 Por fazer | — | ⚠️ robots bloqueia ClaudeBot; agrega vários portais |
-| autoboerse.de | Alemanha | `__NEXT_DATA__` | 🔴 Por fazer | — | ~264k |
 | MeinAuto.de | Alemanha | `__NUXT__` | 🔴 Por fazer | — | seminovos/leasing |
 | Quoka.de | Alemanha | JSON-LD `Vehicle` (20/página) | 🔴 Por fazer | — | Cloudflare passivo |
 | Ooyyo (BE) | Bélgica | JSON-LD `Car` | 🔴 Por fazer | — | ~72k; agrega sites difíceis (ex. Autolive.be) |
@@ -114,6 +113,7 @@
 
 ## Changelog
 
+- **2026-07-11** — **autoboerse.de 🟢 a recolher (3/13).** Coletor batch + contínuo (mesma lógica do theparking/autotrader) via `__NEXT_DATA__` SSR, reutilizando o `lib/` genérico. ~263k anúncios DE, Incapsula passivo, robots-clean. `--full` fatia por marca (`brands[]` → `/fahrzeugsuche/{marca}`). Vantagem: **recência real** (`?orderBy=date` default + `createdAt` por anúncio) → watch fiável. Verificado: amostra 54 anúncios/8s com campos ricos preenchidos, `--resume` p/ 5 págs (88) sem duplicar, watch 2 ciclos (só novos reais), guarda robots bloqueia os 4 paths disallow, imagem CDN 200. Investigação: [`autoboerse-investigacao.md`](autoboerse-investigacao.md).
 - **2026-07-10** — **AutoTrader.nl 🟢 a recolher (2/13).** Coletor batch + contínuo (mesma lógica do theparking) sobre a stack Scout24, via `__NEXT_DATA__` SSR. Extraído código genérico para `tools/collector/lib/` (http, normalize, sink) — reutilizado por ambos; theparking refatorado e re-verificado. Verificado: amostra 56 anúncios/5s, watch dedup OK, resume OK, guarda robots bloqueia `/api/`.
 - **2026-07-10** — **Recolha contínua theparking.eu.** Adicionado modo `watch` (poll de 1min à página de recentes) que deteta anúncios novos + mudanças de preço e emite eventos; estado persistido (`id→linha`). Tudo pronto exceto o upsert na DB, isolado em `theparking/sink.mjs`. Verificado: 3 ciclos, dedup contínuo OK.
 - **2026-07-10** — **theparking.eu 🟢 a recolher.** Coletor construído (`tools/collector/`, HTTP puro sem deps) e verificado ponta-a-ponta: amostra Bélgica/BMW = 66 anúncios em 4s, 20 campos por registo (incl. país/região/CP e fonte original), dedupe+resume validados, multi-país OK. Traz stock de fontes que nos bloqueiam diretamente (gocar.be, marktplaats.nl, autowereld.nl). Secção 2: 1/13.

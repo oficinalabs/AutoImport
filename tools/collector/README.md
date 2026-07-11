@@ -109,6 +109,36 @@ Saída: `autotrader-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
 > usa `sort=age&desc=1` (1ª-registo mais recente) como **proxy** — a captura exaustiva de novos
 > anúncios depende do re-crawl batch periódico.
 
+## autoboerse.de (terceiro coletor)
+
+Marketplace alemão grande (~263 mil anúncios; rede de concessionários parceiros da Santander),
+tecnicamente limpo. Investigação: [`../../research/autoboerse-investigacao.md`](../../research/autoboerse-investigacao.md).
+
+- **Fonte = `__NEXT_DATA__` (SSR)**: `props.pageProps.classifieds.classifiedList[]` (18/página) +
+  `.total`; `brands[]`/`provinces[]` (contagens) servem de seed ao `--full`. Dados riquíssimos por
+  anúncio (preço, veículo, potência kW/PS, CO2 WLTP, TÜV, dono anterior, acidentes, dealer, cidade/CP).
+- **Anti-bot Imperva/Incapsula passivo** (cookies de sessão; sem challenge). HTTP puro; rate-limit + retry.
+- **Paginação `?page=N`**; rota `/fahrzeugsuche`. Host canónico **sem `www`**.
+- ✅ **Recência REAL**: ordena por data (`?orderBy=date`, o default) **e** cada anúncio traz
+  `createdAt` — o watch deteta novos de forma fiável (vantagem vs AutoTrader).
+
+```bash
+# batch
+node run-autoboerse.mjs --max-pages 3                    # amostra
+node run-autoboerse.mjs --brand volkswagen --max-pages 5 # só uma marca (slug do path)
+node run-autoboerse.mjs --full --max-pages 500           # cobertura fatiada por marca
+node run-autoboerse.mjs --resume
+
+# recolha contínua (1 min)
+node watch-autoboerse.mjs                                 # contínuo
+node watch-autoboerse.mjs --interval 60 --pages 2
+```
+
+Saída: `autoboerse-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`autoboerse-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). O `--full` fatia por marca (`/fahrzeugsuche/{marca}`); marcas
+densas (VW/Mercedes/BMW/Audi) podem saturar o cap de paginação — corte fino futuro por modelo/preço.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -120,8 +150,11 @@ theparking/               JSON-LD Vehicle (agregador, multi-país)
   http · parse · schema · sitemap · crawl · watch · sink   (wrappers finos + específicos)
 autotrader/               __NEXT_DATA__ SSR (marketplace NL, stack Scout24)
   http · parse · schema · crawl · watch
+autoboerse/               __NEXT_DATA__ SSR (marketplace DE, ~263k, recência real via createdAt)
+  http · parse · schema · crawl · watch
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
+run-autoboerse.mjs / watch-autoboerse.mjs      CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
