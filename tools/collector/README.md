@@ -293,6 +293,252 @@ Saída: `aramisauto-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
 > default de `/achat/` como **proxy** e loga o `max(vehicleId)` (id crescente = mais recente) como sinal;
 > a captura exaustiva de novos depende do re-crawl batch.
 
+## coches.trovit.es (oitavo coletor)
+
+Secção de automóveis de Espanha do **Trovit** (agregador do grupo **Lifull Connect**), **HTTP puro
+sem anti-bot**. Segue o **molde theparking/autocasion** (JSON-LD + extras do card, juntos por ID).
+Investigação: [`../../research/trovit-investigacao.md`](../../research/trovit-investigacao.md).
+
+- **Fonte = 1 bloco `application/ld+json` por página = `SearchResultsPage` com `about[]` de 25 `Car`**
+  (make/model/description/year/km/price/doors/image). Junta-se ao **card** (`data-id`, thribee href,
+  `item-address`, `item-updated-date`) pelo **id** do anúncio (path da imagem ↔ `data-id`).
+- **`fuel`/`gearbox`/potência** não têm campo estruturado → regex sobre `description`+`name`+título do
+  card. `detail_url`/região/recência vêm do card.
+- **⚠️ Agregador com origem escondida:** o link aponta para `rd.clk.thribee.com` (robots `Disallow: /`)
+  que esconde o site de origem → **não o resolvemos**; `source`=null, `source_site`='coches.trovit.es',
+  dedupe por `id`.
+- **⚠️ robots:** bloqueia bots nomeados (ClaudeBot/Ahrefs/…) mas o grupo `*` permite a listagem
+  `/coches/{slug}` — usamos UA de browser, honrando o grupo `*`.
+- **Rota `/coches/{slug}`, paginação no PATH** (`/coches/audi/2`). **Sem página "todos os coches"** →
+  `--full` fatia por **marca** (lista fixa `MARCAS`). `--brand` aceita qualquer faceta (marca/cidade/
+  região/modelo). Default sem flags: slug `madrid`.
+- **✅ Recência real:** `?order_by=source_date` ("más recientes") + "Hace 21 h" por card → watch fiável.
+
+```bash
+# batch
+node run-trovit.mjs --max-pages 3                 # amostra (slug default: madrid)
+node run-trovit.mjs --brand audi --max-pages 2    # uma faceta (marca/cidade/região/modelo)
+node run-trovit.mjs --full --max-pages 500        # cobertura fatiada por marca
+node run-trovit.mjs --resume
+
+# recolha contínua (1 min, sort por data)
+node watch-trovit.mjs                             # slug default (madrid), contínuo
+node watch-trovit.mjs --slug audi --interval 60 --pages 2
+```
+
+Saída: `trovit-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `trovit-state.json` /
+`-events.ndjson` (watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras
+próprios: `source_site`, `id`, `power_cv`, `updated_text`, `updated_ago_min`, `is_new`, `title`.
+
+> ⚠️ **Limitações:** `source` (origem) = null (redirecionador com robots `Disallow: /`); `fuel`/
+> `gearbox` incompletos nas facetas de cidade (texto de marketing) — bem mais ricos por marca (`--full`).
+
+## meinauto.de (nono coletor)
+
+Marketplace alemão (agrega stands, origem "MARA") que **mistura novos e usados** — filtramos SEMPRE
+`conditionCategories=PRE_OWNED` para apanhar só os **Gebrauchtwagen** (**~9.100 anúncios** com preço/km/
+ano reais). Segue o **molde aramisauto** (app Nuxt), mas é **Nuxt 3**: o payload SSR vem num
+`<script id="__NUXT_DATA__" type="application/json">` em **JSON puro** (formato *devalue flatten*, com
+referências por índice) → `JSON.parse` + re-hidratação do grafo (`unflatten`), **sem `node:vm`** (o
+aramisauto/Nuxt 2 usava IIFE avaliada em sandbox). Investigação: [`../../research/meinauto-investigacao.md`](../../research/meinauto-investigacao.md).
+
+- **Fonte = `root.pinia.results` = { meta, results }** (47/pág). `results[]` traz todos os campos
+  (make/model/trim/1ª-matrícula/km/combustível/caixa/cilindrada/cor/portas/carroçaria/preço/stand/
+  morada/CO2/potência/dono/acidentes/`createdAt`). `meta.totalResults` + `meta.counts` (facetas → seed do `--full`).
+- **Preço** = `calculation.purchasePrice` (float → `Math.round`, NÃO `toInt`). `detail_url` =
+  `/fahrzeugsuche/detail/{id}`; `image` = `assets-meinauto.de/{path}`. `source`=stand, `region`=Bundesland, `postalCode`+`city` por anúncio.
+- **Anti-bot passivo** (stack Google envoy + GCLB; Baqend Speedkit). HTTP puro; robots-clean (só `/envkv/`,
+  `/motoren/`, `/ausstattung/`); sem Crawl-delay → rate default 1500ms.
+- **Paginação `?page=N`** (rota `/fahrzeugsuche/`, barra final obrigatória) **SEM teto de offset** — a
+  query única cobre os ~9.100 usados (~194 págs). O `--full` fatia mesmo assim por **marca** (`makes={nome}`,
+  ~47 nomes de `meta.counts.makes`); `--brand <Nome>` filtra uma marca.
+
+```bash
+# batch
+node run-meinauto.mjs --max-pages 3                 # amostra (usados)
+node run-meinauto.mjs --brand Audi --max-pages 2    # só uma marca (makes=Audi)
+node run-meinauto.mjs --full --max-pages 500        # cobertura fatiada por marca
+node run-meinauto.mjs --resume
+
+# recolha contínua (1 min)
+node watch-meinauto.mjs                              # contínuo
+node watch-meinauto.mjs --interval 60 --pages 2
+```
+
+Saída: `meinauto-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`meinauto-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). Extras próprios no registo: `source_site`, `id`, `seller_slug`, `city`,
+`power_kw`, `co2`, `previous_owner`, `accidents`, `first_registration`, `usage_type`, `condition_category`,
+`emission_class`, `total_list_price`, `images`, `listing_created_at`.
+
+> ✅ **Recência REAL** (como o autoboerse): `sortBy=createdAt&order=desc` ordena por data de criação
+> (topo da p1 = anúncios do próprio dia) E cada anúncio traz `createdAt` → deteção de novos fiável no watch.
+
+## quoka.de (décimo coletor)
+
+Classificados alemães generalistas (secção de carros = "Automarkt"), **P2P (particulares)**. Segue
+o **molde theparking/autocasion** (JSON-LD + card, juntos por ID), mas aqui o **card HTML é a fonte
+principal** e o JSON-LD é complementar (dá a cilindrada). Investigação:
+[`../../research/quoka-investigacao.md`](../../research/quoka-investigacao.md).
+
+- **Fonte 1 = 1 bloco `application/ld+json` = `ItemList` com 20 `Vehicle`**: `offers.price`,
+  `vehicleModelDate`, `fuelType`, `vehicleEngine.engineDisplacement` (cm³), `url` (hash de join).
+- **Fonte 2 = card `div.article-item`** (20 regulares + ~1 Premium promovido, este só no HTML):
+  título (make/model em texto livre), `ano | combustível | km`, cidade/Bundesland, **data de
+  publicação**, preço (e preço antigo se houve descida), nº de fotos, hash (join), UUID. Junta-se
+  card↔JSON-LD pelo hash de 32 chars do URL.
+- **P2P:** o card **não nomeia o vendedor** → `source='particular'`. `make`/`model` vêm do slug da
+  query (`--full`/`--brand`, marca 100%) ou de um dicionário sobre o título (listagem geral,
+  ~81%/71%). `gearbox`/`color`/`doors` não estruturados (gearbox best-effort por regex).
+- **Anti-bot Cloudflare passivo** (200 sem challenge com UA de browser). HTTP puro; rate-limit + retry.
+- **Paginação `?pag=N`**; rota `/anzeigen/auto-motorrad/automarkt/`. O `--full` fatia por marca via
+  path `/automarkt/{marca}/` (87 slugs descobertos na 1ª página, filtrando os 16 Bundesländer).
+
+```bash
+# batch
+node run-quoka.mjs --max-pages 3                        # amostra
+node run-quoka.mjs --brand volkswagen --max-pages 5     # só uma marca (slug do path)
+node run-quoka.mjs --full --max-pages 500               # cobertura fatiada por marca
+node run-quoka.mjs --resume
+
+# recolha contínua (1 min)
+node watch-quoka.mjs                                    # contínuo
+node watch-quoka.mjs --interval 60 --pages 2
+```
+
+Saída: `quoka-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `quoka-state.json` /
+`-events.ndjson` (watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras
+próprios no registo: `source_site`, `id` (hash), `article_id` (UUID), `city`, `price_old`, `images`,
+`listing_date`, `premium`, `verified_phone`, `description`.
+
+> ✅ **Recência REAL:** sort default `date` ("Neueste Anzeigen") + `listing_date` por anúncio
+> ("heute HH:MM") → deteção de novos fiável (o watch força `?sort=date`; o card Premium fixo no
+> topo é deduplicado pelo hash).
+
+## ooyyo.com — Bélgica (décimo-primeiro coletor)
+
+**Ooyyo** é um **agregador/motor de busca** de carros usados (indexa dezenas de sites de origem),
+secção **Bélgica** = `idCountry=23`, **~72.060 anúncios**. Host: `www.ooyyo.com` (NÃO `ooyyo.be`, que
+é um blog de aluguer). Molde **card HTML server-rendered** (família theparking, mas o card é a fonte
+completa — sem JSON-LD/`__NEXT_DATA__`). Investigação: [`../../research/ooyyo-investigacao.md`](../../research/ooyyo-investigacao.md).
+
+- **Chegada à listagem via API interna** `GET /ooyyo-services/resources/quicksearch/qselements?json={…}`
+  (`idCountry:23, idLanguage:47, idCurrency:3, isNew:0, qsType:advanced`; sem `code`). Devolve o **URL
+  da 1ª SRP** (com `code` válido), o **`count`** e as **marcas** (seed do `--full`). Servida em
+  `www.ooyyo.com` (o host `analytics.ooyyo.com` é gated → "forbidden!").
+- **Fonte = card `<a class="car-card-1">`** (15/pág) na SRP `/belgium/…used-cars-for-sale/c=<code>/`:
+  year/make/model/engine, preço (`data-price`), km, carroçaria+combustível(+cor) por **vocabulário**,
+  cidade, e o **site de origem** no URL da imagem (proxy `images.ooyyo.com/…?url=<origem>/…`).
+- **`source`** = site de origem do anúncio (agregador: autolive.be, autoline.be, moniteurautomobile.be,
+  woowmotors.com…). `source_site='ooyyo.com'`. Dedupe por `id` (`data-record`, hash único).
+- **Anti-bot Cloudflare passivo** (200 sem challenge). HTTP puro; **`Crawl-delay: 30`** → `--rate`
+  default **30000ms** (honra o robots). Disallow `/automobili/`, `/outlet-service-web/`, `/counter`
+  não tocados.
+- **Paginação = seguir "Next"** (o `code` codifica a página). O `--full` fatia por **marca** via
+  `qselements idMake` (BMW → `/belgium/used-bmw-for-sale/…`, ~9k); o análogo do `--brand` é `--make`.
+
+```bash
+# batch
+node run-ooyyo.mjs --max-pages 3                 # amostra (toda a Bélgica)
+node run-ooyyo.mjs --make bmw --max-pages 2      # só uma marca (via qselements idMake)
+node run-ooyyo.mjs --full --max-pages 500        # cobertura fatiada por marca
+node run-ooyyo.mjs --resume
+
+# recolha contínua (1 min)
+node watch-ooyyo.mjs                             # contínuo
+node watch-ooyyo.mjs --interval 60 --pages 2
+```
+
+Saída: `ooyyo-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `ooyyo-state.json` /
+`-events.ndjson` (watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras
+próprios no registo: `source_site`, `id`, `source_host`, `deal`, `save_percent`, `image_count`.
+
+> ⚠️ **Recência (como o AutoTrader):** a SRP não tem sort por data e os ids são hashes (não
+> sequenciais). O watch usa a ordem default da SRP como **proxy**; a captura exaustiva de novos
+> depende do re-crawl batch (`--full`).
+
+## Autoline / Via-Mobilis (BE — ligeiros) (décimo-segundo coletor)
+
+Coletor do **autoline.pt**, o marketplace pan-europeu do grupo **Via Mobilis / LineMedia**. Recolhe a
+secção **país = Bélgica**, categoria **CARROS** (`--c1169`, passenger cars). ⚠️ O autoline é sobretudo de
+**veículos comerciais/pesados e máquinas**, mas tem categoria de ligeiros — que é a que recolhemos;
+a fatia BE é **quase toda de LEILÃO** (Troostwijk/Auctim/AuctionPort/VAVATO) e inclui alguns
+ligeiros-comerciais leves (Sprinter/Transit/Master). ~590 anúncios BE (~11k ligeiros em toda a UE).
+Investigação: [`../../research/autoline-investigacao.md`](../../research/autoline-investigacao.md).
+
+- **HTTP puro, sem anti-bot.** Fonte = **card HTML (primário) + JSON-LD `ItemList`→`Product`
+  (enriquecimento)**, juntos por ID. O card é a spine porque o JSON-LD vem vazio nalguns países (GB).
+- **Rota:** `/-/carros/{Pais}--c1169cnt{CC}`, paginação `?page=N`. `--full` fatia por **país**
+  (facets UE: DE/BE/GB/FR/ES/CH); `--country <CC>` para uma fatia (default BE).
+- **Recência real:** o `id` (data-code) é um timestamp de criação → `created_at`; watch loga `max(id)`
+  (robots proíbe `?sort=`).
+
+```bash
+# batch
+node run-autoline.mjs --max-pages 3                 # amostra (Bélgica)
+node run-autoline.mjs --country DE --max-pages 2    # outra secção-país
+node run-autoline.mjs --full --max-pages 500        # cobertura fatiada por país
+node run-autoline.mjs --resume
+
+# recolha contínua (1 min)
+node watch-autoline.mjs                              # contínuo
+node watch-autoline.mjs --interval 60 --pages 2
+```
+
+Saída: `autoline-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `autoline-state.json` /
+`-events.ndjson` (watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras
+próprios: `source_site`, `id`, `dealer`, `is_auction`, `condition`, `ref_code`, `power`, `axle_config`,
+`body_type`, `euro_norm`, `first_registration`, `created_at`.
+
+> ⚠️ **Qualidade do stock:** o autoline é sobretudo comerciais/pesados/máquinas; a fatia de ligeiros
+> BE (~590) é quase toda de leilão e ~23% sem preço fixo (só "Leilão"). É o alvo de menor qualidade —
+> recolhível e normalizado para o schema comum, mas avaliar se compensa manter.
+
+## autohero.com (décimo-terceiro coletor)
+
+Retalhista de usados de **stock próprio** do grupo **AUTO1** (multi-país; recolhemos o mercado
+**Alemanha /de/**), **~7.442 anúncios DE**, tecnicamente limpo. É uma **SPA Apollo/GraphQL**: o SSR
+(`window.__APOLLO_STATE__`) só traz ~24-30 resultados e ignora `?page=N` — a paginação real é por uma
+**API GraphQL interna no MESMO host**, que usamos diretamente. Investigação:
+[`../../research/autohero-investigacao.md`](../../research/autohero-investigacao.md).
+
+- **Fonte = API GraphQL** `POST /v1/retail-customer-gateway/graphql` (operação `searchAdV9AdsV2`,
+  query+endpoint extraídos do bundle da app). O resolver devolve um **escalar JSON** `{total, data[]}`
+  (sem sub-seleção → vem tudo), **sem autenticação**. Campos ricos: preço, km, potência kW/PS, CO2,
+  nº donos/acidentes/danos, livro de revisões, histórico de preço, sucursal, e **datas de publicação**.
+- **`source`='Autohero'** (stock próprio, não é agregador de stands); `country`='GERMANY',
+  `currency`='EUR'. `region`/`postalCode`=null (retalhista nacional; sucursal em `branch_*`).
+  `color`/`doors`/`category`=null (não vêm nesta projeção). Códigos `fuelType`/`gearType` mapeados.
+- **Paginação por `limit`(≤100)/`offset`** com sort determinístico `newest_eligible` → cobertura
+  completa do catálogo em ~75 pedidos, **sem facetas** (a API já é paginável — mais simples que o
+  Flexicar). Anti-bot CloudFront passivo (HTTP puro passa). O `http.mjs` acrescenta um `postGraphql`
+  que reaproveita rate-limit/robots/cookies do cliente base.
+- **robots-clean** — só proíbe `myhero/inspection/checkout/identify/center/unsubscribe`; **a API está
+  no mesmo host e o seu path NÃO é proibido** (verificado, ao contrário do Flexicar).
+
+```bash
+# batch
+node run-autohero.mjs --max-pages 3                 # amostra (3 págs × 100)
+node run-autohero.mjs --full --max-pages 100        # catálogo completo (~75 págs)
+node run-autohero.mjs --sort most_popular           # sort alternativo (popularidade)
+node run-autohero.mjs --resume
+
+# recolha contínua (1 min)
+node watch-autohero.mjs                              # contínuo
+node watch-autohero.mjs --interval 60 --pages 2
+```
+
+Saída: `autohero-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`autohero-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). Extras no registo: `source_site`, `id` (UUID), `stock_number`,
+`power_kw`/`power_ps`, `drive_train`, `co2`, `first_registration`, `preowner_count`, `accidents`,
+`damages`, `has_service_book`, `monthly_payment`, `price_previous`/`price_first`, `branch_city`/`branch_zip`,
+`listing_first_published_at`, `is_coming_soon`, `retail_ad_state`.
+
+> ✅ **Recência REAL** (vantagem sobre aramisauto/autotrader): sort `newest_eligible` + `firstPublishedAt`
+> por anúncio. O watch pede o topo por recência e loga o `max(firstPublishedAt)` por ciclo.
+> ⚠️ Depende de uma query GraphQL extraída do bundle da app — mais frágil que SSR se a app mudar.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -314,6 +560,18 @@ flexicar/                 __NEXT_DATA__ SSR (stock próprio ES, ~22k; cobertura 
   http · parse · schema · crawl · watch
 aramisauto/               __NUXT__ SSR via node:vm (retalhista FR, ~3k; --full por categoria)
   http · parse · schema · crawl · watch
+trovit/                   JSON-LD SearchResultsPage + card (agregador ES, molde theparking)
+  http · parse · schema · crawl · watch
+meinauto/                 __NUXT_DATA__ Nuxt 3 devalue (usados DE ~9k; filtro PRE_OWNED)
+  http · parse · schema · crawl · watch
+quoka/                    card HTML primário + JSON-LD (classificados P2P DE)
+  http · parse · schema · crawl · watch
+ooyyo/                    API qselements + SRP server-rendered (agregador BE ~72k)
+  http · parse · schema · crawl · watch
+autoline/                 card HTML + JSON-LD (Via Mobilis BE; --full por país; ⚠ leilão/comerciais)
+  http · parse · schema · crawl · watch
+autohero/                 API GraphQL interna (AUTO1 DE ~7k; postGraphql no host wrapper)
+  http · parse · schema · crawl · watch
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
 run-autoboerse.mjs / watch-autoboerse.mjs      CLIs
@@ -321,6 +579,12 @@ run-autocasion.mjs / watch-autocasion.mjs      CLIs
 run-ocasionplus.mjs / watch-ocasionplus.mjs    CLIs
 run-flexicar.mjs / watch-flexicar.mjs          CLIs
 run-aramisauto.mjs / watch-aramisauto.mjs      CLIs
+run-trovit.mjs / watch-trovit.mjs              CLIs
+run-meinauto.mjs / watch-meinauto.mjs          CLIs
+run-quoka.mjs / watch-quoka.mjs                CLIs
+run-ooyyo.mjs / watch-ooyyo.mjs                CLIs
+run-autoline.mjs / watch-autoline.mjs          CLIs
+run-autohero.mjs / watch-autohero.mjs          CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
