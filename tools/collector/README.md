@@ -539,6 +539,174 @@ Saída: `autohero-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
 > por anúncio. O watch pede o topo por recência e loga o `max(firstPublishedAt)` por ciclo.
 > ⚠️ Depende de uma query GraphQL extraída do bundle da app — mais frágil que SSR se a app mudar.
 
+---
+
+# Coletores do mercado nacional (Portugal)
+
+Fontes PT (secção 5 do `scraping-estado.md`) — o lado nacional da comparação de preço. Padrão comum:
+o SSR embute o estado da listagem e a **API interna costuma estar robots-proibida** → usamos sempre o
+HTML/SSR permitido. Todos passam com **HTTP puro** (sem proxies/stealth).
+
+## standvirtual.com (décimo-quarto coletor)
+
+Maior marketplace de usados de **Portugal** (grupo OLX/Adevinta; irmão do OTOMOTO), **~42,3k anúncios**,
+stands **e** particulares. Investigação: [`../../research/standvirtual-investigacao.md`](../../research/standvirtual-investigacao.md).
+
+- **Fonte = `__NEXT_DATA__` → urqlState (SSR)**: `advertSearch.edges[].node` (32/página) + `totalCount`.
+  Node rico: preço, localização (cidade/região), `seller.__typename` (stand vs particular),
+  `sellerLink.name` (nome do stand), `thumbnail` (olxcdn) e `parameters[]` (make/model/version/fuel/
+  gearbox/km/cilindrada/potência/ano).
+- **⚠️ NÃO usamos a API GraphQL**: o robots proíbe `/api/` e `/ajax/`. Como o SSR da listagem já traz
+  os anúncios (ramo `Allow: /`), recolhemos só o HTML de `/carros`.
+- **Anti-bot DataDome passivo** (200 com UA de browser, sem challenge). HTTP puro; minDelay 2500ms + retry.
+- **Paginação `?page=N`, SEM cap** (chega ao fim do catálogo, ~1324 págs) → `--full` pagina direto,
+  sem fatiar por marca. `--brand {slug}` (ex. `bmw`, `mercedes-benz`) restringe a uma marca.
+- ✅ **Recência REAL**: sort `search[order]=created_at_first:desc` + `createdAt` por anúncio → watch fiável.
+
+```bash
+# batch
+node run-standvirtual.mjs --max-pages 3              # amostra
+node run-standvirtual.mjs --brand bmw --max-pages 5  # só uma marca (slug do path)
+node run-standvirtual.mjs --full                     # cobertura completa (~1324 págs)
+node run-standvirtual.mjs --resume
+
+# recolha contínua (1 min)
+node watch-standvirtual.mjs                          # contínuo
+node watch-standvirtual.mjs --interval 60 --pages 2
+```
+
+Saída: `standvirtual-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
+`standvirtual-state.json` / `-events.ndjson` (watch). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). `seller_type` distingue stand/particular.
+
+## olx.pt (décimo-quinto coletor)
+
+Secção de carros do **OLX Portugal** (`/carros-motos-e-barcos/carros/`, grupo OLX/Adevinta), **~50,8k
+carros**, stands **e** particulares (via `seller_type` business/private). Investigação:
+[`../../research/olxpt-investigacao.md`](../../research/olxpt-investigacao.md).
+
+- **Fonte = SSR `window.__PRERENDERED_STATE__`** (React SPA que embute o estado no HTML) →
+  `state.listing.listing.ads[]` (52/página), com o array `params[]` (atributos do carro chave→valor),
+  `createdTime` (recência real), `price`, `location`, `user`, `isBusiness`, `photos`. HTTP puro, sem browser.
+- **⚠️ API não usada (robots):** o `robots.txt` tem `Disallow: /api/`, logo a API `/api/v1/offers` (JSON
+  paginável por offset, para onde apontam os `links.next` do estado) é **proibida** — ficamos no SSR humano,
+  que é permitido. O guard `assertAllowed` bloqueia `/api/` por segurança.
+- **Anti-bot passivo** (200 com UA de browser + `Accept-Language: pt-PT`). Sem proxies/stealth.
+- **Paginação `?page=N`** (teto 100 págs × 52 ≈ 5.200/faceta) → `--full` **fatia por marca** (path SEO
+  `/carros/{marca}/`, ~40 slugs); `--make`/`--region`. As 2 marcas mais densas (BMW/Mercedes ~5,5k)
+  passam ligeiramente o teto de 100 págs e truncam (corte fino futuro: marca×distrito).
+- **make** detetada do título (o OLX não tem param de marca) e, no `--full`, carimbada pela faceta.
+  color/doors/postalCode = null (não expostos na listagem).
+- ✅ **Recência REAL**: `?search[order]=created_at:desc` (honrado pelo SSR) + `createdTime` por anúncio.
+
+```bash
+node run-olxpt.mjs --max-pages 3                # amostra (3×52 ≈ 156)
+node run-olxpt.mjs --make bmw --max-pages 5     # uma marca (/carros/bmw/)
+node run-olxpt.mjs --region porto --max-pages 5 # um distrito (/carros/porto/)
+node run-olxpt.mjs --full --max-pages 100       # catálogo completo, fatiado por marca
+node run-olxpt.mjs --resume
+node watch-olxpt.mjs --interval 60 --pages 2    # contínuo, por recência
+```
+
+Saída: `olxpt-*` (batch/watch, igual aos outros). Pronto exceto o upsert na DB
+([`lib/sink.mjs`](lib/sink.mjs)). Extras: `seller_type` (business/private), `power_hp`, `body_type`,
+`seats`, `origin` (imported/national), `first_registration`, `created_time`.
+
+## custojusto.pt (décimo-sexto coletor)
+
+Marketplace português de usados (grupo Schibsted), **~26,4k carros**, tecnicamente limpo.
+Investigação: [`../../research/custojusto-investigacao.md`](../../research/custojusto-investigacao.md).
+
+- **Fonte = `__NEXT_DATA__` (SSR, flag `__N_SSP`)**: `props.pageProps.listItems[]` (40/página) +
+  total real em `initialState.search.resources.totalAds` (~26.412). A taxonomia `carBrands` (75
+  marcas) e `baseLocations` (20 distritos) vêm no mesmo SSR e semeiam o `--full`.
+- **make** casado contra `carBrands` (robusto p/ multi-palavra); **model/variant** por corte do
+  título; **km/power_hp** best-effort por regex (texto livre); color/doors/engine não expostos.
+- **Vendedor Profissional/Particular** via `companyAd` → `seller_type` + `source`. Extras:
+  distrito/concelho/freguesia, `category_code`, `listing_created_at`, `image_count`.
+- **Anti-bot Cloudflare passivo** (200 com UA de browser, sem challenge). HTTP puro; rate-limit + retry.
+- **⚠️ Paginação `?o=N` ROBOTS-PROIBIDA** (`Disallow: /*?o=*`) → nunca a geramos. Cobertura por
+  **facetas** path-based (marca/distrito/categoria), cada URL a render a 1ª página (40, mais recentes).
+- ✅ **Recência REAL**: sort default `SORT_DESC_PUBLISH_DATE` + `listTime` por anúncio → watch fiável.
+
+```bash
+# batch (unidade = faceta; sem paginação)
+node run-custojusto.mjs --max-pages 3                   # amostra (base + primeiras facetas)
+node run-custojusto.mjs --brand peugeot --max-pages 1   # só uma marca (slug do path)
+node run-custojusto.mjs --full --max-pages 1500         # cobertura fatiada marca×distrito
+node run-custojusto.mjs --resume
+node watch-custojusto.mjs --interval 60                 # contínuo
+```
+
+Saída: `custojusto-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O
+`--full` faz o produto marca×distrito (1500 facetas); combos densos (>40, ex. Peugeot·Lisboa=408)
+truncam na 1ª página — corte fino futuro por categoria/preço/ano.
+
+## auto.pt (décimo-sétimo coletor)
+
+Marketplace **português** (Pixelplan-Digital Web Lda), SSR tradicional (Symfony), **~16,2k carros
+usados**, scraper-friendly. Segue o **molde quoka/autocasion** (card HTML + JSON-LD juntos por id).
+Investigação: [`../../research/autopt-investigacao.md`](../../research/autopt-investigacao.md).
+
+- **Fonte principal = CARD** `<a data-testid="car_listing_entry" id="item_XXXX">` (20/página): id
+  (referenceNumber), URL, título, preço, **vendedor (stand)**, **distrito**, `<ul>` [combustível,
+  ano, km], imagem.
+- **JSON-LD enriquece:** `WebPage.mainEntity`=`OfferCatalog` (20 `Vehicle`: marca/modelo separados,
+  `fuelType`, ano, km, condição, imagem) + `ItemList` (id via `url` + `numberOfItems`). Join
+  **id→Vehicle** por posição via `ItemList` (alinhamento 20/20/20 verificado).
+- **⚠️ Particular vs. empresa (per-card):** stand traz o span do nome; particular não → `owner_type`
+  + `source` (nome do stand ou "Particular").
+- **Anti-bot Cloudflare passivo** (200 sem challenge). HTTP puro; rate-limit + retry. robots-clean
+  (só `/area-pessoal` + `/_components/*` bloqueados).
+- **Paginação `?page=N`**; rota `/carros-usados`. O `--full` fatia por marca via **path**
+  `/carros-usados/{marca}` (~132 slugs); slices `--make`/`--district`.
+- **⚠️ Filtros/sort por query não funcionam num GET puro** (`?search[...]` → 500; `?sortBy=` ignorado)
+  → só path + `?page=N`. Recência-proxy (ordem default "Destacados").
+
+```bash
+node run-autopt.mjs --max-pages 3                      # amostra
+node run-autopt.mjs --make renault --max-pages 2       # só uma marca (path)
+node run-autopt.mjs --district lisboa --max-pages 2    # só um distrito (path)
+node run-autopt.mjs --full --max-pages 900             # cobertura fatiada por marca
+node run-autopt.mjs --resume
+node watch-autopt.mjs --interval 60 --pages 2          # contínuo
+```
+
+Saída: `autopt-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
+`owner_type`, `dealer`, `condition`. gearbox/engine/color/doors/segmento só no detalhe (null na listagem).
+
+## auto.sapo.pt (décimo-oitavo coletor)
+
+Marketplace automóvel do **portal SAPO** — particulares (grátis) + profissionais (stands), **~24,4k
+usados**. **A pista de "SPA JS-heavy / API em `auto-frontoffice.sapo.pt`" revelou-se falsa:** é uma app
+**ASP.NET Core MVC com SSR** — o HTML de `/carros-usados` já traz os cartões; não há API JSON de pesquisa.
+Investigação: [`../../research/autosapo-investigacao.md`](../../research/autosapo-investigacao.md).
+
+- **Fonte primária = cartões HTML SSR** (molde theparking/autocasion, mas **sem JSON-LD**). Cada card
+  dá id (**ObjectId** no href), marca+modelo, variante/potência/portas, ano/km/combustível, preço,
+  imagem. `source`='Auto SAPO'. **Separação marca/modelo** via os 83 slugs do sitemap de marcas.
+- **✅ Recência REAL:** o **ObjectId codifica o timestamp de publicação** → `published_at` por anúncio
+  (sem depender de campos do card). O `orderby=1` ("Mais recente") é honrado pelo SSR.
+- **Fonte opcional = detalhe (`--detail`)**: `dataLayer` + JSON-LD + morada → caixa, cor, carroçaria,
+  **distrito**, cilindrada, VIN, lugares, tração, **vendedor (particular/profissional)** e **`national`
+  (matrícula PT vs importado)**. 1 pedido/anúncio → só p/ amostras/fatias, não p/ o catálogo inteiro.
+- **Paginação `?p=N`** (20/pág) chega ao fim (`p=1218`) → `--full` cobre tudo **sem facetas**; dedupe
+  global apanha os "Em destaque" repetidos. `--slice "marca=volvo"` filtra (querystring cru).
+- **robots-clean** (só `/account/` e `/user/`); HTTP puro sem anti-bot.
+
+```bash
+node run-autosapo.mjs --max-pages 3                  # amostra (3 págs × 20)
+node run-autosapo.mjs --full                         # catálogo completo (~1218 págs, ~24k)
+node run-autosapo.mjs --slice "marca=volvo"          # só uma marca (657 viaturas)
+node run-autosapo.mjs --max-pages 2 --detail         # enriquece via pág. de detalhe (lento)
+node run-autosapo.mjs --resume
+node watch-autosapo.mjs --interval 60 --pages 3      # contínuo, poll por recência
+```
+
+Saída: `autosapo-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
+`id` (ObjectId), `power_cv`, `published_at`, `highlighted`; com `--detail`: `locality`, `seats`, `vin`,
+`interior_color`/`interior_type`, `drive_train`, `seller_type`, `national`, `dealer`.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -572,6 +740,16 @@ autoline/                 card HTML + JSON-LD (Via Mobilis BE; --full por país;
   http · parse · schema · crawl · watch
 autohero/                 API GraphQL interna (AUTO1 DE ~7k; postGraphql no host wrapper)
   http · parse · schema · crawl · watch
+standvirtual/             __NEXT_DATA__ urqlState SSR (líder PT ~42k; API GraphQL robots-proibida)
+  http · parse · schema · crawl · watch
+olxpt/                    __PRERENDERED_STATE__ SSR (OLX PT ~51k; API /api/ robots-proibida)
+  http · parse · schema · crawl · watch
+custojusto/               __NEXT_DATA__ SSR (Schibsted PT ~26k; facetas — ?o=N robots-proibida)
+  http · parse · schema · crawl · watch
+autopt/                   card HTML + JSON-LD (Symfony PT ~16k; join por id via ItemList)
+  http · parse · schema · crawl · watch
+autosapo/                 card HTML SSR ASP.NET (SAPO PT ~24k; recência via ObjectId; --detail)
+  http · parse · schema · crawl · watch
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
 run-autoboerse.mjs / watch-autoboerse.mjs      CLIs
@@ -585,6 +763,11 @@ run-quoka.mjs / watch-quoka.mjs                CLIs
 run-ooyyo.mjs / watch-ooyyo.mjs                CLIs
 run-autoline.mjs / watch-autoline.mjs          CLIs
 run-autohero.mjs / watch-autohero.mjs          CLIs
+run-standvirtual.mjs / watch-standvirtual.mjs  CLIs
+run-olxpt.mjs / watch-olxpt.mjs                CLIs
+run-custojusto.mjs / watch-custojusto.mjs      CLIs
+run-autopt.mjs / watch-autopt.mjs              CLIs
+run-autosapo.mjs / watch-autosapo.mjs          CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
