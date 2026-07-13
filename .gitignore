@@ -3,6 +3,8 @@ node_modules/
 .DS_Store
 __pycache__/
 *.pyc
+.venv/
+tools/collector/piscapisca/.venv/
 dist/
 build/
 tools/net-capture/node_modules

@@ -1,0 +1,15 @@
+# requirements.txt — dependências do coletor PiscaPisca (Python, ISOLADAS a este subdiretório).
+#
+# ⚠️ EXCEÇÃO DELIBERADA à norma "HTTP puro, zero-deps" dos outros 23 coletores (Node): o PiscaPisca
+# está atrás de um challenge ATIVO do Cloudflare (HTTP 403 a clientes não-browser, mesmo com headers
+# de browser + HTTP/2 — probe 2026-07-13). O Scrapling resolve o challenge via browser stealth
+# (Camoufox) com solve_cloudflare=True. Ver research/piscapisca-investigacao.md e o README.
+#
+# Instalação (num venv dedicado — ver README, secção PiscaPisca):
+#   python3.13 -m venv .venv
+#   .venv/bin/pip install -r requirements.txt
+#   .venv/bin/scrapling install      # descarrega o browser Camoufox (centenas de MB)
+#
+# Versão fixada após validação ponta-a-ponta em 2026-07-13 (Python 3.13.2, macOS arm64).
+# Python 3.14 é demasiado recente (faltavam wheels do Camoufox/patchright) → usar 3.12/3.13 no venv.
+scrapling[fetchers]==0.4.11

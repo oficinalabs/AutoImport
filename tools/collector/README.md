@@ -882,6 +882,68 @@ Saída: `carplus-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`
 `taeg`, `power_cv`, `condition`, `availability`, `reserved`, `dealer_district`/`dealer_municipality`,
 `installation`, `stock`, `origin`.
 
+## piscapisca.pt (vigésimo-quarto coletor — ⚠️ Python + browser stealth, exceção deliberada)
+
+Marketplace de stands PT (Credibom + APDCA), **~56.000 viaturas** (misto: orientado a stands, mas
+particulares anunciam grátis). É o alvo com volume real da secção 5d.
+Investigação: [`../../research/piscapisca-investigacao.md`](../../research/piscapisca-investigacao.md).
+
+> ### ⚠️ Exceção deliberada à norma "HTTP puro, sem evasão"
+> Os outros 23 coletores são **HTTP puro, zero-deps** (Node) e passam o Cloudflare *passivo* dos seus
+> sites. O PiscaPisca tem um **challenge ATIVO do Cloudflare**: devolve **HTTP 403** a qualquer cliente
+> não-browser, **mesmo** com UA + headers de browser completos e HTTP/2 (probe 2026-07-13). Por decisão
+> **explícita do utilizador**, este — e **só este** — coletor usa **browser stealth** ([Scrapling](https://github.com/D4Vinci/Scrapling),
+> `StealthySession` Camoufox, `solve_cloudflare=True`) para resolver o challenge. É **Python** (o
+> Scrapling é Python) e vive isolado em `piscapisca/`, com o seu próprio venv. Os 23 coletores Node
+> **mantêm-se HTTP puro** — a dependência não os toca.
+
+- **Fonte = `ng-state` (Angular Transfer State).** A listagem `/carros` é uma app **Angular SSR**; os
+  dados vêm 100% estruturados no `<script id="ng-state">`: `COUNT_VEHICLES` (~56k), `VEHICLES_PAGINATION`
+  e `SEARCH_VEHICLES[]` (**20 viaturas/página**, campos ricos: brand/model/serie, prices{private,
+  professional}, year, km, fuel, transmission, **cilindrada**, **powerCV**, **vehicleType**, **origin**
+  (Nacional/Importado), stand, standLocation{district,county,postal_code}, warranty, certification).
+- **Sessão QUENTE (crítico):** UMA `StealthySession` por processo resolve o challenge **uma só vez** e
+  reaproveita o `cf_clearance` em todas as páginas/ciclos (re-solver por ciclo seria proibitivo).
+- **Paginação `/carros?page=N`** (1-indexado). A vista base está **limitada a 10.000** (500 págs); as
+  **facetas de path** (`/carros/{marca}`, `/carros/{distrito}`) expõem o total real e ficam abaixo do
+  teto → `--full` faz a **união marca ∪ distrito** (o `?marca=` não filtra no SSR; combos não são
+  possíveis). ⚠️ só as ~20 marcas/distritos "populares" do SSR; marcas de cauda-longa dependem das
+  facetas de distrito (Lisboa/Porto truncam a 10k).
+- **Recência POR PROXY** (ordem default = relevância). O sort "Mais recentes" é API-only (vedado pela
+  allowlist) → watch por proxy, como AutoTrader/autocasion. `--pages` alarga a captura por ciclo.
+- **Boa cidadania:** robots.txt ilegível (403 atrás do CF) → **allowlist estrita**: só `/carros[...]`
+  (listagem/detalhe); nunca `/api`, `/admin`, `/conta`, `/login`, `/empresa`, `/stand`… Ritmo lento
+  (`--rate` default **4000 ms**, headless, 1 sessão, sem concorrência).
+
+### Instalação (Python, uma vez)
+
+```bash
+cd tools/collector/piscapisca
+python3.13 -m venv .venv                 # 3.10+; 3.14 é demasiado recente p/ o Camoufox → usar 3.12/3.13
+.venv/bin/pip install -r requirements.txt
+.venv/bin/scrapling install              # descarrega o browser Camoufox (centenas de MB)
+```
+
+### Como usar (executar com o Python do venv)
+
+```bash
+cd tools/collector
+piscapisca/.venv/bin/python run-piscapisca.py --max-pages 3                # amostra (3 págs = 60)
+piscapisca/.venv/bin/python run-piscapisca.py --brand bmw --max-pages 5    # só uma marca (path)
+piscapisca/.venv/bin/python run-piscapisca.py --district lisboa            # só um distrito
+piscapisca/.venv/bin/python run-piscapisca.py --full --max-pages 500       # cobertura marca ∪ distrito
+piscapisca/.venv/bin/python run-piscapisca.py --resume                     # continua (orçamento de págs)
+piscapisca/.venv/bin/python watch-piscapisca.py --interval 60 --pages 2    # contínuo (sessão quente)
+```
+
+Flags idênticas aos CLIs Node: batch `--max-pages` (5, = orçamento de págs por execução), `--brand`,
+`--district`, `--full`, `--resume`, `--rate` (4000), `--out`; watch `--interval` (60), `--cycles`
+(0=infinito), `--pages` (1), `--rate`, `--out`. Saída em `out/` (gitignored): `piscapisca-*` (batch/
+watch), formato NDJSON/eventos **idêntico** aos outros. Pronto exceto o upsert na DB
+([`piscapisca/sink.py`](piscapisca/sink.py), espelho de [`lib/sink.mjs`](lib/sink.mjs)). Extras:
+`seller_type`, `dealer`, `origin` (Nacional/Importado), `power_hp`, `engine_cc`, `price_private`/
+`price_professional`, `warranty`, `certification_associate`, `district`/`county`/`city`.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -935,6 +997,8 @@ caetano/                  API JSON interna do grupo (Salvador Caetano PT ~2,4k; 
   http · parse · schema · crawl · watch
 carplus/                  __NUXT_DATA__ devalue (Salvador Caetano PT ~1k; 93% ⊂ caetano — dedup VIN)
   http · parse · schema · crawl · watch
+piscapisca/               ⚠️ PYTHON + browser stealth (Scrapling/Cloudflare) — ng-state Angular (PT ~56k)
+  fetcher · normalize · parse · schema · sink · crawl · watch   (venv isolado; exceção deliberada)
 (oparking/                ⚫ BLOQUEADO — Cloudflare challenge ativo; usar theparking·PT)
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
@@ -959,6 +1023,7 @@ run-autouncle.mjs / watch-autouncle.mjs        CLIs
 run-santogal.mjs / watch-santogal.mjs          CLIs
 run-caetano.mjs / watch-caetano.mjs            CLIs
 run-carplus.mjs / watch-carplus.mjs            CLIs
+run-piscapisca.py / watch-piscapisca.py        CLIs (Python — correr com piscapisca/.venv/bin/python)
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).

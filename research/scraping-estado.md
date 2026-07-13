@@ -81,6 +81,12 @@
 
 *Anti-bot ativo (DataDome/Akamai/Incapsula/Cloudflare-challenge). Aceder exigiria browser stealth + proxies residenciais = evasão → **não fazemos**. Registados para não os re-testar e para reavaliar via parceria/API oficial se o negócio justificar.*
 
+> ⚠️ **Exceção deliberada (1, documentada):** o **PiscaPisca** (secção 5d, Cloudflare ativo) foi
+> **ligado por decisão explícita do utilizador** usando **browser stealth** ([Scrapling](https://github.com/D4Vinci/Scrapling)/Camoufox,
+> `solve_cloudflare=True`), **contra** esta norma. Fica **isolado** a esse coletor (Python, venv
+> próprio, allowlist estrita, ritmo lento); os restantes bloqueados acima **mantêm-se fora de âmbito**
+> e os 23 coletores Node mantêm-se HTTP puro. Ver [`piscapisca-investigacao.md`](piscapisca-investigacao.md).
+
 | Site | País | Anti-bot | Estado | Notas |
 |---|---|---|---|---|
 | mobile.de | Alemanha | Akamai + DataDome | ⚫ Fora de âmbito | 403 na homepage; via correta = API oficial |
@@ -112,7 +118,8 @@ viaturas. Fontes portuguesas de anúncios — marketplaces, agregadores e redes 
 por pesquisa profunda (2026-07-12, 75 factos verificados adversarialmente); volumes lidos ao vivo, a
 confirmar por probe técnica no arranque de cada coletor. **Estado inicial: por investigar/fazer.***
 
-**Progresso:** 10/16 a recolher (5a completa; 5b = 2/3 + 1 bloqueado; 5c completa 3/3; falta 5d).
+**Progresso:** 11/16 a recolher (5a completa; 5b = 2/3 + 1 bloqueado; 5c completa 3/3; 5d = 1/5,
+PiscaPisca ligado via browser stealth).
 
 ### 5a. Marketplaces primários (nacionais) — ✅ 5/5 a recolher
 
@@ -152,7 +159,7 @@ confirmar por probe técnica no arranque de cada coletor. **Estado inicial: por 
 
 | Site | Tipo | Volume PT (aprox.) | Stands/Particulares | Notas técnicas (recolha) | Estado |
 |---|---|---|---|---|---|
-| [PiscaPisca](https://www.piscapisca.pt) | Marketplace de stands (Credibom + APDCA, desde 2020) | >58k viaturas | **Misto** (orientado a stands, mas particulares anunciam grátis) | ⚠️ **Cloudflare ativo → HTTP 403** a clientes não-browser; app Android (`pt.credibom.piscapiscaapp`); paginação profunda (≥198 págs) | 🔴 Por fazer (risco anti-bot) |
+| [PiscaPisca](https://www.piscapisca.pt) → [`run-piscapisca.py`](../tools/collector/run-piscapisca.py) | Marketplace de stands (Credibom + APDCA, desde 2020) | ~55.977 viaturas (lido de `COUNT_VEHICLES`) | **Misto** (orientado a stands, mas particulares anunciam grátis) | ✅ **⚠️ 1.º coletor com BROWSER STEALTH** (exceção deliberada à norma "HTTP puro" — ver secção 4). **Cloudflare ATIVO → 403** a HTTP puro (mesmo c/ UA+headers+HTTP/2); resolvido por **[Scrapling](https://github.com/D4Vinci/Scrapling)** (`StealthySession` Camoufox, `solve_cloudflare=True`, **Python**, venv isolado). Fonte = **`ng-state` (Angular SSR)** `SEARCH_VEHICLES[]` (20/pág, campos ricos: cilindrada/powerCV/**origin** Nacional-Importado/warranty/stand). **Sessão QUENTE** (resolve o CF 1×). Paginação `?page=N` limitada a 10k → `--full` fatia por **marca ∪ distrito** (path; `?marca=` não filtra). Recência-proxy (sort "recentes" é API-only). Investigação: [`piscapisca-investigacao.md`](piscapisca-investigacao.md) | 🟢 A recolher (browser stealth) |
 | [VPAuto](https://www.vpauto.pt) | Leilão B2B (frota/empresa) | ~50k/ano | Só profissionais/frota | Inventário pesquisável por marca (ex. 570 Peugeot); + transporte integrado p/ PT | 🔴 Por fazer |
 | [Manheim Portugal](https://www.manheim.pt) | Leilão B2B (Cox Automotive) | dinâmico (não legível estático) | Só profissionais | ⚫ **Login-gated**; SPA Angular; não scrapável sem credenciais de dealer | ⚫ Fora de âmbito |
 | [Autorola.pt](https://www.autorola.pt) | Leilão B2B (remarketing) | lotes (5–130/leilão; ~7 ativos) | Profissionais/frotistas | ⚫ **Login** para ver listagens | ⚫ Fora de âmbito |
@@ -161,7 +168,8 @@ confirmar por probe técnica no arranque de cada coletor. **Estado inicial: por 
 > **Notas de prioridade:** os alvos limpos e de arranque fácil são **CustoJusto** (SSR/`__NEXT_DATA__`),
 > **Auto.pt** e **Santogal** (SSR sem anti-bot), e o **OParking** (já coberto pelo coletor theparking).
 > **StandVirtual/OLX** são os de maior valor (líderes de volume) mas exigem lidar com SPA/API + anti-bot
-> (perfil da secção 3). **PiscaPisca** tem Cloudflare ativo (403). Os leilões B2B (Manheim/Autorola/BCA)
+> (perfil da secção 3). **PiscaPisca** tinha Cloudflare ativo (403) → **ligado por browser stealth**
+(Scrapling; exceção deliberada — ver secção 4 e 5d). Os leilões B2B (Manheim/Autorola/BCA)
 > são login-gated → fora de âmbito para recolha aberta, registados para eventual via API/parceria.
 
 ---
@@ -174,6 +182,7 @@ confirmar por probe técnica no arranque de cada coletor. **Estado inicial: por 
 
 ## Changelog
 
+- **2026-07-13** — **PiscaPisca 🟢 a recolher (secção 5d, 11/16) — ⚠️ 1.º coletor com BROWSER STEALTH (exceção deliberada).** O PiscaPisca (~55.977 viaturas, `COUNT_VEHICLES`) estava atrás de **Cloudflare ATIVO** (403 a HTTP puro, mesmo com UA+headers+HTTP/2). Por **decisão explícita do utilizador**, ligado com **[Scrapling](https://github.com/D4Vinci/Scrapling)** (`StealthySession` Camoufox, `solve_cloudflare=True`) — **contra** a norma "HTTP puro" (secção 4), **isolado** a este coletor (Python, venv próprio `tools/collector/piscapisca/.venv/`; os 23 coletores Node mantêm-se HTTP puro/zero-deps). **Fonte descoberta na Fase 0** (o HTML só é visível depois de passar o CF): app **Angular SSR**, dados 100% estruturados no `<script id="ng-state">` → `SEARCH_VEHICLES[]` (20/pág, campos ricos: cilindrada, powerCV, **origin** Nacional/Importado, warranty, stand, standLocation). **Sessão QUENTE** resolve o challenge 1× e reaproveita o `cf_clearance` (crítico p/ o watch 1 min). Paginação `?page=N` **limitada a 10k** → `--full` fatia por **marca ∪ distrito** (path; `?marca=` não filtra no SSR — testado). Recência-**proxy** (sort "recentes" é API-only, vedado pela allowlist). **Boa cidadania:** allowlist estrita (só `/carros[...]`), ritmo 4000 ms, headless, 1 sessão. Coletor Python espelha o contrato Node (CAMPOS_BASE, to_int/clean_str, Sink/NDJSON, checkpoint/resume, watch). Verificado ponta-a-ponta ao vivo: CF passou (200 real); `--max-pages 3` → 60 anúncios (make/model/year/price/fuel/origin 60/60); `--resume` 60→117 sem duplicar; `--brand bmw` 40/40 BMW; watch 2 ciclos (ciclo 2: 0 novos, 3s, sem re-solve); allowlist 9/9 bloqueados. Fix: `engine_cc` de "2143 cm3" (evitar o "3" de cm3). Investigação: [`piscapisca-investigacao.md`](piscapisca-investigacao.md).
 - **2026-07-13** — **Redes de stands PT (secção 5c completa 3/3): Santogal + Caetano + Carplus 🟢 a recolher (10/16).** Três subagentes Opus 4.8 em paralelo, todos stock próprio (só profissional). **Santogal** (~1.538 usados; corrige a estimativa de ~3,8k, que era o stock total): SSR Umbraco, card `card_car`, sem JSON-LD útil, robots 100% permissivo. **Caetano** (~2.359): SPA Vue → **API JSON interna do grupo** (`api.gsci.pt/ds/search/v2`, `companyId:24`), filtro cliente CAR+Usado. **Carplus** (~1.037): SPA Nuxt 3 → payload `__NUXT_DATA__` (devalue → resolver recursivo). **Achado-chave (medido ao vivo):** Caetano e Carplus são duas montras do **mesmo pool Salvador Caetano** — **93% do Carplus (964/1037 VINs) está no Caetano**; união distinta = 2.432, Carplus só acrescenta +73 VINs → **Caetano é a fonte primária, Carplus quase-redundante**; dedup por VIN. Todos verificados ponta-a-ponta + smoke-test central ao vivo (80/32/458 na amostra; fulls 1.538/2.359/1.037). Investigações: [`santogal`](santogal-investigacao.md) · [`caetano`](caetano-investigacao.md) · [`carplus`](carplus-investigacao.md).
 - **2026-07-13** — **Quick win OParking→theparking·PT.** Acrescentado `portugal` ao mapa `PAISES` do `run-theparking.mjs` (única alteração a um coletor existente, cirúrgica e re-verificada) → o inventário PT da rede leparking (~128k, `nb_results=128 281`), inacessível diretamente no oparking.pt (Cloudflare challenge), passa a ser recolhível por HTTP puro via `node run-theparking.mjs --country portugal`. Fontes reais na fatia PT: custojusto.pt, standvirtual.com, olx.pt, **piscapisca.pt** (bónus — bloqueado diretamente), autohero.com. Verificado ao vivo: 52 anúncios/2 págs, 50/52 = PORTUGAL. Default (DE/NL/BE/FR) intacto.
 - **2026-07-13** — **Agregadores PT (secção 5b): AutoUncle.pt + encontracarros.pt 🟢 a recolher; OParking ⚫ bloqueado (7/16).** Três subagentes Opus 4.8 em paralelo. **AutoUncle.pt** (~99k): SSR Next.js junta JSON-LD (`ItemList` 25/pág) + payload RSC (`__next_f`) pelo carId (molde theparking); `source`=site de origem, extras AutoScore/preço-justo/dias-em-stock; Cloudflare passivo, HTTP puro; robots proíbe filtros por query `s[...]=` → `--full` por facetas de path (config API robots-permitida). **encontracarros.pt** (~50k): `/pesquisa` é client-side → recolha por `sitemap.xml` (lastmod) + detalhe SSR (JSON-LD `Vehicle` + `carListing` RSC), 1 req/anúncio; **`source_url`** do anúncio original → dedupe cross-coletor; recência REAL via `lastmod`. **OParking** ⚫: investigado e **NÃO construído** — Cloudflare *managed challenge* ativo (403 em todos os pedidos, incl. `/robots.txt`, não intermitente); corrige a nota "sem Cloudflare" (era da pesquisa, errada). O mesmo motor (theparking.eu) passa a 200 → política de CF por zona. **Caminho para o inventário PT do OParking: fatia `portugal` do coletor theparking** (`/used-cars/portugal.html`, `nb_results=128 281`). Os 2 funcionais verificados ponta-a-ponta + smoke-test central ao vivo (25/30 anúncios, `source`=origem real). Investigações: [`autouncle`](autouncle-investigacao.md) · [`encontracarros`](encontracarros-investigacao.md) · [`oparking`](oparking-investigacao.md).
