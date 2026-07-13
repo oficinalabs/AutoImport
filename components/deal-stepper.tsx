@@ -1,7 +1,7 @@
-import { Check } from "lucide-react";
 import { DEAL_STAGES, STAGE_INDEX } from "@/lib/deal-stages";
 import type { DealStageKey } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 
 /** Stepper horizontal com todas as fases; a atual destacada. */
 export function DealStepper({ stage }: { stage: DealStageKey }) {

@@ -1,6 +1,6 @@
-import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 import type { KmTrust } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
 
 const CONFIG = {
   verificado: { icon: ShieldCheck, label: "Km verificado", tone: "text-good" },

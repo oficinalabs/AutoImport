@@ -1,6 +1,6 @@
-import { ChevronDown, Info } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import type { CostBreakdown as Breakdown } from "@/lib/types";
+import { ChevronDown, Info } from "lucide-react";
 
 const LINES: { key: keyof Omit<Breakdown, "totalPt">; label: string }[] = [
   { key: "originPrice", label: "Preço na origem" },
@@ -45,10 +45,10 @@ export function CostBreakdown({ cost }: { cost: Breakdown }) {
           Como calculámos o ISV
         </summary>
         <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-          O ISV soma a componente de cilindrada e a componente ambiental (CO₂), com
-          redução por antiguidade do veículo (10% a 80%). É normalmente o maior custo
-          isolado da importação. Valor estimado com as tabelas de 2026 — confirmar na
-          Autoridade Tributária antes de fechar negócio.
+          O ISV soma a componente de cilindrada e a componente ambiental (CO₂), com redução por
+          antiguidade do veículo (10% a 80%). É normalmente o maior custo isolado da importação.
+          Valor estimado com as tabelas de 2026 — confirmar na Autoridade Tributária antes de fechar
+          negócio.
         </p>
       </details>
     </div>

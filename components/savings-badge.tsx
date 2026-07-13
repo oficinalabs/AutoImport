@@ -1,6 +1,6 @@
+import { formatEuro, formatPercent } from "@/lib/format";
 import type { Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { formatEuro, formatPercent } from "@/lib/format";
 
 const TONE: Record<Verdict, string> = {
   compensa: "text-good",
