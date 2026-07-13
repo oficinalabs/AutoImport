@@ -707,6 +707,90 @@ Saída: `autosapo-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs
 `id` (ObjectId), `power_cv`, `published_at`, `highlighted`; com `--detail`: `locality`, `seats`, `vin`,
 `interior_color`/`interior_type`, `drive_train`, `seller_type`, `national`, `dealer`.
 
+## encontracarros.pt (décimo-nono coletor — agregador PT)
+
+Agregador/meta-motor **português** (Next.js App Router) que compara os principais sites PT
+(standvirtual, olx.pt, custojusto.pt, auto.sapo.pt, auto.pt) + centenas de stands próprios
+(carmine.pt, santogal.pt…). **~50k anúncios recentes** alcançáveis (o site anuncia "100k+/800+
+stands"; o "1,67M" reportado é global/inflacionado). Segue o **molde theparking** (agregador →
+`source`=site de origem), adaptado a **sitemap + páginas de detalhe SSR**.
+Investigação: [`../../research/encontracarros-investigacao.md`](../../research/encontracarros-investigacao.md).
+
+- **⚠️ A listagem `/pesquisa` é CLIENT-SIDE** (HTML sem cards) → inútil por HTTP puro. A recolha faz-se
+  pelo **`sitemap.xml`** (50k `/anuncio/…` com `<lastmod>`, ordenados por recência) + **páginas de
+  detalhe** `/anuncio/{slug}-{id6}` (SSR; **1 request/anúncio**).
+- **Fonte 1 = JSON-LD `Vehicle`**: marca, modelo, ano, km, caixa, portas, lugares, `bodyType`,
+  combustível, potência (cv), imagens, preço, localidade (distrito), país (PT).
+- **Fonte 2 = objeto `carListing`** do payload RSC (`self.__next_f`, isolado por brace-matching para
+  evitar os ~12 anúncios de comparação): **site de origem** (`advertiser`), **URL externo original**,
+  **vendedor/stand** (`dealership_name`), cor, condição, nacional/importado.
+- **`source`=site/stand de origem**; `source_site='encontracarros.pt'`; `country='PORTUGAL'`. `id`=6
+  chars do slug (dedupe). **`source_url`** = anúncio original → **dedupe cross-coletor** (contra
+  standvirtual/olxpt/custojusto/autopt/autosapo).
+- **HTTP puro, sem anti-bot.** robots só proíbe `/link` (nunca tocado; URL original vem no HTML).
+- **`--full`** percorre o sitemap todo (~50k); slices `--brand`/`--district`/`--since` do slug/lastmod.
+- **⭐ Recência REAL:** watch faz poll dos anúncios com `lastmod` > watermark do ciclo anterior.
+
+```bash
+node run-encontracarros.mjs --max-pages 3                 # amostra (~90 mais recentes)
+node run-encontracarros.mjs --brand bmw --max-pages 2     # só uma marca (slug)
+node run-encontracarros.mjs --district porto --max-pages 2 # só um distrito (slug)
+node run-encontracarros.mjs --full                        # cobertura ~50k (longo)
+node run-encontracarros.mjs --resume
+node watch-encontracarros.mjs --interval 60 --pages 2     # contínuo (recência via lastmod)
+```
+
+Saída: `encontracarros-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
+Extras: `source_url`, `dealer`, `condition`, `national`, `seats`, `listed_at`. postalCode não exposto.
+
+## autouncle.pt (vigésimo coletor — agregador PT)
+
+Meta-motor/agregador dinamarquês **AutoUncle**, versão Portugal (~99k listagens PT de ~9 sites-fonte;
+o "93 sites" do título é o total global), com avaliação de preço própria (**AutoScore** 1–5).
+Segue o **molde theparking** (agregador). Investigação: [`../../research/autouncle-investigacao.md`](../../research/autouncle-investigacao.md).
+
+- **Fonte = SSR de `/pt/carros-usados`, dois blocos juntos pelo carId**: (1) **JSON-LD**
+  (`@graph`→`ItemList.itemListElement[25].item` = `Product`+`Vehicle` rico + `numberOfItems` = total)
+  para o catálogo; (2) **payload RSC** (`self.__next_f`, ~250 chunks) para o que falta a um agregador —
+  a **fonte de origem** (`sourceName`), o **AutoScore** (`auRating`), a imagem real, a variante e os
+  dias em stock. `source`=site/stand de origem; `source_site='autouncle.pt'`; `country='PORTUGAL'`.
+- **Anti-bot Cloudflare passivo** (200 sem challenge com UA de browser). HTTP puro; rate-limit + retry.
+- **Paginação `?page=N`** (25/pág, teto ~pág 100). **⚠️ robots proíbe filtros/ordenação por query
+  `s[...]=`** → cobertura **só por facetas de PATH** (`/pt/carros-usados/{Marca}`) + `?page`. A saída
+  para a origem (`/pt/link-externo/`) é proibida → só se LÊ o slug, nunca se pede. A **config API**
+  (`/api/v4/car_search_form/config`, robots-permitida) semeia as marcas do `--full`.
+
+```bash
+node run-autouncle.mjs --max-pages 3                    # amostra
+node run-autouncle.mjs --brand Renault --max-pages 5    # só uma marca (slug canónico do path)
+node run-autouncle.mjs --full --max-pages 100           # cobertura fatiada por marca (config API)
+node run-autouncle.mjs --resume
+node watch-autouncle.mjs --interval 60 --pages 2        # contínuo
+```
+
+Saída: `autouncle-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O
+`--full` fatia por marca; as ~14 marcas densas (Peugeot/Renault/Mercedes/BMW…) saturam o teto de
+paginação (~2.500) — corte fino por modelo é frágil (slug do site ≠ config) e ficou por fazer.
+**Recência**: sem sort por data (robots) → proxy `days_on_market`. Extras: `price_rating` (AutoScore),
+`estimated_price` (preço-justo AutoUncle), `you_save`, `days_on_market`, `seller_type`,
+`source_slug`/`source_external_id`, `power_hp`/`power_kw`, `co2`, `model_generation`.
+
+## oparking.pt (investigado — BLOQUEADO, sem coletor)
+
+Agregador/meta-motor português da família **leparking/theparking** (front PT). A hipótese era clonar o
+coletor theparking (mesmo motor, mesmo JSON-LD `Vehicle`). **Não avançou: o oparking.pt está atrás de
+um Cloudflare "managed challenge" ATIVO** — HTTP 403 (`cf-mitigated: challenge`) em TODOS os pedidos
+(`/`, `/robots.txt`, listagens, `/sitemap.xml`), não intermitente, sem `cf_clearance` reutilizável.
+HTTP puro (fetch/curl) não passa; exigiria browser headless/impersonação TLS — fora da arquitetura
+leve destes coletores. Contraste: o theparking.eu (mesma família) passa a 200 no mesmo dia/UA.
+Investigação: [`../../research/oparking-investigacao.md`](../../research/oparking-investigacao.md).
+
+> ✅ **Caminho para o inventário PT desta família:** usar o coletor **theparking** com a fatia
+> `portugal` — `theparking.eu/used-cars/portugal.html` serve os anúncios PT por HTTP puro (200),
+> mesmo JSON-LD `Vehicle`, `nb_results = 128 281` (≈ os ~128k do oparking.pt), fontes reais
+> custojusto.pt/standvirtual.com/olx.pt/autohero.com. (Requer acrescentar `portugal` ao mapa
+> `PAISES` do `run-theparking.mjs`.)
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -750,6 +834,11 @@ autopt/                   card HTML + JSON-LD (Symfony PT ~16k; join por id via 
   http · parse · schema · crawl · watch
 autosapo/                 card HTML SSR ASP.NET (SAPO PT ~24k; recência via ObjectId; --detail)
   http · parse · schema · crawl · watch
+encontracarros/           sitemap + detalhe SSR (agregador PT ~50k; JSON-LD + carListing RSC)
+  http · sitemap · parse · schema · crawl · watch
+autouncle/                JSON-LD ItemList + RSC __next_f (agregador PT ~99k; molde theparking)
+  http · parse · schema · crawl · watch
+(oparking/                ⚫ BLOQUEADO — Cloudflare challenge ativo; usar theparking·PT)
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
 run-autoboerse.mjs / watch-autoboerse.mjs      CLIs
@@ -768,6 +857,8 @@ run-olxpt.mjs / watch-olxpt.mjs                CLIs
 run-custojusto.mjs / watch-custojusto.mjs      CLIs
 run-autopt.mjs / watch-autopt.mjs              CLIs
 run-autosapo.mjs / watch-autosapo.mjs          CLIs
+run-encontracarros.mjs / watch-encontracarros.mjs  CLIs
+run-autouncle.mjs / watch-autouncle.mjs        CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
