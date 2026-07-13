@@ -1,7 +1,7 @@
-import { Heart } from "lucide-react";
-import Link from "next/link";
 import { CarCard } from "@/components/car-card";
 import { getFavorites } from "@/lib/data";
+import { Heart } from "lucide-react";
+import Link from "next/link";
 
 export default async function FavoritosPage() {
   const favorites = await getFavorites();

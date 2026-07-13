@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
-import { TopBar } from "@/components/top-bar";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -39,14 +38,7 @@ export default function RootLayout({
   return (
     <html lang="pt" suppressHydrationWarning>
       <body className={`${archivo.variable} ${plexSans.variable} ${plexMono.variable}`}>
-        <Providers>
-          <div className="flex min-h-screen flex-col">
-            <TopBar />
-            <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 sm:px-6">
-              {children}
-            </main>
-          </div>
-        </Providers>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

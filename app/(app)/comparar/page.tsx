@@ -1,5 +1,3 @@
-import { ArrowLeft, Trophy } from "lucide-react";
-import Link from "next/link";
 import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
 import { VerdictBadge } from "@/components/verdict-badge";
@@ -7,6 +5,8 @@ import { getListingsByIds } from "@/lib/data";
 import { formatEuro, formatKm, formatPercent } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { ArrowLeft, Trophy } from "lucide-react";
+import Link from "next/link";
 
 const ROWS: { label: string; get: (l: Listing) => string; highlight?: boolean }[] = [
   { label: "País", get: (l) => l.country },
@@ -119,7 +119,10 @@ export default async function CompararPage({
             <tr className="border-t border-line">
               <td className="sticky left-0 bg-surface p-3 text-ink-soft">Veredito</td>
               {list.map((l) => (
-                <td key={l.id} className={cn("p-3", l.savings === bestSavings && "bg-good-soft/40")}>
+                <td
+                  key={l.id}
+                  className={cn("p-3", l.savings === bestSavings && "bg-good-soft/40")}
+                >
                   <VerdictBadge verdict={l.verdict} />
                 </td>
               ))}
