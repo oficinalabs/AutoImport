@@ -4,6 +4,7 @@
 //   node run-theparking.mjs                                  # amostra: DE,NL,BE,FR (default)
 //   node run-theparking.mjs --country belgium --make bmw --max-pages 3
 //   node run-theparking.mjs --country germany --country netherlands --max-pages 2
+//   node run-theparking.mjs --country portugal --max-pages 10   # inventário PT (~128k; via oparking bloqueado)
 //   node run-theparking.mjs --full --max-pages 10            # cobertura por país×modelo (longo)
 //   node run-theparking.mjs --resume                         # retomar a última recolha
 //
@@ -33,6 +34,10 @@ const PAISES = {
   belgium: 'belgium', belgica: 'belgium', 'bélgica': 'belgium',
   netherlands: 'netherlands', holanda: 'netherlands', 'paises-baixos': 'netherlands',
   spain: 'spain', espanha: 'spain',
+  // PT: a fatia `portugal` (`/used-cars/portugal.html`, ~128k anúncios) dá acesso por HTTP puro
+  // ao inventário PT da rede leparking — o mesmo que o oparking.pt agregaria mas serve bloqueado
+  // por Cloudflare challenge. Fontes reais: custojusto.pt, standvirtual.com, olx.pt, autohero.com.
+  portugal: 'portugal', 'português': 'portugal', portugues: 'portugal',
 };
 
 // Parser de argumentos minimalista (suporta flags repetíveis via acumulação).

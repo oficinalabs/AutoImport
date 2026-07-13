@@ -785,11 +785,12 @@ HTTP puro (fetch/curl) não passa; exigiria browser headless/impersonação TLS 
 leve destes coletores. Contraste: o theparking.eu (mesma família) passa a 200 no mesmo dia/UA.
 Investigação: [`../../research/oparking-investigacao.md`](../../research/oparking-investigacao.md).
 
-> ✅ **Caminho para o inventário PT desta família:** usar o coletor **theparking** com a fatia
-> `portugal` — `theparking.eu/used-cars/portugal.html` serve os anúncios PT por HTTP puro (200),
-> mesmo JSON-LD `Vehicle`, `nb_results = 128 281` (≈ os ~128k do oparking.pt), fontes reais
-> custojusto.pt/standvirtual.com/olx.pt/autohero.com. (Requer acrescentar `portugal` ao mapa
-> `PAISES` do `run-theparking.mjs`.)
+> ✅ **Caminho para o inventário PT desta família (JÁ LIGADO):** o coletor **theparking** aceita a
+> fatia `portugal` — `node run-theparking.mjs --country portugal --max-pages 10`. Serve os anúncios PT
+> por HTTP puro (200), mesmo JSON-LD `Vehicle`, `nb_results = 128 281` (≈ os ~128k do oparking.pt),
+> com fontes reais custojusto.pt/standvirtual.com/olx.pt/**piscapisca.pt**/autohero.com (inclui stock
+> do PiscaPisca, que é inacessível diretamente por Cloudflare). Verificado: 52 anúncios/2 págs, 50/52
+> = PORTUGAL.
 
 ## Arquitetura e o "porquê" das decisões
 
