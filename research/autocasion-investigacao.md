@@ -92,11 +92,11 @@ Captura exaustiva de novos depende do **re-crawl batch periódico**. (Mesma deci
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-autocasion.mjs --max-pages 3` → **76 anúncios** ES (5s), com `price`, `make/model`, `year`,
+1. `run-autocasion.ts --max-pages 3` → **76 anúncios** ES (5s), com `price`, `make/model`, `year`,
    `km`, `fuel`, `gearbox`, `region`, `source`(dealer), `power_hp`, `image` preenchidos.
 2. `--resume --max-pages 4` → retomou em 76, +25 (p4) sem duplicar (101).
 3. `--brand audi --max-pages 2` → **50 anúncios, todos AUDI** (via SEO `/…/audi-ocasion`).
-4. `watch-autocasion.mjs --interval 12 --cycles 2` → ciclo 1: 26 novos; ciclo 2: 0 novos (dedupe).
+4. `watch-autocasion.ts --interval 12 --cycles 2` → ciclo 1: 26 novos; ciclo 2: 0 novos (dedupe).
 5. Guarda robots: pedidos a `/api/`, `/movil`, `/cdn-cgi/`, `/index2.php` são bloqueados; a listagem passa.
 6. Junção card↔JSON-LD: `fuel` e `region` preenchidos em 76/76.
 

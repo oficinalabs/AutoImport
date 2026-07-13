@@ -138,17 +138,17 @@ Só faz sentido em **fatias estreitas** (o utilizador limita via facetas/`--max-
 
 ```bash
 # amostra 1 marca (~300 anúncios, size=100)
-node run-autoscout24.mjs --make bmw --max-pages 3
+node run-autoscout24.ts --make bmw --max-pages 3
 # pan-EU (vários países num só comando)
-node run-autoscout24.mjs --country D,A,B,E,F,I,L,NL --make bmw --max-pages 1
+node run-autoscout24.ts --country D,A,B,E,F,I,L,NL --make bmw --max-pages 1
 # cobertura completa pan-EU (adaptativo país×marca×preço)
-node run-autoscout24.mjs --full
+node run-autoscout24.ts --full
 # fatia + sub-fatia por preço
-node run-autoscout24.mjs --full --country D --make bmw --max-pages 2 --resume
+node run-autoscout24.ts --full --country D --make bmw --max-pages 2 --resume
 # enriquecer (1 req/anúncio) — usar só em fatias estreitas
-node run-autoscout24.mjs --detail --make bmw --size 5 --max-pages 1
+node run-autoscout24.ts --detail --make bmw --size 5 --max-pages 1
 # recolha contínua (recência real)
-node watch-autoscout24.mjs --country D,F --pages 2 --online-since 1
+node watch-autoscout24.ts --country D,F --pages 2 --online-since 1
 ```
 
 Flags batch: `--max-pages` (5), `--size` (100), `--country <cy,…>`, `--make <slug|id>`, `--full`,

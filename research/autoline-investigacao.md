@@ -97,11 +97,11 @@ logamos `max(id)` por ciclo. Captura exaustiva de novos depende do re-crawl batc
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-autoline.mjs --max-pages 3` → **75 anúncios BELGIUM** (4s), cobertura acima; 74/75 em leilão.
+1. `run-autoline.ts --max-pages 3` → **75 anúncios BELGIUM** (4s), cobertura acima; 74/75 em leilão.
 2. `--resume --max-pages 5` → retomou em 75, +49 (p4–p5) sem duplicar (**124**).
 3. `--full --max-pages 1` → **6 países** percorridos (DE/BE/**GB**/FR/ES/CH), 25–26 cada = **151**
    (GB inclui-se corretamente — validou a decisão card-primário: o JSON-LD de GB vem vazio).
-4. `watch-autoline.mjs --interval 12 --cycles 2` → ciclo 1: 25 novos; ciclo 2: 0 novos (dedupe);
+4. `watch-autoline.ts --interval 12 --cycles 2` → ciclo 1: 25 novos; ciclo 2: 0 novos (dedupe);
    `maxId`/`created_at` logados; eventos emitidos para o sink.
 5. Guarda robots: `/api/`, `/search/`, `/sales/`, `/-/sdb/`, `/export/` **bloqueados**; a listagem passa.
 

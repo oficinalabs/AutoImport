@@ -101,12 +101,12 @@ AutoTrader/aramisauto).
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-meinauto.mjs --max-pages 3` → **141 usados** (9s), preço €9.890–68.790 (média 24.945), com
+1. `run-meinauto.ts --max-pages 3` → **141 usados** (9s), preço €9.890–68.790 (média 24.945), com
    make/model/year/km/fuel/gearbox/region/source(stand)/power_kw/image preenchidos; todos PRE_OWNED.
 2. `--resume --max-pages 5` → retomou em 141, +94 (p4-p5) sem duplicar (235); 235 linhas = 235 ids únicos.
 3. `--brand Audi --max-pages 2` → **94 anúncios, todos AUDI** (via `makes=Audi`).
 4. `--full --max-pages 1` → sonda descobre **47 marcas** a percorrer.
-5. `watch-meinauto.mjs --interval 12 --cycles 2` → ciclo 1: 47 novos; ciclo 2: 0 novos (dedupe);
+5. `watch-meinauto.ts --interval 12 --cycles 2` → ciclo 1: 47 novos; ciclo 2: 0 novos (dedupe);
    anúncio mais recente com `createdAt` do próprio dia (sortBy=createdAt confirmado).
 6. Guarda robots: `/envkv/`, `/motoren/`, `/ausstattung/` bloqueados; `/fahrzeugsuche/` e
    `/gebrauchtwagen/` passam.

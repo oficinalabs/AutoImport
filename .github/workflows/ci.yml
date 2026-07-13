@@ -32,5 +32,8 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck (tools/ — coletores TS, type-stripping nativo)
+        run: pnpm typecheck:tools
+
       - name: Build
         run: pnpm build

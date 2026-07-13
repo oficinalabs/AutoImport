@@ -16,19 +16,19 @@ Investigação técnica completa: [`../../research/theparking-investigacao.md`](
 
 ```bash
 # amostra (default: DE, NL, BE, FR)
-node run-theparking.mjs
+node run-theparking.ts
 
 # estreitar por país/marca
-node run-theparking.mjs --country belgium --make bmw --max-pages 3
+node run-theparking.ts --country belgium --make bmw --max-pages 3
 
 # multi-país
-node run-theparking.mjs --country germany --country netherlands --max-pages 2
+node run-theparking.ts --country germany --country netherlands --max-pages 2
 
 # cobertura máxima (fatiar país × modelo via sitemap — longo)
-node run-theparking.mjs --full --max-pages 10
+node run-theparking.ts --full --max-pages 10
 
 # retomar a última recolha (checkpoint)
-node run-theparking.mjs --resume
+node run-theparking.ts --resume
 ```
 
 Flags: `--country <slug|nome-pt>` (repetível), `--make <slug>`, `--max-pages <n>`,
@@ -48,10 +48,10 @@ de preço**. Tudo pronto para produção **exceto o envio para a base de dados**
 (marcado `>>> AQUI ENTRA A BASE DE DADOS <<<`).
 
 ```bash
-node watch-theparking.mjs                          # 1 em 1 min, DE/NL/BE/FR (contínuo)
-node watch-theparking.mjs --country belgium --make bmw
-node watch-theparking.mjs --interval 60 --pages 1  # intervalo em segundos
-node watch-theparking.mjs --interval 15 --cycles 3 # teste: 3 ciclos e sai
+node watch-theparking.ts                          # 1 em 1 min, DE/NL/BE/FR (contínuo)
+node watch-theparking.ts --country belgium --make bmw
+node watch-theparking.ts --interval 60 --pages 1  # intervalo em segundos
+node watch-theparking.ts --interval 15 --cycles 3 # teste: 3 ciclos e sai
 ```
 
 - **Estado** (`theparking-state.json`): a "tabela" atual `id → última linha` (dedupe +
@@ -91,14 +91,14 @@ para a família AutoScout24). Investigação: [`../../research/autotrader-invest
 
 ```bash
 # batch
-node run-autotrader.mjs --max-pages 3            # amostra
-node run-autotrader.mjs --make 13 --max-pages 5  # só uma marca (mmvmk0; BMW=13)
-node run-autotrader.mjs --full --max-pages 200   # cobertura por faixas de preço
-node run-autotrader.mjs --resume
+node run-autotrader.ts --max-pages 3            # amostra
+node run-autotrader.ts --make 13 --max-pages 5  # só uma marca (mmvmk0; BMW=13)
+node run-autotrader.ts --full --max-pages 200   # cobertura por faixas de preço
+node run-autotrader.ts --resume
 
 # recolha contínua (1 min)
-node watch-autotrader.mjs                         # contínuo
-node watch-autotrader.mjs --interval 60 --pages 2
+node watch-autotrader.ts                         # contínuo
+node watch-autotrader.ts --interval 60 --pages 2
 ```
 
 Saída: `autotrader-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -124,14 +124,14 @@ tecnicamente limpo. Investigação: [`../../research/autoboerse-investigacao.md`
 
 ```bash
 # batch
-node run-autoboerse.mjs --max-pages 3                    # amostra
-node run-autoboerse.mjs --brand volkswagen --max-pages 5 # só uma marca (slug do path)
-node run-autoboerse.mjs --full --max-pages 500           # cobertura fatiada por marca
-node run-autoboerse.mjs --resume
+node run-autoboerse.ts --max-pages 3                    # amostra
+node run-autoboerse.ts --brand volkswagen --max-pages 5 # só uma marca (slug do path)
+node run-autoboerse.ts --full --max-pages 500           # cobertura fatiada por marca
+node run-autoboerse.ts --resume
 
 # recolha contínua (1 min)
-node watch-autoboerse.mjs                                 # contínuo
-node watch-autoboerse.mjs --interval 60 --pages 2
+node watch-autoboerse.ts                                 # contínuo
+node watch-autoboerse.ts --interval 60 --pages 2
 ```
 
 Saída: `autoboerse-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -157,14 +157,14 @@ tecnicamente limpo. Segue o **molde theparking** (JSON-LD + extras do card, junt
 
 ```bash
 # batch
-node run-autocasion.mjs --max-pages 3                 # amostra
-node run-autocasion.mjs --brand audi --max-pages 2    # só uma marca (SEO /…-ocasion)
-node run-autocasion.mjs --full --max-pages 500        # cobertura fatiada por marca
-node run-autocasion.mjs --resume
+node run-autocasion.ts --max-pages 3                 # amostra
+node run-autocasion.ts --brand audi --max-pages 2    # só uma marca (SEO /…-ocasion)
+node run-autocasion.ts --full --max-pages 500        # cobertura fatiada por marca
+node run-autocasion.ts --resume
 
 # recolha contínua (1 min)
-node watch-autocasion.mjs                              # contínuo
-node watch-autocasion.mjs --interval 60 --pages 2
+node watch-autocasion.ts                              # contínuo
+node watch-autocasion.ts --interval 60 --pages 2
 ```
 
 Saída: `autocasion-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -198,14 +198,14 @@ tecnicamente limpo (Next.js/App Router atrás de CloudFront, sem anti-bot). Segu
 
 ```bash
 # batch
-node run-ocasionplus.mjs --max-pages 3                # amostra
-node run-ocasionplus.mjs --brand audi --max-pages 2   # só uma marca (path /coches-segunda-mano/audi)
-node run-ocasionplus.mjs --full --max-pages 800       # cobertura fatiada por marca
-node run-ocasionplus.mjs --resume
+node run-ocasionplus.ts --max-pages 3                # amostra
+node run-ocasionplus.ts --brand audi --max-pages 2   # só uma marca (path /coches-segunda-mano/audi)
+node run-ocasionplus.ts --full --max-pages 800       # cobertura fatiada por marca
+node run-ocasionplus.ts --resume
 
 # recolha contínua (1 min)
-node watch-ocasionplus.mjs                             # contínuo
-node watch-ocasionplus.mjs --interval 60 --pages 2
+node watch-ocasionplus.ts                             # contínuo
+node watch-ocasionplus.ts --interval 60 --pages 2
 ```
 
 Saída: `ocasionplus-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -236,14 +236,14 @@ Next.js limpo. Segue o **molde autoboerse/autotrader** (`__NEXT_DATA__` SSR). In
 
 ```bash
 # batch
-node run-flexicar.mjs --max-pages 3                 # amostra (base + fatias por marca)
-node run-flexicar.mjs --brand audi --max-pages 1    # só uma marca (/audi/segunda-mano/)
-node run-flexicar.mjs --full --max-pages 500        # cobertura por facetas do sitemap
-node run-flexicar.mjs --resume
+node run-flexicar.ts --max-pages 3                 # amostra (base + fatias por marca)
+node run-flexicar.ts --brand audi --max-pages 1    # só uma marca (/audi/segunda-mano/)
+node run-flexicar.ts --full --max-pages 500        # cobertura por facetas do sitemap
+node run-flexicar.ts --resume
 
 # recolha contínua (1 min)
-node watch-flexicar.mjs                              # contínuo
-node watch-flexicar.mjs --interval 60 --pages 2
+node watch-flexicar.ts                              # contínuo
+node watch-flexicar.ts --interval 60 --pages 2
 ```
 
 Saída: `flexicar-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `flexicar-state.json` /
@@ -273,14 +273,14 @@ vem numa IIFE `window.__NUXT__=(function(){…}())` — avaliada num **sandbox `
 
 ```bash
 # batch
-node run-aramisauto.mjs --max-pages 3                 # amostra (/achat/)
-node run-aramisauto.mjs --slice diesel --max-pages 2  # só um silo (/achat/diesel/)
-node run-aramisauto.mjs --full --max-pages 200        # cobertura fatiada por categoria
-node run-aramisauto.mjs --resume
+node run-aramisauto.ts --max-pages 3                 # amostra (/achat/)
+node run-aramisauto.ts --slice diesel --max-pages 2  # só um silo (/achat/diesel/)
+node run-aramisauto.ts --full --max-pages 200        # cobertura fatiada por categoria
+node run-aramisauto.ts --resume
 
 # recolha contínua (1 min)
-node watch-aramisauto.mjs                              # contínuo
-node watch-aramisauto.mjs --interval 60 --pages 2
+node watch-aramisauto.ts                              # contínuo
+node watch-aramisauto.ts --interval 60 --pages 2
 ```
 
 Saída: `aramisauto-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -316,14 +316,14 @@ Investigação: [`../../research/trovit-investigacao.md`](../../research/trovit-
 
 ```bash
 # batch
-node run-trovit.mjs --max-pages 3                 # amostra (slug default: madrid)
-node run-trovit.mjs --brand audi --max-pages 2    # uma faceta (marca/cidade/região/modelo)
-node run-trovit.mjs --full --max-pages 500        # cobertura fatiada por marca
-node run-trovit.mjs --resume
+node run-trovit.ts --max-pages 3                 # amostra (slug default: madrid)
+node run-trovit.ts --brand audi --max-pages 2    # uma faceta (marca/cidade/região/modelo)
+node run-trovit.ts --full --max-pages 500        # cobertura fatiada por marca
+node run-trovit.ts --resume
 
 # recolha contínua (1 min, sort por data)
-node watch-trovit.mjs                             # slug default (madrid), contínuo
-node watch-trovit.mjs --slug audi --interval 60 --pages 2
+node watch-trovit.ts                             # slug default (madrid), contínuo
+node watch-trovit.ts --slug audi --interval 60 --pages 2
 ```
 
 Saída: `trovit-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `trovit-state.json` /
@@ -355,14 +355,14 @@ aramisauto/Nuxt 2 usava IIFE avaliada em sandbox). Investigação: [`../../resea
 
 ```bash
 # batch
-node run-meinauto.mjs --max-pages 3                 # amostra (usados)
-node run-meinauto.mjs --brand Audi --max-pages 2    # só uma marca (makes=Audi)
-node run-meinauto.mjs --full --max-pages 500        # cobertura fatiada por marca
-node run-meinauto.mjs --resume
+node run-meinauto.ts --max-pages 3                 # amostra (usados)
+node run-meinauto.ts --brand Audi --max-pages 2    # só uma marca (makes=Audi)
+node run-meinauto.ts --full --max-pages 500        # cobertura fatiada por marca
+node run-meinauto.ts --resume
 
 # recolha contínua (1 min)
-node watch-meinauto.mjs                              # contínuo
-node watch-meinauto.mjs --interval 60 --pages 2
+node watch-meinauto.ts                              # contínuo
+node watch-meinauto.ts --interval 60 --pages 2
 ```
 
 Saída: `meinauto-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -396,14 +396,14 @@ principal** e o JSON-LD é complementar (dá a cilindrada). Investigação:
 
 ```bash
 # batch
-node run-quoka.mjs --max-pages 3                        # amostra
-node run-quoka.mjs --brand volkswagen --max-pages 5     # só uma marca (slug do path)
-node run-quoka.mjs --full --max-pages 500               # cobertura fatiada por marca
-node run-quoka.mjs --resume
+node run-quoka.ts --max-pages 3                        # amostra
+node run-quoka.ts --brand volkswagen --max-pages 5     # só uma marca (slug do path)
+node run-quoka.ts --full --max-pages 500               # cobertura fatiada por marca
+node run-quoka.ts --resume
 
 # recolha contínua (1 min)
-node watch-quoka.mjs                                    # contínuo
-node watch-quoka.mjs --interval 60 --pages 2
+node watch-quoka.ts                                    # contínuo
+node watch-quoka.ts --interval 60 --pages 2
 ```
 
 Saída: `quoka-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `quoka-state.json` /
@@ -439,14 +439,14 @@ completa — sem JSON-LD/`__NEXT_DATA__`). Investigação: [`../../research/ooyy
 
 ```bash
 # batch
-node run-ooyyo.mjs --max-pages 3                 # amostra (toda a Bélgica)
-node run-ooyyo.mjs --make bmw --max-pages 2      # só uma marca (via qselements idMake)
-node run-ooyyo.mjs --full --max-pages 500        # cobertura fatiada por marca
-node run-ooyyo.mjs --resume
+node run-ooyyo.ts --max-pages 3                 # amostra (toda a Bélgica)
+node run-ooyyo.ts --make bmw --max-pages 2      # só uma marca (via qselements idMake)
+node run-ooyyo.ts --full --max-pages 500        # cobertura fatiada por marca
+node run-ooyyo.ts --resume
 
 # recolha contínua (1 min)
-node watch-ooyyo.mjs                             # contínuo
-node watch-ooyyo.mjs --interval 60 --pages 2
+node watch-ooyyo.ts                             # contínuo
+node watch-ooyyo.ts --interval 60 --pages 2
 ```
 
 Saída: `ooyyo-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `ooyyo-state.json` /
@@ -475,14 +475,14 @@ Investigação: [`../../research/autoline-investigacao.md`](../../research/autol
 
 ```bash
 # batch
-node run-autoline.mjs --max-pages 3                 # amostra (Bélgica)
-node run-autoline.mjs --country DE --max-pages 2    # outra secção-país
-node run-autoline.mjs --full --max-pages 500        # cobertura fatiada por país
-node run-autoline.mjs --resume
+node run-autoline.ts --max-pages 3                 # amostra (Bélgica)
+node run-autoline.ts --country DE --max-pages 2    # outra secção-país
+node run-autoline.ts --full --max-pages 500        # cobertura fatiada por país
+node run-autoline.ts --resume
 
 # recolha contínua (1 min)
-node watch-autoline.mjs                              # contínuo
-node watch-autoline.mjs --interval 60 --pages 2
+node watch-autoline.ts                              # contínuo
+node watch-autoline.ts --interval 60 --pages 2
 ```
 
 Saída: `autoline-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch); `autoline-state.json` /
@@ -518,14 +518,14 @@ Retalhista de usados de **stock próprio** do grupo **AUTO1** (multi-país; reco
 
 ```bash
 # batch
-node run-autohero.mjs --max-pages 3                 # amostra (3 págs × 100)
-node run-autohero.mjs --full --max-pages 100        # catálogo completo (~75 págs)
-node run-autohero.mjs --sort most_popular           # sort alternativo (popularidade)
-node run-autohero.mjs --resume
+node run-autohero.ts --max-pages 3                 # amostra (3 págs × 100)
+node run-autohero.ts --full --max-pages 100        # catálogo completo (~75 págs)
+node run-autohero.ts --sort most_popular           # sort alternativo (popularidade)
+node run-autohero.ts --resume
 
 # recolha contínua (1 min)
-node watch-autohero.mjs                              # contínuo
-node watch-autohero.mjs --interval 60 --pages 2
+node watch-autohero.ts                              # contínuo
+node watch-autohero.ts --interval 60 --pages 2
 ```
 
 Saída: `autohero-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -565,14 +565,14 @@ stands **e** particulares. Investigação: [`../../research/standvirtual-investi
 
 ```bash
 # batch
-node run-standvirtual.mjs --max-pages 3              # amostra
-node run-standvirtual.mjs --brand bmw --max-pages 5  # só uma marca (slug do path)
-node run-standvirtual.mjs --full                     # cobertura completa (~1324 págs)
-node run-standvirtual.mjs --resume
+node run-standvirtual.ts --max-pages 3              # amostra
+node run-standvirtual.ts --brand bmw --max-pages 5  # só uma marca (slug do path)
+node run-standvirtual.ts --full                     # cobertura completa (~1324 págs)
+node run-standvirtual.ts --resume
 
 # recolha contínua (1 min)
-node watch-standvirtual.mjs                          # contínuo
-node watch-standvirtual.mjs --interval 60 --pages 2
+node watch-standvirtual.ts                          # contínuo
+node watch-standvirtual.ts --interval 60 --pages 2
 ```
 
 Saída: `standvirtual-*.ndjson` / `-summary.json` / `-checkpoint.json` (batch);
@@ -600,12 +600,12 @@ carros**, stands **e** particulares (via `seller_type` business/private). Invest
 - ✅ **Recência REAL**: `?search[order]=created_at:desc` (honrado pelo SSR) + `createdTime` por anúncio.
 
 ```bash
-node run-olxpt.mjs --max-pages 3                # amostra (3×52 ≈ 156)
-node run-olxpt.mjs --make bmw --max-pages 5     # uma marca (/carros/bmw/)
-node run-olxpt.mjs --region porto --max-pages 5 # um distrito (/carros/porto/)
-node run-olxpt.mjs --full --max-pages 100       # catálogo completo, fatiado por marca
-node run-olxpt.mjs --resume
-node watch-olxpt.mjs --interval 60 --pages 2    # contínuo, por recência
+node run-olxpt.ts --max-pages 3                # amostra (3×52 ≈ 156)
+node run-olxpt.ts --make bmw --max-pages 5     # uma marca (/carros/bmw/)
+node run-olxpt.ts --region porto --max-pages 5 # um distrito (/carros/porto/)
+node run-olxpt.ts --full --max-pages 100       # catálogo completo, fatiado por marca
+node run-olxpt.ts --resume
+node watch-olxpt.ts --interval 60 --pages 2    # contínuo, por recência
 ```
 
 Saída: `olxpt-*` (batch/watch, igual aos outros). Pronto exceto o upsert na DB
@@ -631,11 +631,11 @@ Investigação: [`../../research/custojusto-investigacao.md`](../../research/cus
 
 ```bash
 # batch (unidade = faceta; sem paginação)
-node run-custojusto.mjs --max-pages 3                   # amostra (base + primeiras facetas)
-node run-custojusto.mjs --brand peugeot --max-pages 1   # só uma marca (slug do path)
-node run-custojusto.mjs --full --max-pages 1500         # cobertura fatiada marca×distrito
-node run-custojusto.mjs --resume
-node watch-custojusto.mjs --interval 60                 # contínuo
+node run-custojusto.ts --max-pages 3                   # amostra (base + primeiras facetas)
+node run-custojusto.ts --brand peugeot --max-pages 1   # só uma marca (slug do path)
+node run-custojusto.ts --full --max-pages 1500         # cobertura fatiada marca×distrito
+node run-custojusto.ts --resume
+node watch-custojusto.ts --interval 60                 # contínuo
 ```
 
 Saída: `custojusto-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O
@@ -664,12 +664,12 @@ Investigação: [`../../research/autopt-investigacao.md`](../../research/autopt-
   → só path + `?page=N`. Recência-proxy (ordem default "Destacados").
 
 ```bash
-node run-autopt.mjs --max-pages 3                      # amostra
-node run-autopt.mjs --make renault --max-pages 2       # só uma marca (path)
-node run-autopt.mjs --district lisboa --max-pages 2    # só um distrito (path)
-node run-autopt.mjs --full --max-pages 900             # cobertura fatiada por marca
-node run-autopt.mjs --resume
-node watch-autopt.mjs --interval 60 --pages 2          # contínuo
+node run-autopt.ts --max-pages 3                      # amostra
+node run-autopt.ts --make renault --max-pages 2       # só uma marca (path)
+node run-autopt.ts --district lisboa --max-pages 2    # só um distrito (path)
+node run-autopt.ts --full --max-pages 900             # cobertura fatiada por marca
+node run-autopt.ts --resume
+node watch-autopt.ts --interval 60 --pages 2          # contínuo
 ```
 
 Saída: `autopt-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
@@ -695,12 +695,12 @@ Investigação: [`../../research/autosapo-investigacao.md`](../../research/autos
 - **robots-clean** (só `/account/` e `/user/`); HTTP puro sem anti-bot.
 
 ```bash
-node run-autosapo.mjs --max-pages 3                  # amostra (3 págs × 20)
-node run-autosapo.mjs --full                         # catálogo completo (~1218 págs, ~24k)
-node run-autosapo.mjs --slice "marca=volvo"          # só uma marca (657 viaturas)
-node run-autosapo.mjs --max-pages 2 --detail         # enriquece via pág. de detalhe (lento)
-node run-autosapo.mjs --resume
-node watch-autosapo.mjs --interval 60 --pages 3      # contínuo, poll por recência
+node run-autosapo.ts --max-pages 3                  # amostra (3 págs × 20)
+node run-autosapo.ts --full                         # catálogo completo (~1218 págs, ~24k)
+node run-autosapo.ts --slice "marca=volvo"          # só uma marca (657 viaturas)
+node run-autosapo.ts --max-pages 2 --detail         # enriquece via pág. de detalhe (lento)
+node run-autosapo.ts --resume
+node watch-autosapo.ts --interval 60 --pages 3      # contínuo, poll por recência
 ```
 
 Saída: `autosapo-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
@@ -732,12 +732,12 @@ Investigação: [`../../research/encontracarros-investigacao.md`](../../research
 - **⭐ Recência REAL:** watch faz poll dos anúncios com `lastmod` > watermark do ciclo anterior.
 
 ```bash
-node run-encontracarros.mjs --max-pages 3                 # amostra (~90 mais recentes)
-node run-encontracarros.mjs --brand bmw --max-pages 2     # só uma marca (slug)
-node run-encontracarros.mjs --district porto --max-pages 2 # só um distrito (slug)
-node run-encontracarros.mjs --full                        # cobertura ~50k (longo)
-node run-encontracarros.mjs --resume
-node watch-encontracarros.mjs --interval 60 --pages 2     # contínuo (recência via lastmod)
+node run-encontracarros.ts --max-pages 3                 # amostra (~90 mais recentes)
+node run-encontracarros.ts --brand bmw --max-pages 2     # só uma marca (slug)
+node run-encontracarros.ts --district porto --max-pages 2 # só um distrito (slug)
+node run-encontracarros.ts --full                        # cobertura ~50k (longo)
+node run-encontracarros.ts --resume
+node watch-encontracarros.ts --interval 60 --pages 2     # contínuo (recência via lastmod)
 ```
 
 Saída: `encontracarros-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
@@ -761,11 +761,11 @@ Segue o **molde theparking** (agregador). Investigação: [`../../research/autou
   (`/api/v4/car_search_form/config`, robots-permitida) semeia as marcas do `--full`.
 
 ```bash
-node run-autouncle.mjs --max-pages 3                    # amostra
-node run-autouncle.mjs --brand Renault --max-pages 5    # só uma marca (slug canónico do path)
-node run-autouncle.mjs --full --max-pages 100           # cobertura fatiada por marca (config API)
-node run-autouncle.mjs --resume
-node watch-autouncle.mjs --interval 60 --pages 2        # contínuo
+node run-autouncle.ts --max-pages 3                    # amostra
+node run-autouncle.ts --brand Renault --max-pages 5    # só uma marca (slug canónico do path)
+node run-autouncle.ts --full --max-pages 100           # cobertura fatiada por marca (config API)
+node run-autouncle.ts --resume
+node watch-autouncle.ts --interval 60 --pages 2        # contínuo
 ```
 
 Saída: `autouncle-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O
@@ -786,7 +786,7 @@ leve destes coletores. Contraste: o theparking.eu (mesma família) passa a 200 n
 Investigação: [`../../research/oparking-investigacao.md`](../../research/oparking-investigacao.md).
 
 > ✅ **Caminho para o inventário PT desta família (JÁ LIGADO):** o coletor **theparking** aceita a
-> fatia `portugal` — `node run-theparking.mjs --country portugal --max-pages 10`. Serve os anúncios PT
+> fatia `portugal` — `node run-theparking.ts --country portugal --max-pages 10`. Serve os anúncios PT
 > por HTTP puro (200), mesmo JSON-LD `Vehicle`, `nb_results = 128 281` (≈ os ~128k do oparking.pt),
 > com fontes reais custojusto.pt/standvirtual.com/olx.pt/**piscapisca.pt**/autohero.com (inclui stock
 > do PiscaPisca, que é inacessível diretamente por Cloudflare). Verificado: 52 anúncios/2 págs, 50/52
@@ -811,11 +811,11 @@ Investigação: [`../../research/santogal-investigacao.md`](../../research/santo
   ⚠️ `€` = `&#x20AC;` — decodificar entidades antes de extrair os dígitos do preço.
 
 ```bash
-node run-santogal.mjs --max-pages 3               # amostra
-node run-santogal.mjs --make BMW --max-pages 2    # só uma marca (querytext=Usados {MARCA})
-node run-santogal.mjs --full                      # cobertura completa (~39 págs, ~1.538)
-node run-santogal.mjs --resume
-node watch-santogal.mjs --interval 60 --pages 2   # contínuo
+node run-santogal.ts --max-pages 3               # amostra
+node run-santogal.ts --make BMW --max-pages 2    # só uma marca (querytext=Usados {MARCA})
+node run-santogal.ts --full                      # cobertura completa (~39 págs, ~1.538)
+node run-santogal.ts --resume
+node watch-santogal.ts --interval 60 --pages 2   # contínuo
 ```
 
 Saída: `santogal-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
@@ -840,10 +840,10 @@ Investigação: [`../../research/caetano-investigacao.md`](../../research/caetan
 - **robots:** `api.gsci.pt` sem robots (nada proibido); `caetano.pt` só `/wp-admin/`.
 
 ```bash
-node run-caetano.mjs --max-pages 3                 # amostra (3 págs × 250 viaturas)
-node run-caetano.mjs --full --max-pages 30         # catálogo completo (~13 págs)
-node run-caetano.mjs --resume
-node watch-caetano.mjs --interval 60 --pages 2     # contínuo
+node run-caetano.ts --max-pages 3                 # amostra (3 págs × 250 viaturas)
+node run-caetano.ts --full --max-pages 30         # catálogo completo (~13 págs)
+node run-caetano.ts --resume
+node watch-caetano.ts --interval 60 --pages 2     # contínuo
 ```
 
 Saída: `caetano-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
@@ -870,11 +870,11 @@ um SPA **Nuxt 3**. Investigação: [`../../research/carplus-investigacao.md`](..
   como fonte primária do grupo; deduplicar por VIN.**
 
 ```bash
-node run-carplus.mjs --max-pages 3                 # amostra
-node run-carplus.mjs --brand audi --max-pages 3    # só uma marca (path)
-node run-carplus.mjs --full --max-pages 120        # catálogo completo (~1.037)
-node run-carplus.mjs --resume
-node watch-carplus.mjs --interval 60 --pages 2     # contínuo
+node run-carplus.ts --max-pages 3                 # amostra
+node run-carplus.ts --brand audi --max-pages 3    # só uma marca (path)
+node run-carplus.ts --full --max-pages 120        # catálogo completo (~1.037)
+node run-carplus.ts --resume
+node watch-carplus.ts --interval 60 --pages 2     # contínuo
 ```
 
 Saída: `carplus-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
@@ -965,14 +965,14 @@ stack Scout24 do AutoTrader.nl** → segue o **molde `autotrader/`**. Investiga�
 
 ```bash
 # batch
-node run-autoscout24.mjs --make bmw --max-pages 3                       # amostra (~300, size=100)
-node run-autoscout24.mjs --country D,A,B,E,F,I,L,NL --make bmw --max-pages 1  # pan-EU
-node run-autoscout24.mjs --full                                        # cobertura pan-EU adaptativa
-node run-autoscout24.mjs --full --country D --make bmw --max-pages 2 --resume  # fatia + sub-fatia preço
-node run-autoscout24.mjs --detail --make bmw --size 5 --max-pages 1     # enriquecer fatia estreita
+node run-autoscout24.ts --make bmw --max-pages 3                       # amostra (~300, size=100)
+node run-autoscout24.ts --country D,A,B,E,F,I,L,NL --make bmw --max-pages 1  # pan-EU
+node run-autoscout24.ts --full                                        # cobertura pan-EU adaptativa
+node run-autoscout24.ts --full --country D --make bmw --max-pages 2 --resume  # fatia + sub-fatia preço
+node run-autoscout24.ts --detail --make bmw --size 5 --max-pages 1     # enriquecer fatia estreita
 
 # recolha contínua (recência REAL)
-node watch-autoscout24.mjs --country D,F --pages 2 --online-since 1
+node watch-autoscout24.ts --country D,F --pages 2 --online-since 1
 ```
 
 Flags batch: `--max-pages` (5), `--size` (100), `--country <cy,…>`, `--make <slug|id>`, `--full`,

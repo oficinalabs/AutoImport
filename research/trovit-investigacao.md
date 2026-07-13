@@ -118,11 +118,11 @@ Deteção de novos fiável (ao contrário do AutoTrader/autocasion, que não tê
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-trovit.mjs --max-pages 3` → **71 anúncios** (madrid) em 5 s, com make/model/variant/year/km/
+1. `run-trovit.ts --max-pages 3` → **71 anúncios** (madrid) em 5 s, com make/model/variant/year/km/
    price/region/detail_url/image/id/updated preenchidos.
 2. `--resume --max-pages 5` → retomou em 71, estendeu para **118** sem duplicar (118 ids únicos).
 3. `--brand audi --max-pages 2` → **50 anúncios, todos Audi** (não-Audi: 0) → o fatiamento filtra.
-4. `watch-trovit.mjs --interval 12 --cycles 2` → ciclo 1: **25 novos**; ciclo 2: **0 novos** (dedupe);
+4. `watch-trovit.ts --interval 12 --cycles 2` → ciclo 1: **25 novos**; ciclo 2: **0 novos** (dedupe);
    "mais fresco 535 min" (sort por data ativo).
 5. Guarda robots: pedidos a `/rd/`, `/index.php/cod.search_cars`, `/details/`, `/listing/`, `/publisher/`,
    `/redirect/` são **bloqueados**; `/coches/audi`, `/coches/madrid/2`, `?order_by=source_date` passam.

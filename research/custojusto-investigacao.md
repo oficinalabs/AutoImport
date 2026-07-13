@@ -94,12 +94,12 @@ o `max(listTime)` do ciclo como sinal de deriva.
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-12)
 
-1. `run-custojusto.mjs --max-pages 3` → **116 anúncios** PT (6s), com make/model/year/fuel/gearbox/
+1. `run-custojusto.ts --max-pages 3` → **116 anúncios** PT (6s), com make/model/year/fuel/gearbox/
    category/price/region/seller_type/image/listing_created_at a **100%** (km 19%, power_hp 28%).
 2. `--resume --max-pages 2` → retomou na 4ª faceta, +2 facetas, **189 linhas, 0 duplicados** (dedupe
    global cross-faceta).
 3. `--brand peugeot --max-pages 1` → **40 anúncios, todos Peugeot** (via `…/carros-usados/peugeot`).
-4. `watch-custojusto.mjs --interval 12 --cycles 2` → ciclo 1: 40 novos; ciclo 2: 0 novos (dedupe);
+4. `watch-custojusto.ts --interval 12 --cycles 2` → ciclo 1: 40 novos; ciclo 2: 0 novos (dedupe);
    `último` = `max(listTime)` mostrado.
 5. Guarda robots: `/user/`, `/login`, `/servicos/` bloqueados; a listagem e as facetas passam.
 
