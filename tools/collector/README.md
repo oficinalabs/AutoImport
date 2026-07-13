@@ -792,6 +792,96 @@ Investigação: [`../../research/oparking-investigacao.md`](../../research/opark
 > do PiscaPisca, que é inacessível diretamente por Cloudflare). Verificado: 52 anúncios/2 págs, 50/52
 > = PORTUGAL.
 
+## santogal.pt (vigésimo-primeiro coletor — rede de stands PT)
+
+Rede de stands **portuguesa** (Santogal — grupo multimarca, **stock próprio**, só profissional), SSR
+Umbraco, **~1.538 carros usados**, scraper-friendly. Segue o **molde quoka/autopt** (card HTML como
+fonte principal — **sem JSON-LD útil por anúncio**).
+Investigação: [`../../research/santogal-investigacao.md`](../../research/santogal-investigacao.md).
+
+- **Fonte = CARD** `<div class="card_car" data-detail-url="/{marca}/{modelo}/{id}/" data-push-object='{…}'>`
+  (40/página): `carroId` (=último segmento do URL), marca (`brand_label`), modelo+variante, km/ano/
+  combustível/cor (spans `col-info-car` por `data-id="icon-…"`), preço (+ `first-price` riscado →
+  `price_old`), imagem, `tipoCarro` (Usado). O único `ld+json` é `Organization` (inútil).
+- **Rede de stands (stock próprio):** `source='Santogal'`, `owner_type='empresa'`, sem particulares.
+- **Anti-bot Cloudflare passivo**; **robots.txt 100% permissivo** (`Disallow:` vazio). HTTP puro.
+- **Paginação `?pagina=N`**; rota `/pt/search-page/?querytext=Usados&vehicletype=car`. `--full` pagina
+  tudo (~39 págs); `--make {MARCA}` via AND no `querytext`.
+- **⚠️ Sort por data indisponível** → recência-proxy (ordem default) + `max(carroId)` no watch.
+  ⚠️ `€` = `&#x20AC;` — decodificar entidades antes de extrair os dígitos do preço.
+
+```bash
+node run-santogal.mjs --max-pages 3               # amostra
+node run-santogal.mjs --make BMW --max-pages 2    # só uma marca (querytext=Usados {MARCA})
+node run-santogal.mjs --full                      # cobertura completa (~39 págs, ~1.538)
+node run-santogal.mjs --resume
+node watch-santogal.mjs --interval 60 --pages 2   # contínuo
+```
+
+Saída: `santogal-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). Extras:
+`node_id`, `owner_type`, `condition`, `price_old`, `vehicle_src`. gearbox/engine/doors/segmento/região
+só no detalhe (null na listagem).
+
+## caetano.pt (vigésimo-segundo coletor — rede de stands PT, Grupo Salvador Caetano)
+
+Rede de retalho do **Grupo Salvador Caetano** / Caetano Baviera Portugal (concessionários Caetano
+Opel/Peugeot/Renault/Hyundai/BMW/Mercedes… + Carplus). **Stock de usados/seminovos, só profissional**.
+**~2.359 carros usados.** Segue o **molde autohero** (fonte = API JSON interna).
+Investigação: [`../../research/caetano-investigacao.md`](../../research/caetano-investigacao.md).
+
+- **Fonte = API JSON "Digital Store" do grupo**, descoberta no bundle da SPA Vue de `/pesquisa/`
+  (`__CAETANO_VUE_APP__` → `companyId 24`): `POST https://api.gsci.pt/ds/search/v2?numberElements=250&page=N…`,
+  header **`companyId: 24` obrigatório** (400 sem ele), body `{}`. Devolve `{count, data.searchResult[],
+  pagination.maxPage}` — rico e paginável, **sem token/cookie**. HTTP puro passa.
+- **⚠️ Filtro de alvo:** a pesquisa devolve `count≈3.200` mas mistura **~28% motas** (`vehicleType='MOTORCYCLE'`)
+  e **~1% novas** → filtramos por `vehicleType='CAR'` **E** `condition='Usado'` → ~2.359.
+- **`source`** = `installationName` (o stand: "Carplus PT", "Caetano Opel - Porto"…). Chave natural =
+  **VIN**; `detail_url` reconstruído com o slug builder da SPA.
+- **robots:** `api.gsci.pt` sem robots (nada proibido); `caetano.pt` só `/wp-admin/`.
+
+```bash
+node run-caetano.mjs --max-pages 3                 # amostra (3 págs × 250 viaturas)
+node run-caetano.mjs --full --max-pages 30         # catálogo completo (~13 págs)
+node run-caetano.mjs --resume
+node watch-caetano.mjs --interval 60 --pages 2     # contínuo
+```
+
+Saída: `caetano-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
+**Recência**-proxy (`updateTime` = sync do feed). Extras ricos: `vin`, `license_plate`, `dealer`/
+`dealer_municipality`, `used_type`, `origin`, `power_cv`, `displacement_cc`, `seats`, `price_previous`,
+`monthly_price`, `stock`.
+
+## carplus.pt (vigésimo-terceiro coletor — rede de stands PT, Grupo Salvador Caetano)
+
+Rede de stands de usados do **Grupo Salvador Caetano** (stock próprio certificado; só profissional),
+**~1.037 viaturas**. Segue o **molde `__NEXT_DATA__`** — fonte única no payload **`__NUXT_DATA__`** de
+um SPA **Nuxt 3**. Investigação: [`../../research/carplus-investigacao.md`](../../research/carplus-investigacao.md).
+
+- **Fonte = `__NUXT_DATA__`** (16 viaturas/página, ~64 campos: brand/model/version, year, km, fuel,
+  transmission, **cilindrada**, **cor**, **portas**, pricePvp, dealerDistrict, **installationName (stand)**,
+  condition, **updateTime**, vin, matrícula…). ⚠️ Está em formato **`devalue`** (array plano com refs por
+  índice) → **resolver recursivo** em `parse.mjs`. `detail_url` do **JSON-LD `Vehicle`** juntado por VIN.
+- **`source`** = stand exposto (`installationName`: "Carplus PT" ou concessões do grupo). Chave = VIN.
+- **Sem anti-bot**; robots só proíbe `/backoffice/`. **API `api.gsci.pt/ds/` descartada** (a SSR já traz
+  tudo). Paginação `?page=N`; ordem default estável → `--full` pagina a listagem geral (completo, 1.037);
+  `--brand {slug}` filtra 1 marca.
+- **⚠️ Sobreposição com o Caetano:** 93% dos VINs do Carplus (964/1.037) estão no coletor `caetano`
+  (mesma plataforma Salvador Caetano); o Carplus só acrescenta +73 VINs únicos. **Preferir o `caetano`
+  como fonte primária do grupo; deduplicar por VIN.**
+
+```bash
+node run-carplus.mjs --max-pages 3                 # amostra
+node run-carplus.mjs --brand audi --max-pages 3    # só uma marca (path)
+node run-carplus.mjs --full --max-pages 120        # catálogo completo (~1.037)
+node run-carplus.mjs --resume
+node watch-carplus.mjs --interval 60 --pages 2     # contínuo
+```
+
+Saída: `carplus-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
+**Recência**-proxy (`update_time`). Extras: `vin`, `license_plate`, `price_pvp`, `monthly_price`,
+`taeg`, `power_cv`, `condition`, `availability`, `reserved`, `dealer_district`/`dealer_municipality`,
+`installation`, `stock`, `origin`.
+
 ## Arquitetura e o "porquê" das decisões
 
 ```
@@ -839,6 +929,12 @@ encontracarros/           sitemap + detalhe SSR (agregador PT ~50k; JSON-LD + ca
   http · sitemap · parse · schema · crawl · watch
 autouncle/                JSON-LD ItemList + RSC __next_f (agregador PT ~99k; molde theparking)
   http · parse · schema · crawl · watch
+santogal/                 card HTML SSR Umbraco (rede stands PT ~1,5k; sem JSON-LD)
+  http · parse · schema · crawl · watch
+caetano/                  API JSON interna do grupo (Salvador Caetano PT ~2,4k; companyId 24)
+  http · parse · schema · crawl · watch
+carplus/                  __NUXT_DATA__ devalue (Salvador Caetano PT ~1k; 93% ⊂ caetano — dedup VIN)
+  http · parse · schema · crawl · watch
 (oparking/                ⚫ BLOQUEADO — Cloudflare challenge ativo; usar theparking·PT)
 run-theparking.mjs / watch-theparking.mjs      CLIs
 run-autotrader.mjs / watch-autotrader.mjs      CLIs
@@ -860,6 +956,9 @@ run-autopt.mjs / watch-autopt.mjs              CLIs
 run-autosapo.mjs / watch-autosapo.mjs          CLIs
 run-encontracarros.mjs / watch-encontracarros.mjs  CLIs
 run-autouncle.mjs / watch-autouncle.mjs        CLIs
+run-santogal.mjs / watch-santogal.mjs          CLIs
+run-caetano.mjs / watch-caetano.mjs            CLIs
+run-carplus.mjs / watch-carplus.mjs            CLIs
 ```
 Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que é específico
 (URLs, parse da fonte, mapeamento de campos).
