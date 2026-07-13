@@ -1,0 +1,7 @@
+{
+  "name": "collector",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Coletores de dados de anúncios para a AutoImport (sem dependências — fetch nativo)"
+}

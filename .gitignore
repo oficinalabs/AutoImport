@@ -11,6 +11,7 @@ next-env.d.ts
 # production
 /build
 dist/
+build/
 
 # misc
 .DS_Store
@@ -29,9 +30,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 
-# python engine
+# python engine / collectors
 __pycache__/
 *.pyc
+.venv/
+tools/collector/piscapisca/.venv/
 
 # vercel
 .vercel
+
+# collectors (tools/) — outputs e deps locais
+tools/collector/node_modules
+tools/collector/out/
+tools/net-capture/node_modules
+tools/net-capture/out/
+tools/net-capture/package-lock.json
