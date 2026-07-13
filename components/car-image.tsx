@@ -1,5 +1,5 @@
-import { Car } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Car } from "lucide-react";
 
 /**
  * Placeholder de foto de carro.

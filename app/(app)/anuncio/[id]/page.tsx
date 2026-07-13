@@ -1,17 +1,17 @@
-import { ArrowLeft, BellPlus, Heart, MessagesSquare } from "lucide-react";
-import Link from "next/link";
-import { notFound } from "next/navigation";
 import { CarImage } from "@/components/car-image";
 import { CostBreakdown } from "@/components/cost-breakdown";
 import { CountryFlag } from "@/components/country-flag";
 import { KmTrustBadge } from "@/components/km-trust-badge";
 import { PriceChart } from "@/components/price-chart";
 import { SavingsBadge } from "@/components/savings-badge";
-import { VerdictBadge } from "@/components/verdict-badge";
 import { Button } from "@/components/ui/button";
+import { VerdictBadge } from "@/components/verdict-badge";
 import { getListing } from "@/lib/data";
 import { formatCc, formatEuro, formatKm, formatNumber } from "@/lib/format";
 import type { Listing } from "@/lib/types";
+import { ArrowLeft, BellPlus, Heart, MessagesSquare } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -104,12 +104,15 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
           <div className="rounded-[10px] border border-line bg-surface p-5">
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-xs uppercase tracking-wide text-ink-soft">Custo final em PT</div>
+                <div className="text-xs uppercase tracking-wide text-ink-soft">
+                  Custo final em PT
+                </div>
                 <div className="tnum font-display text-2xl font-bold">
                   {formatEuro(listing.cost.totalPt)}
                 </div>
                 <div className="mt-1 text-xs text-ink-soft">
-                  vs <span className="tnum">{formatEuro(listing.ptMarket.estimatedPrice)}</span> em Portugal
+                  vs <span className="tnum">{formatEuro(listing.ptMarket.estimatedPrice)}</span> em
+                  Portugal
                 </div>
               </div>
               <SavingsBadge
@@ -130,8 +133,8 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
             </h3>
             <KmTrustBadge trust={listing.kmTrust} />
             <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-              Confirma sempre o histórico de quilometragem antes de fechar — o risco de
-              fraude é maior em importados.
+              Confirma sempre o histórico de quilometragem antes de fechar — o risco de fraude é
+              maior em importados.
             </p>
           </div>
 

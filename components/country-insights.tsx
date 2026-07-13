@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { country } from "@/lib/countries";
 import { formatEuro, formatNumber } from "@/lib/format";
 import type { CountryInsight } from "@/lib/types";
+import Link from "next/link";
 
 /** "Melhores países agora" — liga a dinâmica de país ao valor. */
 export function CountryInsights({ insights }: { insights: CountryInsight[] }) {

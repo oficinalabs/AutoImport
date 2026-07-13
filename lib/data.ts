@@ -15,9 +15,9 @@ import {
   CONVERSATIONS,
   COUNTRY_INSIGHTS,
   DEALS,
-  findListing,
   LISTINGS,
   STAND,
+  findListing,
 } from "./mock";
 import type {
   Alert,
@@ -52,14 +52,16 @@ export async function searchListings(filters: SearchFilters = {}): Promise<Listi
     const q = filters.query.toLowerCase();
     out = out.filter((l) => l.title.toLowerCase().includes(q));
   }
-  if (filters.countries?.length) {
-    out = out.filter((l) => filters.countries!.includes(l.country));
+  const wantedCountries = filters.countries;
+  if (wantedCountries?.length) {
+    out = out.filter((l) => wantedCountries.includes(l.country));
   }
   if (filters.onlyOpportunities) {
     out = out.filter((l) => l.verdict === "compensa");
   }
-  if (filters.maxPrice) {
-    out = out.filter((l) => l.cost.totalPt <= filters.maxPrice!);
+  const maxPrice = filters.maxPrice;
+  if (maxPrice) {
+    out = out.filter((l) => l.cost.totalPt <= maxPrice);
   }
   switch (filters.sort) {
     case "price":
@@ -95,7 +97,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
 export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
   return settle(
-    [...LISTINGS].filter((l) => l.verdict === "compensa").sort((a, b) => b.savings - a.savings).slice(0, limit),
+    [...LISTINGS]
+      .filter((l) => l.verdict === "compensa")
+      .sort((a, b) => b.savings - a.savings)
+      .slice(0, limit),
   );
 }
 
@@ -118,11 +123,26 @@ export async function getAlerts(): Promise<Alert[]> {
   return settle([...ALERTS]);
 }
 
+export interface AlertDraft {
+  name: string;
+  criteria: string;
+  countries: CountryCode[];
+  maxPrice?: number;
+}
+
+// TODO(backend): persistir em saved_searches/alerts e ligar o job de matching.
+export async function createAlert(_draft: AlertDraft): Promise<void> {
+  return settle(undefined);
+}
+
+// TODO(backend): persistir o estado ativo/inativo.
+export async function toggleAlert(_id: string, _active: boolean): Promise<void> {
+  return settle(undefined);
+}
+
 // ── Negociações ─────────────────────────────────────────────────
 export async function getConversations(): Promise<Conversation[]> {
-  return settle(
-    [...CONVERSATIONS].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-  );
+  return settle([...CONVERSATIONS].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 }
 
 export async function getConversation(id: string): Promise<Conversation | null> {

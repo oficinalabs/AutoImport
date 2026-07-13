@@ -1,8 +1,5 @@
 "use client";
 
-import { Heart } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
 import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
 import { KmTrustBadge } from "@/components/km-trust-badge";
@@ -12,6 +9,9 @@ import { toggleFavorite } from "@/lib/data";
 import { formatEuro, formatKm } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Heart } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 export function CarCard({ listing }: { listing: Listing }) {
   const [fav, setFav] = useState(listing.isFavorite);
@@ -60,8 +60,12 @@ export function CarCard({ listing }: { listing: Listing }) {
 
         <div className="mt-auto flex items-end justify-between border-t border-line pt-3">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-ink-soft">Custo final em PT</div>
-            <div className="tnum font-display text-lg font-bold">{formatEuro(listing.cost.totalPt)}</div>
+            <div className="text-[11px] uppercase tracking-wide text-ink-soft">
+              Custo final em PT
+            </div>
+            <div className="tnum font-display text-lg font-bold">
+              {formatEuro(listing.cost.totalPt)}
+            </div>
           </div>
           <SavingsBadge
             savings={listing.savings}

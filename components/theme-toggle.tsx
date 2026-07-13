@@ -1,9 +1,9 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
 
 const OPTIONS = [
   { value: "light", icon: Sun, label: "Claro" },
@@ -21,9 +21,8 @@ export function ThemeToggle() {
   }
 
   return (
-    <div
+    <fieldset
       className="flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5"
-      role="group"
       aria-label="Tema"
     >
       {OPTIONS.map(({ value, icon: Icon, label }) => (
@@ -41,6 +40,6 @@ export function ThemeToggle() {
           <Icon className="size-3.5" />
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }

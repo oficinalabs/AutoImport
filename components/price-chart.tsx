@@ -1,7 +1,7 @@
 "use client";
 
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatEuro } from "@/lib/format";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 /** Histórico de preço de mercado PT do modelo. */
 export function PriceChart({ data }: { data: { month: string; price: number }[] }) {
@@ -21,10 +21,7 @@ export function PriceChart({ data }: { data: { month: string; price: number }[] 
             axisLine={false}
             tickLine={false}
           />
-          <YAxis
-            hide
-            domain={["dataMin - 1500", "dataMax + 1500"]}
-          />
+          <YAxis hide domain={["dataMin - 1500", "dataMax + 1500"]} />
           <Tooltip
             cursor={{ stroke: "var(--line-strong)" }}
             contentStyle={{

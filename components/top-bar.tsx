@@ -1,32 +1,33 @@
 "use client";
 
+import { ThemeToggle } from "@/components/theme-toggle";
+import { COUNTRY_LIST } from "@/lib/countries";
+import { cn } from "@/lib/utils";
 import {
   Bell,
+  BellRing,
   Car,
   ChevronDown,
   Heart,
   LayoutDashboard,
+  LogOut,
   MessagesSquare,
   Search,
   Store,
-  BellRing,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { COUNTRY_LIST } from "@/lib/countries";
-import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Painel", icon: LayoutDashboard, exact: true },
+  { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/pesquisar", label: "Pesquisar", icon: Search },
   { href: "/favoritos", label: "Favoritos", icon: Heart },
   { href: "/negociacoes", label: "Negociações", icon: MessagesSquare },
   { href: "/compras", label: "Compras", icon: Car },
 ];
 
-function isActive(pathname: string, href: string, exact?: boolean) {
-  return exact ? pathname === href : pathname.startsWith(href);
+function isActive(pathname: string, href: string) {
+  return pathname.startsWith(href);
 }
 
 export function TopBar() {
@@ -36,7 +37,7 @@ export function TopBar() {
     <header className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-2 px-4 sm:px-6">
         {/* Logo */}
-        <Link href="/" className="mr-2 flex items-center gap-2 font-display font-bold">
+        <Link href="/painel" className="mr-2 flex items-center gap-2 font-display font-bold">
           <span className="flex size-7 items-center justify-center rounded-[6px] bg-petrol text-amber">
             <Car className="size-4" />
           </span>
@@ -45,8 +46,8 @@ export function TopBar() {
 
         {/* Nav */}
         <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto">
-          {NAV.map(({ href, label, icon: Icon, exact }) => {
-            const active = isActive(pathname, href, exact);
+          {NAV.map(({ href, label, icon: Icon }) => {
+            const active = isActive(pathname, href);
             return (
               <Link
                 key={href}
@@ -140,6 +141,15 @@ function AvatarMenu() {
             {label}
           </Link>
         ))}
+        <div className="my-1 h-px bg-line" />
+        {/* TODO(backend): terminar sessão real com Better Auth */}
+        <Link
+          href="/entrar"
+          className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
+        >
+          <LogOut className="size-4" />
+          Terminar sessão
+        </Link>
       </div>
     </details>
   );

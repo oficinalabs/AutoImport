@@ -1,8 +1,8 @@
-import { Building2, Mail, MapPin, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getStand } from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
+import { Building2, Mail, MapPin, Phone } from "lucide-react";
 
 const SUB_LABEL = {
   trial: { label: "Trial (1.º mês grátis)", className: "bg-good-soft text-good" },

@@ -1,7 +1,5 @@
 "use client";
 
-import { Lock, Send } from "lucide-react";
-import { useState } from "react";
 import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
 import { Button } from "@/components/ui/button";
@@ -9,6 +7,8 @@ import { sendMessage } from "@/lib/data";
 import { formatEuro, relativeDay } from "@/lib/format";
 import type { Conversation, ConversationStatus, Message } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Lock, Send } from "lucide-react";
+import { useState } from "react";
 
 const STATUS: Record<ConversationStatus, { label: string; className: string }> = {
   aguarda_resposta: { label: "Aguarda resposta", className: "bg-neutral-soft text-steel" },
@@ -101,8 +101,8 @@ export function NegotiationsView({ conversations }: { conversations: Conversatio
             {/* Aviso de privacidade */}
             <div className="flex items-center gap-2 bg-surface-2 px-3 py-2 text-xs text-ink-soft">
               <Lock className="size-3.5 shrink-0 text-steel" />
-              Comunicação por email mascarado da plataforma — o email real do fornecedor
-              e do stand fica privado.
+              Comunicação por email mascarado da plataforma — o email real do fornecedor e do stand
+              fica privado.
             </div>
 
             {/* Mensagens */}

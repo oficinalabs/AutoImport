@@ -1,10 +1,10 @@
-import { Check, Circle } from "lucide-react";
 import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
 import { DealStepper } from "@/components/deal-stepper";
 import { getDeals } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { Check, Circle } from "lucide-react";
 
 export default async function ComprasPage() {
   const deals = await getDeals();
@@ -31,7 +31,9 @@ export default async function ComprasPage() {
                     <span>·</span>
                     <span className="tnum">{formatEuro(d.totalPt)}</span>
                     <span>·</span>
-                    <span className="tnum font-medium text-good">poupa {formatEuro(d.savings)}</span>
+                    <span className="tnum font-medium text-good">
+                      poupa {formatEuro(d.savings)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -54,7 +56,9 @@ export default async function ComprasPage() {
                 </div>
               )}
               <div>
-                <div className="mb-1.5 text-xs uppercase tracking-wide text-ink-soft">Documentos</div>
+                <div className="mb-1.5 text-xs uppercase tracking-wide text-ink-soft">
+                  Documentos
+                </div>
                 <ul className="flex flex-col gap-1">
                   {d.checklist.map((c) => (
                     <li

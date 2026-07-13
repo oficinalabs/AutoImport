@@ -1,5 +1,3 @@
-import { BellRing, Car, PiggyBank, Sparkles } from "lucide-react";
-import Link from "next/link";
 import { CarCard } from "@/components/car-card";
 import { CountryFlag } from "@/components/country-flag";
 import { CountryInsights } from "@/components/country-insights";
@@ -7,13 +5,10 @@ import { DealProgress } from "@/components/deal-stepper";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  getCountryInsights,
-  getDashboardStats,
-  getDeals,
-  getTopOpportunities,
-} from "@/lib/data";
+import { getCountryInsights, getDashboardStats, getDeals, getTopOpportunities } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
+import { BellRing, Car, PiggyBank, Sparkles } from "lucide-react";
+import Link from "next/link";
 
 export default async function PainelPage() {
   const [stats, opportunities, insights, deals] = await Promise.all([
@@ -28,9 +23,7 @@ export default async function PainelPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Bom dia, Rui 👋</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Aqui está o que compensa importar hoje.
-          </p>
+          <p className="mt-1 text-sm text-ink-soft">Aqui está o que compensa importar hoje.</p>
         </div>
         <Button asChild variant="accent">
           <Link href="/pesquisar">
@@ -41,7 +34,11 @@ export default async function PainelPage() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label="Oportunidades novas" value={String(stats.newOpportunities)} icon={Sparkles} />
+        <StatCard
+          label="Oportunidades novas"
+          value={String(stats.newOpportunities)}
+          icon={Sparkles}
+        />
         <StatCard
           label="Poupança potencial"
           value={formatEuro(stats.totalPotentialSavings)}

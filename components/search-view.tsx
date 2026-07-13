@@ -1,14 +1,14 @@
 "use client";
 
-import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
 import { CarCard } from "@/components/car-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_LIST } from "@/lib/countries";
 import type { CountryCode, Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 
 type Sort = "savings" | "recent" | "price";
 
@@ -21,12 +21,27 @@ export function SearchView({
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [countries, setCountries] = useState<CountryCode[]>(
-    initialCountry ? [initialCountry] : [],
-  );
+  const [countries, setCountries] = useState<CountryCode[]>(initialCountry ? [initialCountry] : []);
   const [onlyOpps, setOnlyOpps] = useState(false);
   const [sort, setSort] = useState<Sort>("savings");
   const [selected, setSelected] = useState<string[]>([]);
+
+  // Filtros avançados ("Mais filtros")
+  const [showMore, setShowMore] = useState(false);
+  const [minYear, setMinYear] = useState("");
+  const [maxKm, setMaxKm] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [fuel, setFuel] = useState("");
+  const [gearbox, setGearbox] = useState("");
+  const advancedCount = [minYear, maxKm, maxPrice, fuel, gearbox].filter(Boolean).length;
+
+  function clearAdvanced() {
+    setMinYear("");
+    setMaxKm("");
+    setMaxPrice("");
+    setFuel("");
+    setGearbox("");
+  }
 
   function toggleCountry(code: CountryCode) {
     setCountries((prev) =>
@@ -48,6 +63,11 @@ export function SearchView({
     }
     if (countries.length) out = out.filter((l) => countries.includes(l.country));
     if (onlyOpps) out = out.filter((l) => l.verdict === "compensa");
+    if (minYear) out = out.filter((l) => l.year >= Number(minYear));
+    if (maxKm) out = out.filter((l) => l.km <= Number(maxKm));
+    if (maxPrice) out = out.filter((l) => l.cost.totalPt <= Number(maxPrice));
+    if (fuel) out = out.filter((l) => l.model.fuel === fuel);
+    if (gearbox) out = out.filter((l) => l.model.transmission === gearbox);
     out.sort((a, b) =>
       sort === "price"
         ? a.cost.totalPt - b.cost.totalPt
@@ -56,7 +76,7 @@ export function SearchView({
           : b.savings - a.savings,
     );
     return out;
-  }, [listings, query, countries, onlyOpps, sort]);
+  }, [listings, query, countries, onlyOpps, sort, minYear, maxKm, maxPrice, fuel, gearbox]);
 
   return (
     <div className="flex flex-col gap-5">
@@ -96,9 +116,21 @@ export function SearchView({
           </label>
           <button
             type="button"
-            className="flex h-10 items-center gap-1.5 rounded-[6px] border border-line-strong px-3 text-sm text-ink-soft hover:text-ink"
+            onClick={() => setShowMore((v) => !v)}
+            aria-expanded={showMore}
+            className={cn(
+              "flex h-10 items-center gap-1.5 rounded-[6px] border px-3 text-sm transition-colors",
+              showMore || advancedCount > 0
+                ? "border-petrol text-ink"
+                : "border-line-strong text-ink-soft hover:text-ink",
+            )}
           >
             <SlidersHorizontal className="size-4" /> Mais filtros
+            {advancedCount > 0 && (
+              <span className="tnum flex size-5 items-center justify-center rounded-full bg-petrol text-[11px] font-semibold text-white">
+                {advancedCount}
+              </span>
+            )}
           </button>
           <div className="ml-auto">
             <select
@@ -113,6 +145,82 @@ export function SearchView({
             </select>
           </div>
         </div>
+
+        {/* Filtros avançados */}
+        {showMore && (
+          <div className="grid gap-3 rounded-[8px] border border-line bg-surface p-3 sm:grid-cols-3 lg:grid-cols-6">
+            <Sel
+              label="Ano mínimo"
+              value={minYear}
+              onChange={setMinYear}
+              options={[
+                ["", "Qualquer"],
+                ["2020", "2020+"],
+                ["2021", "2021+"],
+                ["2022", "2022+"],
+                ["2023", "2023+"],
+                ["2024", "2024+"],
+              ]}
+            />
+            <Sel
+              label="Km máximos"
+              value={maxKm}
+              onChange={setMaxKm}
+              options={[
+                ["", "Qualquer"],
+                ["30000", "até 30 000"],
+                ["60000", "até 60 000"],
+                ["100000", "até 100 000"],
+                ["150000", "até 150 000"],
+              ]}
+            />
+            <Sel
+              label="Preço final máx."
+              value={maxPrice}
+              onChange={setMaxPrice}
+              options={[
+                ["", "Qualquer"],
+                ["20000", "até 20 000 €"],
+                ["30000", "até 30 000 €"],
+                ["40000", "até 40 000 €"],
+                ["50000", "até 50 000 €"],
+              ]}
+            />
+            <Sel
+              label="Combustível"
+              value={fuel}
+              onChange={setFuel}
+              options={[
+                ["", "Todos"],
+                ["gasolina", "Gasolina"],
+                ["diesel", "Diesel"],
+                ["híbrido", "Híbrido"],
+                ["phev", "PHEV"],
+                ["elétrico", "Elétrico"],
+              ]}
+            />
+            <Sel
+              label="Caixa"
+              value={gearbox}
+              onChange={setGearbox}
+              options={[
+                ["", "Todas"],
+                ["manual", "Manual"],
+                ["automática", "Automática"],
+              ]}
+            />
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={clearAdvanced}
+                disabled={advancedCount === 0}
+                className="flex h-10 w-full items-center justify-center gap-1 rounded-[6px] border border-line-strong text-sm text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
+              >
+                <X className="size-3.5" /> Limpar
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Chips de país */}
         <div className="flex flex-wrap gap-2">
@@ -197,5 +305,34 @@ export function SearchView({
         </div>
       )}
     </div>
+  );
+}
+
+function Sel({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: [string, string][];
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-ink-soft">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-10 rounded-[6px] border border-line-strong bg-surface px-2.5 text-sm text-ink"
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

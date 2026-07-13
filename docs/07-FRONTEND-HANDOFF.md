@@ -48,17 +48,23 @@ de ISV mudam por ano) e vir já preenchidos em `Listing.cost` / `savings` / `ver
 
 ## Pontos que precisam de backend a sério (hoje são stub/otimista)
 
-1. **Autenticação (Better Auth, [03](03-BACKEND.md)).** Não há login. Adicionar middleware de
-   sessão e proteger `app/(app)`. O stand em `getStand()` está fixo — passar a vir da sessão
-   (multi-tenant: stand = tenant).
+1. **Autenticação (Better Auth, [03](03-BACKEND.md)).** Os ecrãs já existem em
+   `app/(auth)/` (`/entrar`, `/registar`, `/recuperar`) com os campos certos — hoje o submit
+   mostra uma nota "em breve" (`components/auth-stub-form.tsx`). Ligar as Server Actions do
+   Better Auth a esses formulários, adicionar middleware de sessão e proteger `app/(app)`.
+   O stand em `getStand()` está fixo — passar a vir da sessão (multi-tenant: stand = tenant).
+   O "Terminar sessão" na top-bar aponta para `/entrar` (trocar por signOut real).
 2. **Favoritos** — `CarCard` faz *optimistic update* local e chama `toggleFavorite` (no-op).
    Persistir por utilizador/stand.
 3. **Negociações / email mascarado** — `sendMessage` só faz append local. Tem de enviar por
    **email proxy da plataforma** (o email real do fornecedor e do stand fica privado, só se
    comunica pela plataforma — requisito de produto, ver [06](06-SERVICOS-EXTERNOS.md)).
-4. **Alertas** — o toggle ativo/inativo e o "Novo alerta" são visuais; falta persistir e o job
-   que dispara emails quando há match (Inngest ou engine).
+4. **Alertas** — a UI já cria alertas e liga/desliga o toggle (otimista, em
+   `components/alerts-view.tsx`), chamando `createAlert`/`toggleAlert` em `lib/data.ts`
+   (no-ops). Falta persistir e o job que dispara emails quando há match (Inngest ou engine).
 5. **Subscrição** — "Gerir subscrição" deve ligar ao Polar (checkout/portal).
+6. **Banner de demonstração** — `components/demo-banner.tsx` está fixo no layout da app;
+   remover (ou condicionar a uma flag) quando os dados forem reais.
 
 ## Imagens dos carros
 
@@ -79,18 +85,24 @@ Quando `Listing.images` trouxer URLs reais:
 ## Mapa de ficheiros
 
 ```
-app/                     rotas (RSC-first)
-  page.tsx               Painel
-  pesquisar/             Pesquisa
-  anuncio/[id]/          Detalhe
-  comparar/              Comparação
-  negociacoes/           Mensagens (email mascarado)
-  compras/               Pipeline
-  favoritos/ alertas/ stand/
+app/                     rotas (RSC-first), em 3 grupos:
+  (marketing)/           landing pública em / (indexável)
+  (auth)/                /entrar /registar /recuperar (UI pronta p/ Better Auth)
+  (app)/                 a app (noindex até haver auth)
+    painel/              Painel (nota: mudou de / para /painel)
+    pesquisar/           Pesquisa (+ "Mais filtros" client-side)
+    anuncio/[id]/        Detalhe
+    comparar/            Comparação
+    negociacoes/         Mensagens (email mascarado)
+    compras/             Pipeline
+    favoritos/ alertas/ stand/
+    loading.tsx          skeleton partilhado do grupo
+  robots.ts sitemap.ts   SEO (só a landing é indexável)
 components/              UI (ui/ = primitivas estilo shadcn)
 lib/
   types.ts               ← CONTRATO de domínio
   data.ts                ← SEAM: ligar backend aqui
   mock.ts                ← dados de exemplo (apagar quando houver backend)
   format.ts verdict.ts countries.ts deal-stages.ts
+.github/workflows/ci.yml lint → typecheck → build em cada PR (docs/05)
 ```
