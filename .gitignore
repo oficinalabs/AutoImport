@@ -1,14 +1,47 @@
+# dependencies
 node_modules/
-.env
+.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+dist/
+build/
+
+# misc
 .DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# python engine / collectors
 __pycache__/
 *.pyc
 .venv/
 tools/collector/piscapisca/.venv/
-dist/
-build/
+
+# vercel
+.vercel
+
+# collectors (tools/) — outputs e deps locais
+tools/collector/node_modules
+tools/collector/out/
 tools/net-capture/node_modules
 tools/net-capture/out/
 tools/net-capture/package-lock.json
-tools/collector/node_modules
-tools/collector/out/
