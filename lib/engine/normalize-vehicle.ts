@@ -71,6 +71,8 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
   volkswagen: [
     [/^t-?roc(?:$|-)/, "t-roc"],
     [/^t-?cross(?:$|-)/, "t-cross"],
+    // Sportsvan é monovolume — nunca comparar com Golf hatch (auditoria)
+    [/(^|-)sportsvan(-|$)/, "golf-sportsvan"],
     [/^(golf|polo|tiguan|passat|touran|touareg|arteon|sharan|caddy|up|scirocco|beetle|jetta)(?:$|-)/, "$1"],
     [/^id-?([3-7])(?:$|-)/, "id-$1"],
     [/^id-?buzz(?:$|-)/, "id-buzz"],
@@ -115,7 +117,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
   dacia: [[/^(sandero|duster|jogger|spring|logan|lodgy|dokker|bigster)(?:$|-)/, "$1"]],
   fiat: [[/^(500[clx]?|panda|tipo|punto|doblo|ducato|talento|600|topolino)(?:$|-)/, "$1"]],
   mini: [
-    [/^(cooper|one|countryman|clubman|paceman|cabrio|hatch|aceman|electric)(?:$|-)/, "mini-$1"],
+    // submodelos (SUV/carrinha) — não-ancorados: a Caetano/Santogal põem
+    // "Mini" no modelo e o submodelo na variante ("Mini Countryman E …")
+    [/(^|-)(countryman|clubman|paceman|aceman)(-|$)/, "$2"],
+    [/^(cooper|one|cabrio|hatch|electric)(?:$|-)/, "mini-$1"],
     [/^mini(?:$|-)/, "mini-cooper"],
   ],
   volvo: [
@@ -149,18 +154,23 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
 export function normModel(
   makeSlug: string | null,
   raw: string | null | undefined,
+  variantRaw?: string | null,
 ): string | null {
   if (!raw) return null;
   const slug = slugify(raw);
   if (!slug) return null;
+  // As regras correm sobre modelo+variante: sites que põem um modelo genérico
+  // ("Mini") escondem o submodelo na variante ("Mini Countryman E …"). Seguro
+  // para as regras ancoradas (^): acrescentar texto ao fim não muda o início.
+  const matchSlug = variantRaw ? `${slug}-${slugify(variantRaw)}` : slug;
   const rules = makeSlug ? MODEL_RULES[makeSlug] : undefined;
   if (rules) {
     for (const [re, canonical] of rules) {
-      const m = re.exec(slug);
+      const m = re.exec(matchSlug);
       if (m) return canonical.replace(/\$(\d)/g, (_, i) => m[Number(i)] ?? "");
     }
   }
-  // fallback: primeiro token do slug (ex.: "308-sw" → "308")
+  // fallback: primeiro token do slug do MODELO (ex.: "308-sw" → "308")
   return slug.split("-")[0] || null;
 }
 
@@ -233,7 +243,7 @@ export function normalizeVehicle(
   co2?: number | null,
 ): NormalizedVehicle | null {
   const make = normMake(makeRaw);
-  const model = normModel(make, modelRaw);
+  const model = normModel(make, modelRaw, variantRaw);
   const fuel = normFuel(fuelRaw, variantRaw, co2);
   if (!make || !model || !fuel) return null;
   return { make, model, fuel, normKey: `${make}|${model}|${fuel}` };

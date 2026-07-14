@@ -29,10 +29,14 @@ export async function computeCosts() {
 
   const tables = await loadTaxTables(db, ISV_YEAR);
 
+  // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
+  // o ISV é €5,61/cm³ e uma mediana envenenada/entre-trims produz impostos
+  // confiantemente errados (caso real: Série 8 com mediana cc=844 → ISV 1k
+  // em vez de ~7k). Sem dados → sem estimativa (nunca adivinhar).
   const pending = (await db.execute(sql`
     select l.id, l.price, l.year, l.km, l.fuel, l.country, l.first_registration,
-           coalesce(l.displacement_cc, vm.displacement_cc) as cc,
-           coalesce(l.co2, vm.co2) as co2,
+           l.displacement_cc as cc,
+           l.co2 as co2,
            l.model_id
     from listings l
     join vehicle_models vm on vm.id = l.model_id

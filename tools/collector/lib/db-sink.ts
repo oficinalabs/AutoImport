@@ -51,9 +51,16 @@ function iso2(country: unknown): string | null {
   return PAIS_ISO2[c] ?? null;
 }
 
-// "1.995 cm³" → 1995; rejeita lixo tipo "2.0 TDI" (20) com um teto sane.
+// Cilindrada a partir do campo engine, em dois formatos:
+//   "1.995 cm³" / 1995      → 1995 (o ponto é separador de milhares)
+//   "3.0 Gasoline" / "2,0 l" → 3000 / 2000 (litros com UMA casa decimal —
+//     conversão determinística ×1000, erro ≤ ~2% ≈ ±100 € de ISV)
+// Rejeita o resto (ex.: "TDI") com guarda de sanidade 400–8500 cm³.
 function displacementCc(engine: unknown): number | null {
-  const n = int(engine);
+  if (engine == null) return null;
+  const s = String(engine);
+  const liters = /^\s*(\d)[.,](\d)(?!\d)/.exec(s);
+  const n = liters ? Number(liters[1]) * 1000 + Number(liters[2]) * 100 : int(s);
   return n != null && n >= 400 && n <= 8500 ? n : null;
 }
 

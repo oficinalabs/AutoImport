@@ -60,6 +60,16 @@ test("normModel fallback: primeiro token quando não há regra", () => {
   assert.equal(normModel(null, "Enyaq iV 80"), "enyaq");
 });
 
+test("normModel: a variante desmascara o submodelo (auditoria)", () => {
+  // Santogal: model="Mini", submodelo na variante → Countryman ≠ Cooper
+  assert.equal(normModel("mini", "Mini", "Mini Countryman E Essential XS"), "countryman");
+  assert.equal(normModel("mini", "Mini", "Mini Cooper E Classic S"), "mini-cooper");
+  assert.equal(normModel("mini", "Cooper", "SE"), "mini-cooper");
+  // Sportsvan (monovolume) nunca compara com Golf hatch
+  assert.equal(normModel("volkswagen", "Golf VII Sportsvan", "1.5 TSI ACT Highline"), "golf-sportsvan");
+  assert.equal(normModel("volkswagen", "Golf", "1.5 TSI"), "golf");
+});
+
 test("normFuel multi-língua", () => {
   // diesel
   for (const raw of ["Diesel", "Gasóleo", "Gazole", "Gasoil", "gasoleo"]) {

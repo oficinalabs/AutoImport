@@ -1,9 +1,11 @@
 /**
  * Teste de integração do pipeline contra o Postgres local (docker):
  * ingest fixture → match-models → pt-market → compute-costs →
- * flag-opportunities. A fixture (tests/fixtures/pipeline) tem 20 anúncios PT
- * do mesmo modelo (mediana 30.000 €) + 3 BMW 320d DE com preços construídos
- * para dar compensa/marginal/nao_compensa + 1 Audi A6 sem amostra PT.
+ * flag-opportunities. A fixture (tests/fixtures/pipeline) usa uma marca
+ * SINTÉTICA ("Testmarke", specs de um 320d) para ser hermética contra uma
+ * BD de dev com dados reais: 20 anúncios PT do mesmo modelo (mediana
+ * 30.000 €) + 3 DE com preços construídos para dar compensa/marginal/
+ * nao_compensa + 1 modelo sem amostra PT.
  * Sem DATABASE_URL (e sem docker) o teste é saltado.
  * Idempotente no fim: apaga tudo o que é `fixture-%`.
  */
@@ -81,11 +83,11 @@ test(
     assert.equal(compensa?.pt_confidence, "normal");
     assert.equal(compensa?.pt_sample_size, 20);
     assert.ok((compensa?.savings ?? 0) > 0);
-    assert.ok((compensa?.isv ?? 0) > 1000, "ISV do 320d deve ser substancial");
+    assert.ok((compensa?.isv ?? 0) > 1000, "ISV (specs de 320d) deve ser substancial");
 
     assert.equal(byId.get("fixture-de-2")?.verdict, "marginal");
     assert.equal(byId.get("fixture-de-3")?.verdict, "nao_compensa");
-    // Audi sem amostra PT → sem estimativa (nunca adivinhar)
+    // modelo sem amostra PT → sem estimativa (nunca adivinhar)
     assert.equal(byId.get("fixture-de-4")?.verdict, null);
 
     // Oportunidade ativa apenas para o compensa
