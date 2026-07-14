@@ -10,7 +10,8 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "typecheck:tools": "tsc -p tools/collector/tsconfig.json && tsc -p tools/net-capture/tsconfig.json"
+    "typecheck:tools": "tsc -p tools/collector/tsconfig.json",
+    "typecheck:net-capture": "tsc -p tools/net-capture/tsconfig.json"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
