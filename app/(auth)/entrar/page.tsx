@@ -1,4 +1,4 @@
-import { AuthStubForm, Field } from "@/components/auth-stub-form";
+import { SignInForm } from "@/components/auth-forms";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -11,27 +11,7 @@ export default function EntrarPage() {
       <p className="mt-1 text-sm text-ink-soft">Bem-vindo de volta ao teu stand.</p>
 
       <div className="mt-5">
-        <AuthStubForm submitLabel="Entrar">
-          <Field
-            label="Email"
-            id="email"
-            type="email"
-            placeholder="tu@stand.pt"
-            autoComplete="email"
-          />
-          <Field
-            label="Password"
-            id="password"
-            type="password"
-            placeholder="••••••••"
-            autoComplete="current-password"
-          />
-          <div className="text-right">
-            <Link href="/recuperar" className="text-sm text-petrol-ink hover:underline">
-              Esqueceste a password?
-            </Link>
-          </div>
-        </AuthStubForm>
+        <SignInForm />
       </div>
 
       <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-soft">
