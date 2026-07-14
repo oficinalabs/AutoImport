@@ -1,6 +1,7 @@
 "use client";
 
 import { ThemeToggle } from "@/components/theme-toggle";
+import { signOut } from "@/lib/auth-client";
 import { COUNTRY_LIST } from "@/lib/countries";
 import { cn } from "@/lib/utils";
 import {
@@ -16,7 +17,7 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const NAV = [
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
@@ -117,6 +118,14 @@ const AVATAR_MENU = [
 ];
 
 function AvatarMenu() {
+  const router = useRouter();
+
+  async function handleSignOut() {
+    await signOut();
+    router.push("/entrar");
+    router.refresh();
+  }
+
   return (
     <details className="group relative">
       <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
@@ -142,14 +151,14 @@ function AvatarMenu() {
           </Link>
         ))}
         <div className="my-1 h-px bg-line" />
-        {/* TODO(backend): terminar sessão real com Better Auth */}
-        <Link
-          href="/entrar"
-          className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
+        <button
+          type="button"
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
         >
           <LogOut className="size-4" />
           Terminar sessão
-        </Link>
+        </button>
       </div>
     </details>
   );

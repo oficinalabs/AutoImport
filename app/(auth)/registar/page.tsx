@@ -1,4 +1,4 @@
-import { AuthStubForm, Field } from "@/components/auth-stub-form";
+import { SignUpForm } from "@/components/auth-forms";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -13,32 +13,7 @@ export default function RegistarPage() {
       </p>
 
       <div className="mt-5">
-        <AuthStubForm
-          submitLabel="Criar conta — 1.º mês grátis"
-          note="A criação de contas fica disponível muito em breve — estamos a ligar a autenticação."
-        >
-          <Field
-            label="Nome do stand"
-            id="stand"
-            placeholder="Stand Costa & Filhos"
-            autoComplete="organization"
-          />
-          <Field label="O teu nome" id="nome" placeholder="Rui Costa" autoComplete="name" />
-          <Field
-            label="Email"
-            id="email"
-            type="email"
-            placeholder="tu@stand.pt"
-            autoComplete="email"
-          />
-          <Field
-            label="Password"
-            id="password"
-            type="password"
-            placeholder="Mínimo 8 caracteres"
-            autoComplete="new-password"
-          />
-        </AuthStubForm>
+        <SignUpForm />
       </div>
 
       <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-soft">

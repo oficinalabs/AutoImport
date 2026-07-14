@@ -4,6 +4,32 @@ O frontend está implementado e a correr sobre **dados mock**. Este documento di
 ao backend **exatamente onde ligar os dados reais** para tornar a plataforma
 dinâmica, sem mexer na UI.
 
+## ✅ Autenticação (Better Auth) — implementada, falta a base de dados
+
+O login/registo/logout já estão ligados ao **Better Auth** (email + password) com
+**Drizzle + Postgres** e multi-tenant (cada **stand** é uma organização, papéis
+owner/member). Só falta uma base de dados. Passos para a ativar:
+
+1. Criar a Postgres no **Supabase** (região UE) e copiar a connection string
+   (pooler *Transaction*, porta 6543).
+2. `cp .env.example .env.local` e preencher `DATABASE_URL` + `BETTER_AUTH_SECRET`
+   (gerar com `openssl rand -base64 32`).
+3. `pnpm db:push` — cria as tabelas de auth (`user`, `session`, `account`,
+   `verification`, `organization`, `member`, `invitation`).
+4. `pnpm dev` → registar um stand em `/registar` e entrar. Feito.
+
+Ficheiros: [`lib/auth.ts`](../lib/auth.ts) (config), [`lib/auth-client.ts`](../lib/auth-client.ts),
+[`db/schema.ts`](../db/schema.ts) (gerado por `pnpm auth:generate`), [`middleware.ts`](../middleware.ts)
+(protege as rotas da app), [`app/api/auth/[...all]/route.ts`](../app/api/auth) (endpoint),
+[`components/auth-forms.tsx`](../components/auth-forms.tsx) (formulários).
+
+**Pendente (não bloqueia o login):** envio de emails de reset via **Resend**
+(`sendResetPassword` em `lib/auth.ts` está como TODO) + a página `/recuperar/definir`
+que consome o token; criação do stand no signup ainda é feita no cliente (mover para
+um `databaseHook` no servidor, para ser atómica). **Verificado sem DB:** o middleware
+protege `/painel`, e um POST a `/api/auth/sign-up/email` gera o SQL correto e só falha
+na ligação (`ECONNREFUSED`) — a cadeia está toda ligada.
+
 > Regra de ouro: a UI só conhece os **tipos** em [`lib/types.ts`](../lib/types.ts) e
 > lê tudo através da camada [`lib/data.ts`](../lib/data.ts). **Só é preciso reescrever
 > o corpo das funções de `lib/data.ts`.** Se as assinaturas e os tipos se mantiverem,
@@ -48,12 +74,9 @@ de ISV mudam por ano) e vir já preenchidos em `Listing.cost` / `savings` / `ver
 
 ## Pontos que precisam de backend a sério (hoje são stub/otimista)
 
-1. **Autenticação (Better Auth, [03](03-BACKEND.md)).** Os ecrãs já existem em
-   `app/(auth)/` (`/entrar`, `/registar`, `/recuperar`) com os campos certos — hoje o submit
-   mostra uma nota "em breve" (`components/auth-stub-form.tsx`). Ligar as Server Actions do
-   Better Auth a esses formulários, adicionar middleware de sessão e proteger `app/(app)`.
-   O stand em `getStand()` está fixo — passar a vir da sessão (multi-tenant: stand = tenant).
-   O "Terminar sessão" na top-bar aponta para `/entrar` (trocar por signOut real).
+1. **Autenticação (Better Auth, [03](03-BACKEND.md)).** ✅ Implementada — ver a secção no
+   topo deste documento. Só falta a `DATABASE_URL`. Pendente ligado à sessão: o stand em
+   `getStand()` ainda é fixo (mock) — passar a vir da organização ativa da sessão.
 2. **Favoritos** — `CarCard` faz *optimistic update* local e chama `toggleFavorite` (no-op).
    Persistir por utilizador/stand.
 3. **Negociações / email mascarado** — `sendMessage` só faz append local. Tem de enviar por

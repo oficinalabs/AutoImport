@@ -1,4 +1,4 @@
-import { AuthStubForm, Field } from "@/components/auth-stub-form";
+import { ForgotPasswordForm } from "@/components/auth-forms";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -13,18 +13,7 @@ export default function RecuperarPage() {
       </p>
 
       <div className="mt-5">
-        <AuthStubForm
-          submitLabel="Enviar link de recuperação"
-          note="O envio de emails fica ativo quando o backend estiver ligado (Resend)."
-        >
-          <Field
-            label="Email"
-            id="email"
-            type="email"
-            placeholder="tu@stand.pt"
-            autoComplete="email"
-          />
-        </AuthStubForm>
+        <ForgotPasswordForm />
       </div>
 
       <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-soft">
