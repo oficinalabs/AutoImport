@@ -8,10 +8,12 @@ export const metadata: Metadata = {
 };
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  // Sem DATABASE_URL a app corre sobre dados mock — o banner avisa disso.
+  const isDemo = !process.env.DATABASE_URL;
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar />
-      <DemoBanner />
+      {isDemo && <DemoBanner />}
       <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

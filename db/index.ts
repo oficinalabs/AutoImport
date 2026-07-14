@@ -10,3 +10,8 @@ const connectionString = process.env.DATABASE_URL ?? "";
 const client = postgres(connectionString, { prepare: false });
 
 export const db = drizzle(client, { schema });
+
+/** Fechar a ligação (scripts/testes — o Next não precisa). */
+export async function closeDb() {
+  await client.end({ timeout: 5 });
+}

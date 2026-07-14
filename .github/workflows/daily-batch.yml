@@ -1,0 +1,120 @@
+# Batch diário do pipeline (docs/03-BACKEND.md): scrape (recência, com caps)
+# → artefactos NDJSON → ingest+recompute na BD (scripts/pipeline/run-daily.ts).
+#
+# Enquanto o secret DATABASE_URL não existir (Supabase pendente), corre só o
+# scrape e publica os artefactos — já verificável e os NDJSON ficam para replay.
+# Fora deste workflow (manuais): piscapisca (Python/Camoufox, correr local e
+# ingerir o NDJSON), crawls --full profundos e o modo watch contínuo.
+name: Daily batch
+
+on:
+  schedule:
+    - cron: "0 3 * * *" # 03:00 UTC, diário
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Correr só uma fonte (nome da entrada da matrix; vazio = todas)"
+        required: false
+        default: ""
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false # uma fonte a falhar não derruba o batch
+      matrix:
+        include:
+          # ── Estrangeiro (recência-first, caps de páginas) ──
+          - name: autoscout24-de
+            cmd: node run-autoscout24.ts --country D --max-pages 10 --rate 1500
+          - name: autoscout24-fr
+            cmd: node run-autoscout24.ts --country F --max-pages 10 --rate 1500
+          - name: autoscout24-be
+            cmd: node run-autoscout24.ts --country B --max-pages 10 --rate 1500
+          - name: autoscout24-nl
+            cmd: node run-autoscout24.ts --country NL --max-pages 10 --rate 1500
+          - name: autoscout24-es
+            cmd: node run-autoscout24.ts --country E --max-pages 10 --rate 1500
+          - name: autoboerse
+            cmd: node run-autoboerse.ts --max-pages 10
+          - name: meinauto
+            cmd: node run-meinauto.ts --max-pages 10
+          - name: autohero
+            cmd: node run-autohero.ts --max-pages 10
+          - name: aramisauto
+            cmd: node run-aramisauto.ts --max-pages 10
+          - name: ooyyo
+            cmd: node run-ooyyo.ts --max-pages 3 # crawl-delay 30 s — páginas mínimas
+          # ── Portugal (baseline de preço PT) ──
+          - name: standvirtual
+            cmd: node run-standvirtual.ts --max-pages 15
+          - name: olxpt
+            cmd: node run-olxpt.ts --max-pages 15
+          - name: custojusto
+            cmd: node run-custojusto.ts --max-pages 15
+          - name: autosapo
+            cmd: node run-autosapo.ts --max-pages 15
+          - name: autopt
+            cmd: node run-autopt.ts --max-pages 15
+    steps:
+      - uses: actions/checkout@v4
+        if: ${{ github.event.inputs.source == '' || github.event.inputs.source == matrix.name }}
+
+      - uses: actions/setup-node@v4
+        if: ${{ github.event.inputs.source == '' || github.event.inputs.source == matrix.name }}
+        with:
+          node-version-file: .nvmrc
+
+      - name: Recolher (${{ matrix.name }})
+        if: ${{ github.event.inputs.source == '' || github.event.inputs.source == matrix.name }}
+        continue-on-error: true # IPs de datacenter podem ser bloqueados — não é fatal
+        working-directory: tools/collector
+        run: ${{ matrix.cmd }}
+
+      - name: Publicar NDJSON
+        if: ${{ github.event.inputs.source == '' || github.event.inputs.source == matrix.name }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ndjson-${{ matrix.name }}
+          path: tools/collector/out/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  ingest:
+    runs-on: ubuntu-latest
+    needs: scrape
+    if: always()
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Juntar artefactos NDJSON
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ndjson-*
+          path: tools/collector/out/
+          merge-multiple: true
+
+      - name: Pipeline diário (ingest → match → mercado PT → custos → oportunidades)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::secret DATABASE_URL ausente — só scrape+artefactos neste run (Supabase pendente)."
+            exit 0
+          fi
+          pnpm exec tsx scripts/pipeline/run-daily.ts

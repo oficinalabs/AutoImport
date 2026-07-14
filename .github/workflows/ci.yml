@@ -1,5 +1,6 @@
-# CI conforme docs/05-INFRA-E-DEPLOY.md: lint → typecheck → build em cada PR.
-# (O passo de testes entra quando existirem testes no repo.)
+# CI conforme docs/05-INFRA-E-DEPLOY.md: lint → typecheck → testes → build em cada PR.
+# O serviço postgres alimenta o teste de integração do pipeline
+# (tests/pipeline/integration.test.ts) — migra + seed antes dos testes.
 name: CI
 
 on:
@@ -13,6 +14,22 @@ env:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: autoimport
+          POSTGRES_USER: autoimport
+          POSTGRES_PASSWORD: autoimport
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U autoimport -d autoimport"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://autoimport:autoimport@localhost:54329/autoimport
     steps:
       - uses: actions/checkout@v4
 
@@ -34,6 +51,12 @@ jobs:
 
       - name: Typecheck (tools/ — coletores TS, type-stripping nativo)
         run: pnpm typecheck:tools
+
+      - name: Migrations + seed (Postgres do serviço)
+        run: pnpm db:migrate && pnpm db:seed
+
+      - name: Testes (cost engine, normalizador, pipeline)
+        run: pnpm test
 
       - name: Build
         run: pnpm build

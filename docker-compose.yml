@@ -1,0 +1,27 @@
+# Postgres local para desenvolvimento — substitui a Supabase até termos as
+# credenciais (ver docs/04-BASE-DE-DADOS.md). Trocar para Supabase = mudar
+# apenas a DATABASE_URL no .env.local; nada mais depende disto.
+#
+#   pnpm db:up      arranca a base de dados
+#   pnpm db:down    pára (o volume mantém os dados)
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: autoimport-db
+    ports:
+      # porta não-standard para não colidir com Postgres locais (5432)
+      - "54329:5432"
+    environment:
+      POSTGRES_DB: autoimport
+      POSTGRES_USER: autoimport
+      POSTGRES_PASSWORD: autoimport
+    volumes:
+      - autoimport-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoimport -d autoimport"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+volumes:
+  autoimport-pgdata:

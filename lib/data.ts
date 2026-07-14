@@ -1,15 +1,21 @@
+"use server";
 /**
  * ┌─────────────────────────────────────────────────────────────────┐
  * │  CAMADA DE DADOS — a fronteira frontend ⇄ backend.                │
  * │                                                                   │
- * │  Toda a UI lê os dados APENAS a partir daqui. Hoje devolvem dados │
- * │  mock (lib/mock.ts). O backend só precisa de reescrever o CORPO   │
- * │  destas funções (fetch a Route Handlers, Server Actions, ou query │
- * │  Drizzle) mantendo as ASSINATURAS e os TIPOS. A UI não muda.      │
+ * │  Toda a UI lê os dados APENAS a partir daqui. Módulo "use server":│
+ * │  nos RSC as funções correm diretas; nos componentes client as     │
+ * │  mutações (toggleFavorite, createAlert…) viram Server Actions.    │
  * │                                                                   │
- * │  Ver docs/07-FRONTEND-HANDOFF.md para o mapa completo.            │
+ * │  Com DATABASE_URL → queries Drizzle reais (lib/queries.ts),       │
+ * │  alimentadas pelo pipeline (scripts/pipeline/run-daily.ts).       │
+ * │  Sem DATABASE_URL → mock (lib/mock.ts), para previews/dev de UI.  │
+ * │  Negociações, compras e stand continuam mock (fora do âmbito do   │
+ * │  pipeline — ver docs/07-FRONTEND-HANDOFF.md).                     │
  * └─────────────────────────────────────────────────────────────────┘
  */
+import { headers } from "next/headers";
+import { auth } from "./auth";
 import {
   ALERTS,
   CONVERSATIONS,
@@ -19,6 +25,7 @@ import {
   STAND,
   findListing,
 } from "./mock";
+import * as q from "./queries";
 import type {
   Alert,
   Conversation,
@@ -30,7 +37,26 @@ import type {
   Stand,
 } from "./types";
 
-/** Simula latência de rede em dev para exercitar estados de loading. */
+const hasDb = () => Boolean(process.env.DATABASE_URL);
+
+/**
+ * Stand (organização) ativo da sessão; null sem sessão/organização.
+ * A sessão nem sempre traz activeOrganizationId — fallback para a primeira
+ * organização do utilizador (um stand por utilizador, por agora).
+ */
+async function activeStandId(): Promise<string | null> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return null;
+    if (session.session.activeOrganizationId) return session.session.activeOrganizationId;
+    const orgs = await auth.api.listOrganizations({ headers: await headers() });
+    return orgs[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Simula latência de rede em dev para exercitar estados de loading (mock). */
 const DELAY = process.env.NODE_ENV === "development" ? 120 : 0;
 function settle<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), DELAY));
@@ -46,11 +72,11 @@ export interface SearchFilters {
 }
 
 export async function searchListings(filters: SearchFilters = {}): Promise<Listing[]> {
-  // TODO(backend): substituir por query real com filtros no servidor.
+  if (hasDb()) return q.searchListingsQuery(filters, await activeStandId());
   let out = [...LISTINGS];
   if (filters.query) {
-    const q = filters.query.toLowerCase();
-    out = out.filter((l) => l.title.toLowerCase().includes(q));
+    const query = filters.query.toLowerCase();
+    out = out.filter((l) => l.title.toLowerCase().includes(query));
   }
   const wantedCountries = filters.countries;
   if (wantedCountries?.length) {
@@ -77,15 +103,27 @@ export async function searchListings(filters: SearchFilters = {}): Promise<Listi
 }
 
 export async function getListing(id: string): Promise<Listing | null> {
+  if (hasDb()) return q.getListingQuery(id, await activeStandId());
   return settle(findListing(id) ?? null);
 }
 
 export async function getListingsByIds(ids: string[]): Promise<Listing[]> {
+  if (hasDb()) return q.getListingsByIdsQuery(ids, await activeStandId());
   return settle(ids.map(findListing).filter((l): l is Listing => Boolean(l)));
 }
 
 // ── Painel ──────────────────────────────────────────────────────
 export async function getDashboardStats(): Promise<DashboardStats> {
+  if (hasDb()) {
+    const counts = await q.dashboardCountsQuery(await activeStandId());
+    return {
+      newOpportunities: counts.newOpportunities,
+      totalPotentialSavings: counts.totalPotentialSavings,
+      // negociações continuam mock até existir o email mascarado (docs/06)
+      activeNegotiations: CONVERSATIONS.filter((c) => c.status !== "acordo").length,
+      activeAlerts: counts.activeAlerts,
+    };
+  }
   const opportunities = LISTINGS.filter((l) => l.verdict === "compensa");
   return settle({
     newOpportunities: opportunities.length,
@@ -96,6 +134,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
+  if (hasDb()) return q.topOpportunitiesQuery(limit, await activeStandId());
   return settle(
     [...LISTINGS]
       .filter((l) => l.verdict === "compensa")
@@ -105,21 +144,34 @@ export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
 }
 
 export async function getCountryInsights(): Promise<CountryInsight[]> {
+  if (hasDb()) return q.countryInsightsQuery();
   return settle([...COUNTRY_INSIGHTS].sort((a, b) => b.avgSavings - a.avgSavings));
 }
 
 // ── Favoritos ───────────────────────────────────────────────────
 export async function getFavorites(): Promise<Listing[]> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    return standId ? q.favoritesQuery(standId) : [];
+  }
   return settle(LISTINGS.filter((l) => l.isFavorite));
 }
 
-// TODO(backend): persistir. Hoje é no-op (a UI faz optimistic update local).
-export async function toggleFavorite(_id: string): Promise<void> {
+export async function toggleFavorite(id: string): Promise<void> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    if (standId) await q.toggleFavoriteMutation(standId, id);
+    return;
+  }
   return settle(undefined);
 }
 
 // ── Alertas ─────────────────────────────────────────────────────
 export async function getAlerts(): Promise<Alert[]> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    return standId ? q.alertsQuery(standId) : [];
+  }
   return settle([...ALERTS]);
 }
 
@@ -130,17 +182,25 @@ export interface AlertDraft {
   maxPrice?: number;
 }
 
-// TODO(backend): persistir em saved_searches/alerts e ligar o job de matching.
-export async function createAlert(_draft: AlertDraft): Promise<void> {
+export async function createAlert(draft: AlertDraft): Promise<void> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    if (standId) await q.createAlertMutation(standId, draft);
+    return;
+  }
   return settle(undefined);
 }
 
-// TODO(backend): persistir o estado ativo/inativo.
-export async function toggleAlert(_id: string, _active: boolean): Promise<void> {
+export async function toggleAlert(id: string, active: boolean): Promise<void> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    if (standId) await q.toggleAlertMutation(standId, id, active);
+    return;
+  }
   return settle(undefined);
 }
 
-// ── Negociações ─────────────────────────────────────────────────
+// ── Negociações (mock — aguarda email mascarado, docs/06) ───────
 export async function getConversations(): Promise<Conversation[]> {
   return settle([...CONVERSATIONS].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
 }
@@ -154,7 +214,7 @@ export async function sendMessage(_conversationId: string, _body: string): Promi
   return settle(undefined);
 }
 
-// ── Compras (pipeline) ──────────────────────────────────────────
+// ── Compras (pipeline de negócio — mock) ────────────────────────
 export async function getDeals(): Promise<Deal[]> {
   return settle([...DEALS]);
 }
@@ -163,7 +223,7 @@ export async function getDeal(id: string): Promise<Deal | null> {
   return settle(DEALS.find((d) => d.id === id) ?? null);
 }
 
-// ── Stand / conta ───────────────────────────────────────────────
+// ── Stand / conta (mock — passar a vir da organização da sessão) ─
 export async function getStand(): Promise<Stand> {
   return settle(STAND);
 }
