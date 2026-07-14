@@ -8,18 +8,14 @@
 // detetamos NOVOS VINs / MUDANÇAS DE PREÇO entre ciclos — que é o sinal que interessa. A captura
 // exaustiva de novos depende do re-crawl batch periódico. Logamos o `updateTime` mais recente por
 // ciclo como sinal de deriva. Ver research/caetano-investigacao.md.
+//
+// Núcleo do polling (estado id→linha, novos/preço, sink, SIGINT, log) em lib/watch.ts; aqui só o
+// fetch do ciclo (API JSON própria via http.postSearch) e o marcador `maisRecente` do log.
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseSearchResponse, recordId, PAGE_SIZE, SORT_RECENTE } from './parse.ts';
-import { Sink } from '../lib/sink.ts';
+import { runWatch } from '../lib/watch.ts';
 import type { HttpClient } from './http.ts';
 import type { CaetanoRecord } from './schema.ts';
-
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-// Linha de estado = registo + marcas temporais de observação.
-type WatchRow = CaetanoRecord & { first_seen: string; last_seen: string };
 
 interface WatchConfig {
   http: HttpClient;
@@ -32,59 +28,26 @@ interface WatchConfig {
 // config: { http, pages (default 1), intervalMs (default 60000), cycles (0=infinito), outDir }
 export async function watch(config: WatchConfig) {
   const { http, pages = 1, intervalMs = 60000, cycles = 0, outDir } = config;
-  mkdirSync(outDir, { recursive: true });
-  const statePath = join(outDir, 'caetano-state.json');
-  const sink = new Sink(outDir, 'caetano');
-
-  const state = new Map<string, WatchRow>(existsSync(statePath) ? Object.entries(JSON.parse(readFileSync(statePath, 'utf8'))) : []);
-  const saveState = () => writeFileSync(statePath, JSON.stringify(Object.fromEntries(state)));
-
-  let stop = false;
-  process.on('SIGINT', () => { stop = true; console.log('\n⏹  a terminar após o ciclo atual…'); });
-
-  console.log(`▶ watch caetano.pt | ${pages} pág×${PAGE_SIZE} (sort recência) | intervalo ${intervalMs / 1000}s`
-    + `${cycles ? ` | ${cycles} ciclos` : ' | contínuo (Ctrl+C p/ parar)'}\n`);
-
-  let cycle = 0;
-  while (!stop) {
-    cycle++;
-    const t0 = Date.now();
-    const nowIso = new Date().toISOString();
-    let vistos = 0, novos = 0, alterados = 0, maisRecente: string | null = null;
-
-    for (let page = 1; page <= pages && !stop; page++) {
-      const json = await http.postSearch({ page, numberElements: PAGE_SIZE, sort: SORT_RECENTE, orderBy: 'desc' });
-      if (!json) continue;
-      const { listings } = parseSearchResponse(json, { collectedAt: nowIso });
-      for (const r of listings) {
-        const id = recordId(r);
-        if (!id) continue;
-        vistos++;
-        if (r.update_time && (maisRecente === null || r.update_time > maisRecente)) maisRecente = r.update_time;
-        const prev = state.get(id);
-        if (!prev) {
-          const row = { ...r, first_seen: nowIso, last_seen: nowIso };
-          state.set(id, row); await sink.upsert(row, 'new'); novos++;
-        } else if (prev.price !== r.price) {
-          const row = { ...r, first_seen: prev.first_seen, last_seen: nowIso };
-          state.set(id, row); await sink.upsert(row, 'price_change'); alterados++;
-        } else {
-          prev.last_seen = nowIso;
-        }
+  return runWatch<CaetanoRecord>({
+    http, sourceName: 'caetano', outDir, pages, intervalMs, cycles,
+    banner: `watch caetano.pt | ${pages} pág×${PAGE_SIZE} (sort recência)`,
+    recordId, unit: 'carros',
+    fetchCycle: async ({ nowIso, pages, stopped }) => {
+      const rows: CaetanoRecord[] = [];
+      for (let page = 1; page <= pages && !stopped(); page++) {
+        const json = await http.postSearch({ page, numberElements: PAGE_SIZE, sort: SORT_RECENTE, orderBy: 'desc' });
+        if (!json) continue;
+        const { listings } = parseSearchResponse(json, { collectedAt: nowIso });
+        rows.push(...listings);
       }
-    }
-
-    saveState();
-    console.log(`[ciclo ${cycle}] ${nowIso} — vistos ${vistos} · novos ${novos} · preço↑↓ ${alterados}`
-      + ` · tabela ${state.size} · maisRecente ${maisRecente ?? '—'} (${Math.round((Date.now() - t0) / 1000)}s)`);
-
-    if (cycles && cycle >= cycles) break;
-    if (stop) break;
-    let resta = Math.max(0, intervalMs - (Date.now() - t0));
-    while (resta > 0 && !stop) { const passo = Math.min(1000, resta); await sleep(passo); resta -= passo; }
-  }
-
-  saveState();
-  console.log(`⏹ parado. tabela com ${state.size} carros · eventos em ${sink.eventsPath}`);
-  return { total: state.size };
+      return rows;
+    },
+    cycleTag: (seen, state) => {
+      let maisRecente: string | null = null;
+      for (const { record } of seen) {
+        if (record.update_time && (maisRecente === null || record.update_time > maisRecente)) maisRecente = record.update_time;
+      }
+      return ` · tabela ${state.size} · maisRecente ${maisRecente ?? '—'}`;
+    },
+  });
 }

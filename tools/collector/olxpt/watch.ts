@@ -1,23 +1,15 @@
-// olxpt/watch.ts — recolha CONTÍNUA (polling) do olx.pt. Mesma lógica do autohero/autoboerse: poll de
-// X em X tempo, deteta NOVOS e MUDANÇAS DE PREÇO, mantém uma "tabela" de estado (id→linha) e emite
-// eventos para o sink (DB isolada em lib/sink.ts).
+// olxpt/watch.ts — recolha CONTÍNUA (polling) do olx.pt. Núcleo do polling (estado id→linha,
+// novos/preço, sink, SIGINT, log) em lib/watch.ts; aqui só o fetch do ciclo.
 //
 // ✅ RECÊNCIA REAL: pedimos as primeiras páginas com `?search[order]=created_at:desc` (honrado pelo SSR)
 // → os anúncios NOVOS aparecem no topo. Cada anúncio traz `createdTime`; logamos o `max(createdTime)`
 // por ciclo como sinal de deriva. (Alguns promovidos são injetados no topo independentemente do sort;
 // o estado id→linha dedupe-os.)
 
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseListingPage, listingUrl, recordId, ORDER_RECENTE } from './parse.ts';
-import { Sink } from '../lib/sink.ts';
+import { runWatch } from '../lib/watch.ts';
 import type { HttpClient } from './http.ts';
 import type { OlxptRecord } from './schema.ts';
-
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-// Linha de estado = registo + marcas temporais de observação.
-type WatchRow = OlxptRecord & { first_seen: string; last_seen: string };
 
 interface WatchConfig {
   http: HttpClient;
@@ -30,61 +22,27 @@ interface WatchConfig {
 // config: { http, pages (default 1), intervalMs (default 60000), cycles (0=infinito), outDir }
 export async function watch(config: WatchConfig) {
   const { http, pages = 1, intervalMs = 60000, cycles = 0, outDir } = config;
-  mkdirSync(outDir, { recursive: true });
-  const statePath = join(outDir, 'olxpt-state.json');
-  const sink = new Sink(outDir, 'olxpt');
-
-  const state = new Map<string, WatchRow>(existsSync(statePath) ? Object.entries(JSON.parse(readFileSync(statePath, 'utf8'))) : []);
-  const saveState = () => writeFileSync(statePath, JSON.stringify(Object.fromEntries(state)));
-
-  let stop = false;
-  process.on('SIGINT', () => { stop = true; console.log('\n⏹  a terminar após o ciclo atual…'); });
-
-  console.log(`▶ watch olx.pt | ${pages} pág×52 (sort recência) | intervalo ${intervalMs / 1000}s`
-    + `${cycles ? ` | ${cycles} ciclos` : ' | contínuo (Ctrl+C p/ parar)'}\n`);
-
-  let cycle = 0;
-  while (!stop) {
-    cycle++;
-    const t0 = Date.now();
-    const nowIso = new Date().toISOString();
-    let vistos = 0, novos = 0, alterados = 0;
-    let maisRecente: string | null = null;
-
-    for (let page = 1; page <= pages && !stop; page++) {
-      const url = listingUrl({ page, order: ORDER_RECENTE });
-      const html = await http.fetchListing(url);
-      if (!html) continue;
-      const { listings } = parseListingPage(html, { collectedAt: nowIso });
-      for (const r of listings) {
-        const id = recordId(r);
-        if (!id) continue;
-        vistos++;
-        if (r.created_time && (maisRecente === null || r.created_time > maisRecente)) maisRecente = r.created_time;
-        const prev = state.get(id);
-        if (!prev) {
-          const row = { ...r, first_seen: nowIso, last_seen: nowIso };
-          state.set(id, row); await sink.upsert(row, 'new'); novos++;
-        } else if (prev.price !== r.price) {
-          const row = { ...r, first_seen: prev.first_seen, last_seen: nowIso };
-          state.set(id, row); await sink.upsert(row, 'price_change'); alterados++;
-        } else {
-          prev.last_seen = nowIso;
-        }
+  return runWatch<OlxptRecord>({
+    http, sourceName: 'olxpt', outDir, pages, intervalMs, cycles,
+    banner: `watch olx.pt | ${pages} pág×52 (sort recência)`,
+    recordId,
+    // fetchListing vive na subclasse HttpClient do olx.pt → fecha sobre o `http` do config.
+    fetchCycle: async ({ nowIso, pages, stopped }) => {
+      const rows: OlxptRecord[] = [];
+      for (let page = 1; page <= pages && !stopped(); page++) {
+        const html = await http.fetchListing(listingUrl({ page, order: ORDER_RECENTE }));
+        if (!html) continue;
+        const { listings } = parseListingPage(html, { collectedAt: nowIso });
+        rows.push(...listings);
       }
-    }
-
-    saveState();
-    console.log(`[ciclo ${cycle}] ${nowIso} — vistos ${vistos} · novos ${novos} · preço↑↓ ${alterados}`
-      + ` · tabela ${state.size} · maisRecente ${maisRecente ?? '—'} (${Math.round((Date.now() - t0) / 1000)}s)`);
-
-    if (cycles && cycle >= cycles) break;
-    if (stop) break;
-    let resta = Math.max(0, intervalMs - (Date.now() - t0));
-    while (resta > 0 && !stop) { const passo = Math.min(1000, resta); await sleep(passo); resta -= passo; }
-  }
-
-  saveState();
-  console.log(`⏹ parado. tabela com ${state.size} anúncios · eventos em ${sink.eventsPath}`);
-  return { total: state.size };
+      return rows;
+    },
+    cycleTag: (seen, state) => {
+      let maisRecente: string | null = null;
+      for (const { record } of seen) {
+        if (record.created_time && (maisRecente === null || record.created_time > maisRecente)) maisRecente = record.created_time;
+      }
+      return ` · tabela ${state.size} · maisRecente ${maisRecente ?? '—'}`;
+    },
+  });
 }
