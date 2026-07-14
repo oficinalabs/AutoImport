@@ -25,7 +25,9 @@ export default async function EntrarPage({
       )}
 
       <div className="mt-5">
-        <SignInForm />
+        <SignInForm
+          googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
+        />
       </div>
 
       <p className="mt-5 border-t border-line pt-4 text-center text-sm text-ink-soft">
