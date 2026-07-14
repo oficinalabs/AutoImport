@@ -13,13 +13,12 @@
 //   • --detail : enriquece cada anúncio novo com a página de detalhe (caixa/cor/distrito/vendedor/
 //     nacional/…). 1 pedido extra por anúncio → só para amostras/fatias, NÃO para o catálogo inteiro.
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { BASE } from './http.ts';
 import {
   LISTING_PATH, BRANDS_SITEMAP, parseListingPage, readPages, recordId, temCartoes,
   extractBrandSlugs, parseDetail, enrich,
 } from './parse.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { AutosapoRecord } from './schema.ts';
 
@@ -40,15 +39,12 @@ interface Stats {
   latestPublished: string | null;
 }
 
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
+// Cursor persistido (checkpoint): slice/detail em curso + página feita + total de páginas descoberto.
+interface OffsetCursor {
   slice: string | null;
   detail: boolean;
   donePages: number;
   totalPages: number | null;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -93,55 +89,46 @@ function atualizaStats(stats: Stats, r: AutosapoRecord) {
 // config: { http, full?, slice?, maxPages, outDir, resume?, detail? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, slice = null, maxPages = 5, outDir, resume = false, detail = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'autosapo-checkpoint.json');
 
   // Taxonomia de marcas (1 pedido) — necessária para separar marca/modelo do h3.
   const brandXml = await http.fetchText(BASE + BRANDS_SITEMAP);
   const brandSet = extractBrandSlugs(brandXml || '');
   console.log(`marcas conhecidas: ${brandSet.size}${brandSet.size ? '' : ' (fallback: 1º token = marca)'}`);
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos (página ${ckpt.donePages})`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `autosapo-${stamp}.ndjson`), slice, detail, donePages: 0, totalPages: null, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  const writer = createCrawlWriter<AutosapoRecord, Stats>({
+    outDir, source: 'autosapo', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats, cursor }) => `↻ resume: ${stats.records} registos já recolhidos (página ${(cursor as OffsetCursor).donePages})`,
+  });
+  const stats = writer.stats;
+
+  let cursor = writer.cursor as OffsetCursor | null;
+  if (!cursor) cursor = { slice, detail, donePages: 0, totalPages: null };
 
   // Pagina a partir de onde o checkpoint parou. `p` é 1-indexado (p=1 = "Pág. 1").
-  for (let page = ckpt.donePages + 1; page <= CAP_PAGINAS; page++) {
+  for (let page = cursor.donePages + 1; page <= CAP_PAGINAS; page++) {
     if (!full && page > maxPages) break;
-    if (ckpt.totalPages !== null && page > ckpt.totalPages) break;   // esgotou a listagem
-    const url = urlListagem(page, { slice: ckpt.slice });
+    if (cursor.totalPages !== null && page > cursor.totalPages) break;   // esgotou a listagem
+    const url = urlListagem(page, { slice: cursor.slice });
     const html = await http.fetchText(url, { validate: temCartoes });
     if (!html) break;                                                // falha/vazio → para (retoma c/ --resume)
-    const { listings, total } = parseListingPage(html, { brandSet, collectedAt });
-    if (page === 1 || ckpt.totalPages === null) { stats.total = total; ckpt.totalPages = readPages(html); }
+    const { listings, total } = parseListingPage(html, { brandSet, collectedAt: writer.collectedAt });
+    if (page === 1 || cursor.totalPages === null) { stats.total = total; cursor.totalPages = readPages(html); }
     if (!listings.length) break;                                     // fim dos resultados
     let novos = 0;
     for (const r of listings) {
       const id = recordId(r);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      if (ckpt.detail && r.detail_url) {                             // enriquecimento opcional
+      if (!id || writer.has(id)) continue;
+      if (cursor.detail && r.detail_url) {                           // enriquecimento opcional
         const dhtml = await http.fetchText(r.detail_url);
         if (dhtml) enrich(r, parseDetail(dhtml));
       }
-      appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-      atualizaStats(stats, r);
-      novos++;
+      if (writer.add(r)) novos++;
     }
     stats.pages++;
-    ckpt.donePages = page;
-    saveCkpt();
-    console.log(`  pág ${page}/${ckpt.totalPages ?? '?'}: +${novos} novos (acum ${stats.records}/${stats.total ?? '?'})`);
+    cursor.donePages = page;
+    writer.save(cursor);
+    console.log(`  pág ${page}/${cursor.totalPages ?? '?'}: +${novos} novos (acum ${stats.records}/${stats.total ?? '?'})`);
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats };
+  return { ndjsonPath: writer.ndjsonPath, stats };
 }

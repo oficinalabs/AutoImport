@@ -12,10 +12,9 @@
 //   • default : uma query (marca opcional via --brand), até `maxPages` páginas (amostra).
 //   • --full  : uma query por marca (semeadas do config), cada uma até `maxPages`/teto.
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseListingPage, listingUrl, parseBrands, recordId } from './parse.ts';
 import { BASE, CONFIG_PATH } from './http.ts';
+import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { AutouncleRecord } from './schema.ts';
 
@@ -34,15 +33,6 @@ interface Stats {
   price: { count: number; sum: number; min: number | null; max: number | null };
   nbResults: Record<string, number | null>;
   minDaysOnMarket: number | null;
-}
-
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
-  doneQueries: Record<string, number>;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -77,21 +67,9 @@ function atualizaStats(stats: Stats, r: AutouncleRecord) {
 // config: { http, full?, brand?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'autouncle-checkpoint.json');
-
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `autouncle-${stamp}.ndjson`), doneQueries: {}, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  const writer = createCrawlWriter<AutouncleRecord, Stats>({
+    outDir, source: 'autouncle', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+  });
 
   // --- plano de queries ---
   // --full: uma query por marca (semeadas do config API, densas primeiro). Sem --full: uma só query
@@ -107,32 +85,20 @@ export async function crawl(config: CrawlConfig) {
     queries = [{ label: brand || 'todos', brand }];
   }
 
-  for (const q of queries) {
-    const startPage = (ckpt.doneQueries[q.label] || 0) + 1;
-    const forcedMake = q.brand || null;
-    for (let page = startPage; page <= Math.min(maxPages, CAP_PAGINAS); page++) {
-      const url = listingUrl({ brand: q.brand, page });
-      const html = await http.fetchText(url, { validate: (t) => t.includes('"@type":"ItemList"') });
-      if (!html) break;                                    // falha/404 (teto) → passa à próxima query
-      const { listings, total } = parseListingPage(html, { collectedAt, forcedMake });
-      if (page === 1) stats.nbResults[q.label] = total;
-      if (!listings.length) break;                         // fim dos resultados
-      let novos = 0;
-      for (const r of listings) {
-        const id = recordId(r);
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-        atualizaStats(stats, r);
-        novos++;
-      }
-      stats.pages++;
-      ckpt.doneQueries[q.label] = page;
-      saveCkpt();
-      console.log(`  ${q.label} p${page}: +${novos} novos (total ${stats.records}${q.expected ? `/${q.expected}` : ''})`);
-      if (novos === 0 && page > 1) break;                  // página sem carros novos (repetição) → fim
-    }
-  }
+  const cursor = (writer.cursor as Record<string, number>) ?? {};
+  await runPagedCrawl({
+    writer, queries, cursor, maxPages, cap: CAP_PAGINAS,
+    fetchPage: async (q, page, collectedAt) => {
+      const html = await http.fetchText(listingUrl({ brand: q.brand, page }), { validate: (t) => t.includes('"@type":"ItemList"') });
+      if (!html) return null;                              // falha/404 (teto) → passa à próxima query
+      const { listings, total } = parseListingPage(html, { collectedAt, forcedMake: q.brand || null });
+      if (page === 1) writer.stats.nbResults[q.label] = total;
+      return { listings };
+    },
+    logLine: (q, page, novos, stats) =>
+      `  ${q.label} p${page}: +${novos} novos (total ${stats.records}${q.expected ? `/${q.expected}` : ''})`,
+    stop: ({ novos, page }) => novos === 0 && page > 1,   // página sem carros novos (repetição) → fim
+  });
 
-  return { ndjsonPath: ckpt.ndjson, stats, queries: queries.length };
+  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
 }

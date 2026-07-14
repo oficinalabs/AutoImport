@@ -13,9 +13,8 @@
 // podem ainda ser grandes; o corte fino seguinte seria por modelo/preço (não implementado — ver
 // README). ⚠️ Crawl-delay: 30 do robots.txt → a recolha é lenta por desígnio (honramos o site).
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { qselementsUrl, parseQsElements, parseListingPage, recordId } from './parse.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from '../lib/http.ts';
 import type { OoyyoRecord } from './schema.ts';
 import type { OoyyoMake, QsResult } from './parse.ts';
@@ -40,14 +39,8 @@ interface Stats {
 // Estado por query (paginação por "Next", retomável).
 interface QueryState { pages: number; nextUrl: string | null; seedUrl: string | null; done: boolean }
 
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
-  queryState: Record<string, QueryState>;
-  seen: string[];
-  stats: Stats;
-}
+// Cursor persistido (checkpoint) para retomar (--resume): o estado por query.
+type NextCursor = Record<string, QueryState>;
 
 interface CrawlConfig {
   http: HttpClient;
@@ -93,21 +86,14 @@ function resolveMake(makes: OoyyoMake[], wanted: string): OoyyoMake | null {
 // config: { http, full?, make?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, make = null, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'ooyyo-checkpoint.json');
+  const writer = createCrawlWriter<OoyyoRecord, Stats>({
+    outDir, source: 'ooyyo', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats }) => `↻ resume: ${stats.records} registos já recolhidos`,
+  });
+  const stats = writer.stats;
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `ooyyo-${stamp}.ndjson`), queryState: {}, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  let cursor = writer.cursor as NextCursor | null;
+  if (!cursor) cursor = {};
 
   // --- plano de queries (cada uma com o seu seedUrl da API) ---
   let queries: Query[];
@@ -126,7 +112,7 @@ export async function crawl(config: CrawlConfig) {
   }
 
   for (const q of queries) {
-    const qs = (ckpt.queryState[q.label] ||= { pages: 0, nextUrl: null, seedUrl: null, done: false });
+    const qs = (cursor[q.label] ||= { pages: 0, nextUrl: null, seedUrl: null, done: false });
     if (qs.done) { console.log(`  ${q.label}: já completo (resume) — ${qs.pages} págs`); continue; }
 
     // URL de arranque: retoma pelo nextUrl guardado, ou (re)obtém o seed pela API.
@@ -143,28 +129,21 @@ export async function crawl(config: CrawlConfig) {
     while (url && pagina < Math.min(maxPages, CAP_PAGINAS)) {
       const html = await http.fetchText(url, { validate: ehSrp });
       if (!html) break;
-      const { listings, nextUrl } = parseListingPage(html, { collectedAt });
+      const { listings, nextUrl } = parseListingPage(html, { collectedAt: writer.collectedAt });
       pagina++;
       let novos = 0;
-      for (const r of listings) {
-        const id = recordId(r);
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-        atualizaStats(stats, r);
-        novos++;
-      }
+      for (const r of listings) if (writer.add(r)) novos++;
       stats.pages++;
       qs.pages = pagina;
       qs.nextUrl = nextUrl;
       if (!nextUrl) qs.done = true;                       // última página (sem Next)
-      saveCkpt();
+      writer.save(cursor);
       console.log(`  ${q.label} p${pagina}: +${novos} novos (total ${stats.records})`);
       if (!nextUrl) break;                                 // fim da marca/query
-      if (novos === 0 && listings.length) { qs.done = true; saveCkpt(); break; } // saturou (tudo repetido)
+      if (novos === 0 && listings.length) { qs.done = true; writer.save(cursor); break; } // saturou (tudo repetido)
       url = nextUrl;
     }
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats, queries: queries.length };
+  return { ndjsonPath: writer.ndjsonPath, stats, queries: queries.length };
 }

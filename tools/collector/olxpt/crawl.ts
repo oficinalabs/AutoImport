@@ -9,10 +9,9 @@
 //   • default : uma query (secção inteira, ou --make/--region), até `maxPages` páginas.
 //   • --full  : uma query por marca (seed), até esgotar cada faceta ou o teto.
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseListingPage, listingUrl, recordId, PAGE_MAX } from './parse.ts';
 import { MAKES, SLUG_TO_NAME } from './schema.ts';
+import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { OlxptRecord } from './schema.ts';
 
@@ -27,14 +26,6 @@ interface Stats {
   price: { count: number; sum: number; min: number | null; max: number | null };
   catalogTotal: number | null;
   latestCreated: string | null;
-}
-
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
-  doneQueries: Record<string, number>;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -69,21 +60,9 @@ function atualizaStats(stats: Stats, r: OlxptRecord) {
 // config: { http, full?, make?, region?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, make = null, region = null, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'olxpt-checkpoint.json');
-
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `olxpt-${stamp}.ndjson`), doneQueries: {}, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  const writer = createCrawlWriter<OlxptRecord, Stats>({
+    outDir, source: 'olxpt', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+  });
 
   // --- plano de queries ---
   // --full: uma query por marca (seed), carimbando a marca da faceta. Sem --full: uma só query
@@ -101,31 +80,22 @@ export async function crawl(config: CrawlConfig) {
     }];
   }
 
-  for (const q of queries) {
-    const startPage = (ckpt.doneQueries[q.label] || 0) + 1;
-    for (let page = startPage; page <= Math.min(maxPages === Infinity ? PAGE_MAX : maxPages, PAGE_MAX); page++) {
-      const url = listingUrl({ make: q.make, region: q.region, page });
-      const html = await http.fetchListing(url);
-      if (!html) break;                                    // falha → passa à próxima query (retoma c/ --resume)
+  const cursor = (writer.cursor as Record<string, number>) ?? {};
+  let lastTotal: number | null = null;                     // total da página corrente, p/ o log
+  await runPagedCrawl({
+    writer, queries, cursor, maxPages,
+    fetchPage: async (q, page, collectedAt) => {
+      const html = await http.fetchListing(listingUrl({ make: q.make, region: q.region, page }));
+      if (!html) return null;                              // falha → passa à próxima query (retoma c/ --resume)
       const { listings, total } = parseListingPage(html, { collectedAt, forcedMake: q.forcedMake });
-      if (page === 1 && total != null) stats.catalogTotal = full ? stats.catalogTotal : total;
-      if (!listings.length) break;                         // fim dos resultados
-      let novos = 0;
-      for (const r of listings) {
-        const id = recordId(r);
-        if (!id || seen.has(id)) continue;
-        seen.add(id);
-        appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-        atualizaStats(stats, r);
-        novos++;
-      }
-      stats.pages++;
-      ckpt.doneQueries[q.label] = page;
-      saveCkpt();
-      console.log(`  ${q.label} p${page}${total != null ? `/${Math.min(total, PAGE_MAX * 52)}` : ''}: +${novos} novos (total ${stats.records})`);
-      if (novos === 0 && page > 1) break;                  // faceta esgotada (só repetidos)
-    }
-  }
+      if (page === 1 && total != null) writer.stats.catalogTotal = full ? writer.stats.catalogTotal : total;
+      lastTotal = total;
+      return { listings };
+    },
+    logLine: (q, page, novos, stats) =>
+      `  ${q.label} p${page}${lastTotal != null ? `/${Math.min(lastTotal, PAGE_MAX * 52)}` : ''}: +${novos} novos (total ${stats.records})`,
+    stop: ({ novos, page }) => novos === 0 && page > 1,   // faceta esgotada (só repetidos)
+  });
 
-  return { ndjsonPath: ckpt.ndjson, stats, queries: queries.length };
+  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
 }

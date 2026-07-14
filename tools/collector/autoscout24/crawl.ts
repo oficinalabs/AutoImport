@@ -1,6 +1,7 @@
 // autoscout24/crawl.ts — recolha batch do AutoScout24: faceting adaptativo (país × marca ×
-// faixa-de-preço), size=100, dedupe global, checkpoint/resume, NDJSON, stats. Mesma forma do
-// autotrader/crawl.ts, escalada para a dimensão pan-europeia (~2,15M sob o cap).
+// faixa-de-preço), size=100, dedupe global, checkpoint/resume, NDJSON, stats. Inner-core
+// (seen/append/stats/checkpoint) em lib/crawl.ts; aqui o loop PRÓPRIO (faceting adaptativo com
+// sonda de numberOfResults + enriquecimento --detail não cabem no page-loop genérico).
 //
 // CAP: cada query satura em ~4.000 registos (com size=100 → 40 páginas; o teto é de REGISTOS,
 // não de páginas — size só troca throughput). Logo o faceting tem de manter cada faceta ≤4.000.
@@ -11,10 +12,9 @@
 // (o mesmo anúncio surge em facetas sobrepostas). Faixas densas podem ainda saturar — degradação
 // aceitável e documentada (research/autoscout24-investigacao.md).
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseListingPage, recordId, extractMakes, type MakeRef } from './parse.ts';
 import { enrichWithDetail } from './detail.ts';
+import { createCrawlWriter, type CrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from '../lib/http.ts';
 import type { Autoscout24Record } from './schema.ts';
 
@@ -52,14 +52,10 @@ interface Stats {
   price: { count: number; sum: number; min: number | null; max: number | null };
 }
 
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
+// Cursor persistido (checkpoint): páginas feitas por faceta + numberOfResults sondado por faceta.
+interface Cursor {
   doneQueries: Record<string, number>;
   nbResults: Record<string, number | null>;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -81,11 +77,8 @@ interface Ctx {
   maxPages: number;
   capPages: number;
   detail: boolean;
-  collectedAt: string;
-  seen: Set<string>;
-  stats: Stats;
-  ckpt: Checkpoint;
-  saveCkpt: () => void;
+  writer: CrawlWriter<Autoscout24Record, Stats>;
+  cursor: Cursor;
 }
 
 // Constrói o URL de listagem. Prefere o path /lst/<slug> (mais limpo e fora do `/lst?` que o
@@ -124,24 +117,15 @@ export async function crawl(config: CrawlConfig) {
     http, full = false, countries = [null], makes = null,
     maxPages = 5, size = 100, outDir, resume = false, detail = false,
   } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'autoscout24-checkpoint.json');
+  const writer = createCrawlWriter<Autoscout24Record, Stats>({
+    outDir, source: 'autoscout24', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+  });
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `autoscout24-${stamp}.ndjson`), doneQueries: {}, nbResults: {}, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
+  let cursor = writer.cursor as Cursor | null;
+  if (!cursor) cursor = { doneQueries: {}, nbResults: {} };
   const capPages = Math.ceil(CAP_RECORDS / size);
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
 
-  const ctx = { http, size, maxPages, capPages, detail, collectedAt, seen, stats, ckpt, saveCkpt };
+  const ctx: Ctx = { http, size, maxPages, capPages, detail, writer, cursor };
 
   // --- resolver a lista de marcas ---
   let makeRefs: (MakeRef | null)[] | null = makes;
@@ -165,10 +149,10 @@ export async function crawl(config: CrawlConfig) {
       const params = { cy, slug: mk?.slug || null, makeId: mk?.id || null };
 
       // Sonda a 1ª página (ingere-a) para conhecer numberOfResults antes de decidir fatiar.
-      let nb = ckpt.nbResults[labelBase];
+      let nb = cursor.nbResults[labelBase];
       if (nb == null) {
         await paginate(ctx, labelBase, params, 1);      // ingere só a página 1
-        nb = ckpt.nbResults[labelBase] ?? null;
+        nb = cursor.nbResults[labelBase] ?? null;
       }
 
       if (full && nb != null && nb > CAP_RECORDS) {
@@ -185,38 +169,35 @@ export async function crawl(config: CrawlConfig) {
     }
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats, facets: Object.keys(ckpt.doneQueries).length };
+  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, facets: Object.keys(cursor.doneQueries).length };
 }
 
 // Pagina uma query (label único) da página seguinte-à-checkpoint até min(endPage, capPages).
 // Ingere anúncios novos (dedupe global), atualiza stats/checkpoint. Regista numberOfResults na
 // 1ª leitura. Enriquece com --detail (1 req/anúncio) se ativo.
 async function paginate(ctx: Ctx, label: string, params: QueryParams, endPage: number) {
-  const { http, size, capPages, detail, collectedAt, seen, stats, ckpt, saveCkpt } = ctx;
-  const start = (ckpt.doneQueries[label] || 0) + 1;
+  const { http, size, capPages, detail, writer, cursor } = ctx;
+  const collectedAt = writer.collectedAt;
+  const start = (cursor.doneQueries[label] || 0) + 1;
   const end = Math.min(endPage ?? ctx.maxPages, capPages);
   for (let page = start; page <= end; page++) {
     const url = buildUrl({ ...params, size, page });
     const html = await http.fetchText(url, { validate });
     if (!html) break;
     const { listings, numberOfResults, numberOfPages } = parseListingPage(html, { collectedAt });
-    if (ckpt.nbResults[label] == null) ckpt.nbResults[label] = numberOfResults;
+    if (cursor.nbResults[label] == null) cursor.nbResults[label] = numberOfResults;
     if (!listings.length) break;                          // fim dos resultados
     let novos = 0;
     for (const r of listings) {
       const id = recordId(r);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      let rec = r;
-      if (detail && r.detail_url) rec = await enrichWithDetail(http, r, collectedAt);
-      appendFileSync(ckpt.ndjson, JSON.stringify(rec) + '\n');
-      atualizaStats(stats, rec);
-      novos++;
+      if (!id || writer.has(id)) continue;                // dedupe antes do --detail (evita fetch de repetidos)
+      const rec = (detail && r.detail_url) ? await enrichWithDetail(http, r, collectedAt) : r;
+      if (writer.add(rec)) novos++;
     }
-    stats.pages++;
-    ckpt.doneQueries[label] = page;
-    saveCkpt();
-    console.log(`  ${label} p${page}: +${novos} novos (total ${stats.records})`);
+    writer.stats.pages++;
+    cursor.doneQueries[label] = page;
+    writer.save(cursor);
+    console.log(`  ${label} p${page}: +${novos} novos (total ${writer.stats.records})`);
     if (numberOfPages && page >= numberOfPages) break;    // não há mais páginas nesta query
   }
 }

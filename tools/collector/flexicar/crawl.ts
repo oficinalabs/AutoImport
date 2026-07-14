@@ -11,10 +11,9 @@
 //   • --full  : ~9.685 facetas do sitemap.xml (marca·modelo·província…); as granulares têm ≤12 →
 //               captura total da fatia. A união deduplicada cobre uma fração grande dos ~22,5k anúncios.
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { BASE } from './http.ts';
 import { parseListingPage, extractBrandSlugs, extractSitemapFacets, recordId } from './parse.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from '../lib/http.ts';
 import type { FlexicarRecord } from './schema.ts';
 
@@ -35,14 +34,10 @@ interface Stats {
   maxId: number | null;
 }
 
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
+// Cursor persistido (checkpoint) para retomar (--resume): as facetas planeadas + quantas já feitas.
+interface FacetCursor {
   facets: string[];
   doneFacets: number;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -85,46 +80,35 @@ async function planearFacetas({ http, full, brand }: { http: HttpClient; full: b
 // config: { http, full?, brand?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'flexicar-checkpoint.json');
+  const writer = createCrawlWriter<FlexicarRecord, Stats>({
+    outDir, source: 'flexicar', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats, cursor }) => {
+      const c = cursor as FacetCursor;
+      return `↻ resume: ${stats.records} registos já recolhidos (${c.doneFacets}/${c.facets.length} facetas feitas)`;
+    },
+  });
+  const stats = writer.stats;
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos (${ckpt.doneFacets}/${ckpt.facets.length} facetas feitas)`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const facets = await planearFacetas({ http, full, brand });
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `flexicar-${stamp}.ndjson`), facets, doneFacets: 0, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  // Cursor: no arranque fresco planeamos as facetas; no resume vêm do checkpoint (não re-planeamos).
+  let cursor = writer.cursor as FacetCursor | null;
+  if (!cursor) cursor = { facets: await planearFacetas({ http, full, brand }), doneFacets: 0 };
 
   // Percorre até `maxPages` facetas NOVAS (a partir de onde o checkpoint parou). Cada faceta = 1 fetch.
-  const inicio = ckpt.doneFacets;
-  const fim = Math.min(ckpt.facets.length, inicio + Math.max(1, maxPages));
+  const inicio = cursor.doneFacets;
+  const fim = Math.min(cursor.facets.length, inicio + Math.max(1, maxPages));
   for (let i = inicio; i < fim; i++) {
-    const path = ckpt.facets[i];
+    const path = cursor.facets[i];
     const html = await http.fetchText(`${BASE}${path}`, { validate: temNext });
-    ckpt.doneFacets = i + 1;
-    if (!html) { saveCkpt(); continue; }
-    const { listings, total } = parseListingPage(html, { collectedAt });
+    cursor.doneFacets = i + 1;
+    if (!html) { writer.save(cursor); continue; }
+    const { listings, total } = parseListingPage(html, { collectedAt: writer.collectedAt });
     if (i === 0) stats.nbResults[path] = total;
     let novos = 0;
-    for (const r of listings) {
-      const id = recordId(r);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-      atualizaStats(stats, r);
-      novos++;
-    }
+    for (const r of listings) if (writer.add(r)) novos++;
     stats.facets++;
-    saveCkpt();
-    console.log(`  [${i + 1}/${ckpt.facets.length}] ${path} (${total ?? '?'} no total) → +${novos} novos (acum ${stats.records})`);
+    writer.save(cursor);
+    console.log(`  [${i + 1}/${cursor.facets.length}] ${path} (${total ?? '?'} no total) → +${novos} novos (acum ${stats.records})`);
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats, facets: ckpt.facets.length, done: ckpt.doneFacets };
+  return { ndjsonPath: writer.ndjsonPath, stats, facets: cursor.facets.length, done: cursor.doneFacets };
 }

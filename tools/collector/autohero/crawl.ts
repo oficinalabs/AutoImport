@@ -1,6 +1,6 @@
 // autohero/crawl.ts — recolha batch do autohero.com: paginação por offset (API), dedupe,
-// checkpoint, NDJSON. Mesma FORMA do aramisauto/autoboerse (dedupe global por id, checkpoint/resume,
-// stats), mas a unidade de recolha é uma PÁGINA DA API (limit=100), não uma página HTML.
+// checkpoint, NDJSON. Inner-core (seen/append/stats/checkpoint) em lib/crawl.ts; aqui o loop
+// PRÓPRIO por offset (a unidade é uma PÁGINA DA API — limit=100 — não uma página HTML).
 //
 // COBERTURA: a API pagina por `offset` de forma estável (sort `newest_eligible`, determinístico) →
 // iterar offset 0,100,200,… até `total` cobre TODO o catálogo (~7,4k no DE) em ~75 pedidos, sem
@@ -9,9 +9,8 @@
 //   • default : pagina até `maxPages` páginas (amostra).
 //   • --full  : pagina até esgotar o `total` (catálogo completo).
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { buildVariables, parseAdsResponse, recordId, LIMIT_MAX, SORT_RECENTE } from './parse.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { AutoheroRecord } from './schema.ts';
 
@@ -31,15 +30,8 @@ interface Stats {
   latestPublished: string | null;
 }
 
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
-  sort: string;
-  donePages: number;
-  seen: string[];
-  stats: Stats;
-}
+// Cursor persistido (checkpoint): página feita + o sort em curso (fixo entre resumes).
+interface OffsetCursor { donePages: number; sort: string }
 
 interface CrawlConfig {
   http: HttpClient;
@@ -71,47 +63,33 @@ function atualizaStats(stats: Stats, r: AutoheroRecord) {
 // config: { http, full?, maxPages, outDir, resume?, sort? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, maxPages = 5, outDir, resume = false, sort = SORT_RECENTE } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'autohero-checkpoint.json');
+  const writer = createCrawlWriter<AutoheroRecord, Stats>({
+    outDir, source: 'autohero', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats, cursor }) => `↻ resume: ${stats.records} registos já recolhidos (página ${(cursor as OffsetCursor).donePages})`,
+  });
+  const stats = writer.stats;
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos (página ${ckpt.donePages})`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `autohero-${stamp}.ndjson`), sort, donePages: 0, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  let cursor = writer.cursor as OffsetCursor | null;
+  if (!cursor) cursor = { donePages: 0, sort };
 
   // Nº de páginas a percorrer nesta invocação: --full → até ao total (descoberto na 1ª página);
   // sem --full → `maxPages`. Começamos onde o checkpoint parou.
-  for (let page = ckpt.donePages; page < CAP_PAGINAS; page++) {
+  for (let page = cursor.donePages; page < CAP_PAGINAS; page++) {
     if (!full && page >= maxPages) break;
     const offset = page * LIMIT_MAX;
     if (stats.total !== null && offset >= stats.total) break;   // esgotou o catálogo
-    const ads = await http.postGraphql(buildVariables({ offset, limit: LIMIT_MAX, sort: ckpt.sort }));
+    const ads = await http.postGraphql(buildVariables({ offset, limit: LIMIT_MAX, sort: cursor.sort }));
     if (!ads) break;                                            // falha → para (retoma com --resume)
-    const { listings, total } = parseAdsResponse(ads, { collectedAt });
+    const { listings, total } = parseAdsResponse(ads, { collectedAt: writer.collectedAt });
     if (page === 0) stats.total = total;
     if (!listings.length) break;                                // fim dos resultados
     let novos = 0;
-    for (const r of listings) {
-      const id = recordId(r);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-      atualizaStats(stats, r);
-      novos++;
-    }
+    for (const r of listings) if (writer.add(r)) novos++;
     stats.pages++;
-    ckpt.donePages = page + 1;
-    saveCkpt();
+    cursor.donePages = page + 1;
+    writer.save(cursor);
     console.log(`  pág ${page + 1} (offset ${offset}): +${novos} novos (acum ${stats.records}/${stats.total ?? '?'})`);
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats };
+  return { ndjsonPath: writer.ndjsonPath, stats };
 }

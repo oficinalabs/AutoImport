@@ -9,9 +9,8 @@
 //   • default : pagina até `maxPages` páginas (amostra).
 //   • --full  : pagina até esgotar o `maxPage` da API (catálogo completo).
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseSearchResponse, recordId, PAGE_SIZE } from './parse.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { CaetanoRecord } from './schema.ts';
 
@@ -32,14 +31,10 @@ interface Stats {
   latestUpdate: string | null;
 }
 
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
+// Cursor persistido (checkpoint) para retomar (--resume): páginas feitas + maxPage descoberto.
+interface PageCursor {
   donePages: number;
   maxPage: number | null;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -71,46 +66,32 @@ function atualizaStats(stats: Stats, r: CaetanoRecord) {
 // config: { http, full?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'caetano-checkpoint.json');
+  const writer = createCrawlWriter<CaetanoRecord, Stats>({
+    outDir, source: 'caetano', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats, cursor }) => `↻ resume: ${stats.records} carros já recolhidos (página ${(cursor as PageCursor).donePages})`,
+  });
+  const stats = writer.stats;
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} carros já recolhidos (página ${ckpt.donePages})`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `caetano-${stamp}.ndjson`), donePages: 0, maxPage: null, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  let cursor = writer.cursor as PageCursor | null;
+  if (!cursor) cursor = { donePages: 0, maxPage: null };
 
   // page da API é 1-indexed. Começamos onde o checkpoint parou (donePages = nº de páginas já feitas).
-  for (let done = ckpt.donePages; done < CAP_PAGINAS; done++) {
+  for (let done = cursor.donePages; done < CAP_PAGINAS; done++) {
     if (!full && done >= maxPages) break;
     const page = done + 1;
-    if (ckpt.maxPage !== null && page > ckpt.maxPage) break;      // esgotou o catálogo (--full)
+    if (cursor.maxPage !== null && page > cursor.maxPage) break;  // esgotou o catálogo (--full)
     const json = await http.postSearch({ page, numberElements: PAGE_SIZE });
     if (!json) break;                                             // falha → para (retoma com --resume)
-    const { listings, rawTotal, maxPage, raw } = parseSearchResponse(json, { collectedAt });
-    if (done === 0) { stats.rawTotal = rawTotal; ckpt.maxPage = maxPage; }
+    const { listings, rawTotal, maxPage, raw } = parseSearchResponse(json, { collectedAt: writer.collectedAt });
+    if (done === 0) { stats.rawTotal = rawTotal; cursor.maxPage = maxPage; }
     if (!raw) break;                                              // página vazia = fim dos resultados
     let novos = 0;
-    for (const r of listings) {                                   // listings = só carros usados
-      const id = recordId(r);
-      if (!id || seen.has(id)) continue;
-      seen.add(id);
-      appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-      atualizaStats(stats, r);
-      novos++;
-    }
+    for (const r of listings) if (writer.add(r)) novos++;         // listings = só carros usados
     stats.pages++;
-    ckpt.donePages = page;
-    saveCkpt();
-    console.log(`  pág ${page}/${ckpt.maxPage ?? '?'}: +${novos} carros usados (de ${raw} viaturas na página · acum ${stats.records})`);
+    cursor.donePages = page;
+    writer.save(cursor);
+    console.log(`  pág ${page}/${cursor.maxPage ?? '?'}: +${novos} carros usados (de ${raw} viaturas na página · acum ${stats.records})`);
   }
 
-  return { ndjsonPath: ckpt.ndjson, stats };
+  return { ndjsonPath: writer.ndjsonPath, stats };
 }

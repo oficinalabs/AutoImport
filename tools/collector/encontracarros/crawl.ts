@@ -11,10 +11,9 @@
 // --full percorre o sitemap todo. Slices: `--brand` (prefixo do slug), `--district` (token antes do
 // id), `--since <ISO>` (só lastmod mais recente).
 
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { parseDetail, recordId } from './parse.ts';
 import { fetchSitemap, districtSlugFromUrl } from './sitemap.ts';
+import { createCrawlWriter } from '../lib/crawl.ts';
 import type { HttpClient } from '../lib/http.ts';
 import type { EncontracarrosRecord } from './schema.ts';
 
@@ -33,15 +32,6 @@ interface Stats {
   byNational: Record<string, number>;
   price: { count: number; sum: number; min: number | null; max: number | null };
   total: number | null;
-}
-
-// Estado persistido (checkpoint) para retomar (--resume).
-interface Checkpoint {
-  startedAt: string;
-  ndjson: string;
-  cursor: number;
-  seen: string[];
-  stats: Stats;
 }
 
 interface CrawlConfig {
@@ -75,21 +65,13 @@ function atualizaStats(stats: Stats, r: EncontracarrosRecord) {
 // config: { http, full?, brand?, district?, since?, maxPages, outDir, resume? }
 export async function crawl(config: CrawlConfig) {
   const { http, full = false, brand = null, district = null, since = null, maxPages = 5, outDir, resume = false } = config;
-  mkdirSync(outDir, { recursive: true });
-  const ckptPath = join(outDir, 'encontracarros-checkpoint.json');
+  const writer = createCrawlWriter<EncontracarrosRecord, Stats>({
+    outDir, source: 'encontracarros', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    resumeLog: ({ stats, seenCount }) => `↻ resume: ${stats.records} registos já recolhidos (${seenCount} ids vistos)`,
+  });
+  const stats = writer.stats;
 
-  let ckpt: Checkpoint;
-  if (resume && existsSync(ckptPath)) {
-    ckpt = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    console.log(`↻ resume: ${ckpt.stats.records} registos já recolhidos (${ckpt.seen.length} ids vistos)`);
-  } else {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    ckpt = { startedAt: stamp, ndjson: join(outDir, `encontracarros-${stamp}.ndjson`), cursor: 0, seen: [], stats: statsVazias() };
-  }
-  const seen = new Set(ckpt.seen);
-  const stats = ckpt.stats;
-  const collectedAt = new Date().toISOString();
-  const saveCkpt = () => { ckpt.seen = [...seen]; writeFileSync(ckptPath, JSON.stringify(ckpt)); };
+  let cursor = (writer.cursor as number | null) ?? 0;
 
   // --- enumeração: sitemap (já ordenado por lastmod DESC) + filtros de slice ---
   console.log('a obter o sitemap.xml…');
@@ -110,31 +92,27 @@ export async function crawl(config: CrawlConfig) {
     + `${brand ? ` | marca ${brand}` : ''}${district ? ` | distrito ${district}` : ''}${since ? ` | desde ${since}` : ''}\n`);
 
   // --- busca anúncio a anúncio, a partir do cursor (permite --resume) ---
-  for (let i = ckpt.cursor; i < limite; i++) {
+  for (let i = cursor; i < limite; i++) {
     const e = entries[i];
     if (!e) break;
-    ckpt.cursor = i + 1;
-    if (seen.has(e.id)) { if (i % 50 === 0) saveCkpt(); continue; }   // dedupe global por id
+    cursor = i + 1;
+    if (writer.has(e.id)) { if (i % 50 === 0) writer.save(cursor); continue; }   // dedupe global por id
 
     const html = await http.fetchText(e.url, { validate: detalheValido });
     stats.fetched++;
     if (!html) continue;
-    const r = parseDetail(html, { collectedAt, sitemap: e });
+    const r = parseDetail(html, { collectedAt: writer.collectedAt, sitemap: e });
     if (!r) continue;
-    const id = recordId(r);
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    appendFileSync(ckpt.ndjson, JSON.stringify(r) + '\n');
-    atualizaStats(stats, r);
+    if (!writer.add(r)) continue;   // dedupe global por id (recordId nulo ou já visto)
 
     // 1 "página" a cada PAGE_SIZE anúncios buscados → log + checkpoint.
     if (stats.fetched % PAGE_SIZE === 0) {
       stats.pages++;
-      saveCkpt();
+      writer.save(cursor);
       console.log(`  p${stats.pages} (${i + 1}/${limite}): ${stats.records} registos · último ${r.source} · ${r.make} ${r.model} €${r.price}`);
     }
   }
-  saveCkpt();
+  writer.save(cursor);
 
-  return { ndjsonPath: ckpt.ndjson, stats };
+  return { ndjsonPath: writer.ndjsonPath, stats };
 }
