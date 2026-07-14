@@ -138,6 +138,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
   suzuki: [[/^(swift|vitara|s-cross|ignis|jimny|swace|across)(?:$|-)/, "$1"]],
   lexus: [[/^([lrnu]x|es|is|ct|gs|ls|lbx|rz)(?:$|-)/, "$1"]],
   byd: [
+    // Dolphin Surf é modelo próprio (mais pequeno/barato) — nunca comparar
+    // com Dolphin (auditoria). O "Surf" pode vir no modelo ou na variante.
+    [/(^|-)dolphin-surf(-|$)/, "dolphin-surf"],
+    [/^dolphin(?:-.*)?-surf(-|$)/, "dolphin-surf"],
     [/^atto-?2(?:$|-)/, "atto-2"],
     [/^atto-?3(?:$|-)/, "atto-3"],
     [/^(dolphin|seal|han|tang|sealion)(?:$|-)/, "$1"],

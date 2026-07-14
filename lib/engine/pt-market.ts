@@ -20,6 +20,11 @@ export interface PtEstimate {
 const MIN_SAMPLE_NORMAL = 5;
 const MIN_SAMPLE_WIDE = 3;
 const WINDOW_DAYS = 60;
+// Guarda anti-frota (auditoria): amostras de um único stand a preço de tabela
+// (ex.: 6× "La Prima" santogal a 23.490 €) não são mercado — a confiança
+// 'normal' exige dispersão mínima de preços e de vendedores.
+const MIN_DISTINCT_PRICES = 3;
+const MIN_DISTINCT_SELLERS = 2;
 
 async function sample(
   db: typeof Db,
@@ -27,18 +32,30 @@ async function sample(
   year: number,
   kmBand: number,
   spread: number,
-): Promise<{ median: number; n: number } | null> {
+  powerHp?: number | null,
+): Promise<{ median: number; n: number; distinctPrices: number; distinctSellers: number } | null> {
+  // Filtro de potência (auditoria: mistura_trim): um GTI/R (245-320cv) não é
+  // comparável com um Golf 1.5 150cv. Tolerância = ±25% OU ±30cv, o que for
+  // mais largo; observações PT sem power_hp são mantidas (não excluir por
+  // falta de dado).
+  const powerFilter =
+    powerHp != null
+      ? sql`and (l.power_hp is null or abs(l.power_hp - ${powerHp}) <= ${Math.max(Math.round(powerHp * 0.25), 30)})`
+      : sql``;
   // Dedupe por CARRO físico, não por anúncio: grupos como Caetano/CarPlus
   // listam o mesmo stock (mesmo VIN) em vários sites — contar 2× inflaciona
   // a amostra. Identidade = VIN; sem VIN, preço+ano+km (o mesmo carro
   // cross-listado partilha os três; carros distintos raramente).
   const rows = (await db.execute(sql`
     select percentile_cont(0.5) within group (order by price)::int as median,
-           count(*)::int as n
+           count(*)::int as n,
+           count(distinct price)::int as distinct_prices,
+           count(distinct seller_key)::int as distinct_sellers
     from (
-      select distinct on (identity) price
+      select distinct on (identity) price, seller_key
       from (
         select coalesce(l.vin, l.price::text || ':' || coalesce(l.year, 0)::text || ':' || coalesce(l.km, 0)::text) as identity,
+               coalesce(l.seller_name, l.id::text) as seller_key,
                o.price, o.observed_at
         from pt_price_observations o
         join listings l on l.id = o.listing_id
@@ -46,12 +63,25 @@ async function sample(
           and o.year between ${year - spread} and ${year + spread}
           and o.km_band between ${kmBand - spread} and ${kmBand + spread}
           and o.observed_at > now() - make_interval(days => ${WINDOW_DAYS})
+          ${powerFilter}
       ) obs
       order by identity, observed_at desc
     ) latest
-  `)) as unknown as { median: number | null; n: number }[];
+  `)) as unknown as {
+    median: number | null;
+    n: number;
+    distinct_prices: number;
+    distinct_sellers: number;
+  }[];
   const row = rows[0];
-  return row?.median != null ? { median: row.median, n: row.n } : null;
+  return row?.median != null
+    ? {
+        median: row.median,
+        n: row.n,
+        distinctPrices: row.distinct_prices,
+        distinctSellers: row.distinct_sellers,
+      }
+    : null;
 }
 
 export async function estimatePtPrice(
@@ -59,12 +89,18 @@ export async function estimatePtPrice(
   modelId: string,
   year: number,
   kmBand: number,
+  powerHp?: number | null,
 ): Promise<PtEstimate | null> {
-  const primary = await sample(db, modelId, year, kmBand, 1);
-  if (primary && primary.n >= MIN_SAMPLE_NORMAL) {
+  const primary = await sample(db, modelId, year, kmBand, 1, powerHp);
+  if (
+    primary &&
+    primary.n >= MIN_SAMPLE_NORMAL &&
+    primary.distinctPrices >= MIN_DISTINCT_PRICES &&
+    primary.distinctSellers >= MIN_DISTINCT_SELLERS
+  ) {
     return { estimatedPrice: primary.median, sampleSize: primary.n, confidence: "normal" };
   }
-  const wide = await sample(db, modelId, year, kmBand, 2);
+  const wide = await sample(db, modelId, year, kmBand, 2, powerHp);
   if (wide && wide.n >= MIN_SAMPLE_WIDE) {
     return { estimatedPrice: wide.median, sampleSize: wide.n, confidence: "alargada" };
   }

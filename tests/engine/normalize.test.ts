@@ -70,6 +70,21 @@ test("normModel: a variante desmascara o submodelo (auditoria)", () => {
   assert.equal(normModel("volkswagen", "Golf", "1.5 TSI"), "golf");
 });
 
+test("normModel BYD: Dolphin Surf é modelo próprio, nunca compara com Dolphin", () => {
+  // "Surf" no próprio modelo
+  assert.equal(normModel("byd", "Dolphin Surf"), "dolphin-surf");
+  assert.equal(normModel("byd", "Dolphin Surf", "43,2 kWh Comfort"), "dolphin-surf");
+  // "Surf" escondido na variante (model genérico "Dolphin")
+  assert.equal(normModel("byd", "Dolphin", "Surf Comfort 43,2kWh"), "dolphin-surf");
+  assert.equal(normModel("byd", "Dolphin", "Active Surf"), "dolphin-surf");
+  // Dolphin normal continua dolphin
+  assert.equal(normModel("byd", "Dolphin"), "dolphin");
+  assert.equal(normModel("byd", "Dolphin", "Comfort 60,4 kWh"), "dolphin");
+  // "surfer" não é "surf"; Seal não é afetado
+  assert.equal(normModel("byd", "Dolphin", "Surfer Edition"), "dolphin");
+  assert.equal(normModel("byd", "Seal", "U DM-i"), "seal");
+});
+
 test("normFuel multi-língua", () => {
   // diesel
   for (const raw of ["Diesel", "Gasóleo", "Gazole", "Gasoil", "gasoleo"]) {

@@ -37,6 +37,7 @@ export async function computeCosts() {
     select l.id, l.price, l.year, l.km, l.fuel, l.country, l.first_registration,
            l.displacement_cc as cc,
            l.co2 as co2,
+           l.power_hp,
            l.model_id
     from listings l
     join vehicle_models vm on vm.id = l.model_id
@@ -59,6 +60,7 @@ export async function computeCosts() {
     first_registration: string | null;
     cc: number | null;
     co2: number | null;
+    power_hp: number | null;
     model_id: string;
   }[];
 
@@ -74,7 +76,7 @@ export async function computeCosts() {
       continue;
     }
 
-    const pt = await estimatePtPrice(db, l.model_id, l.year, kmBand(l.km));
+    const pt = await estimatePtPrice(db, l.model_id, l.year, kmBand(l.km), l.power_hp);
     if (!pt) {
       semAmostra++;
       continue;
