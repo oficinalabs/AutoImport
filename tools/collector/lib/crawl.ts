@@ -35,6 +35,16 @@ interface CrawlWriterConfig<T, S extends { records: number }> {
   resumeLog?: (w: { stats: S; cursor: unknown; seenCount: number }) => string;
 }
 
+// Compat: checkpoints pré-refactor (5c5073a) guardavam o progresso do loop (doneQueries /
+// donePages+sort / facets+doneFacets) em TOP-LEVEL, sem chave `cursor`. Reconstruímos o cursor
+// a partir dos campos residuais para não rebentar o resumeLog nem perder o progresso antigo.
+const CKPT_BASE_KEYS = new Set(['startedAt', 'ndjson', 'seen', 'stats', 'cursor']);
+function legacyCursor(ck: Record<string, unknown>): unknown {
+  const rest: Record<string, unknown> = {};
+  for (const k of Object.keys(ck)) if (!CKPT_BASE_KEYS.has(k)) rest[k] = ck[k];
+  return Object.keys(rest).length ? rest : null;
+}
+
 // Dono do seen/append/stats/checkpoint. Cada coletor injeta os buckets via newStats/updateStats.
 export function createCrawlWriter<T, S extends { records: number }>(cfg: CrawlWriterConfig<T, S>): CrawlWriter<T, S> {
   const { outDir, source, resume, recordId, newStats, updateStats, resumeLog } = cfg;
@@ -46,7 +56,7 @@ export function createCrawlWriter<T, S extends { records: number }>(cfg: CrawlWr
   let resumed = false;
   if (resume && existsSync(ckptPath)) {
     const ck = JSON.parse(readFileSync(ckptPath, 'utf8'));
-    startedAt = ck.startedAt; ndjsonPath = ck.ndjson; seen = new Set(ck.seen); stats = ck.stats; cursor = ck.cursor ?? null;
+    startedAt = ck.startedAt; ndjsonPath = ck.ndjson; seen = new Set(ck.seen); stats = ck.stats; cursor = ck.cursor ?? legacyCursor(ck);
     resumed = true;
   } else {
     startedAt = new Date().toISOString().replace(/[:.]/g, '-');
