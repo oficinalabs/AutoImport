@@ -19,90 +19,50 @@
 //
 // Documentação e o "porquê" de cada decisão: ver README.md deste diretório.
 
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpClient } from './theparking/http.ts';
 import { crawl } from './theparking/crawl.ts';
+import { defineRunCli, topN } from './lib/cli.ts';
+import { parseArgs } from './theparking/cli-args.ts';
 
-const __dir = dirname(fileURLToPath(import.meta.url));
-
-// Nomes de país (PT/EN) -> slug usado no URL do theparking.eu.
-const PAISES: Record<string, string> = {
-  germany: 'germany', alemanha: 'germany',
-  france: 'france', franca: 'france', 'frança': 'france',
-  belgium: 'belgium', belgica: 'belgium', 'bélgica': 'belgium',
-  netherlands: 'netherlands', holanda: 'netherlands', 'paises-baixos': 'netherlands',
-  spain: 'spain', espanha: 'spain',
-  // PT: a fatia `portugal` (`/used-cars/portugal.html`, ~128k anúncios) dá acesso por HTTP puro
-  // ao inventário PT da rede leparking — o mesmo que o oparking.pt agregaria mas serve bloqueado
-  // por Cloudflare challenge. Fontes reais: custojusto.pt, standvirtual.com, olx.pt, autohero.com.
-  portugal: 'portugal', 'português': 'portugal', portugues: 'portugal',
-};
-
-// Parser de argumentos minimalista (suporta flags repetíveis via acumulação).
-function parseArgs(argv: string[]): { country: string[]; [key: string]: string | boolean | string[] } {
-  const args: { country: string[]; [key: string]: string | boolean | string[] } = { country: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a.startsWith('--')) continue;
-    const key = a.slice(2);
-    const val = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
-    if (key === 'country') args.country.push(String(val).toLowerCase());
-    else args[key] = val;
-  }
-  return args;
-}
-
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-
-  // Resolve países (default: os 4 viáveis confirmados — DE, NL, BE, FR).
-  const pedidos = args.country.length ? args.country : ['germany', 'netherlands', 'belgium', 'france'];
-  const countries = [...new Set(pedidos.map((c) => PAISES[c]).filter(Boolean))];
-  if (!countries.length) { console.error('✗ nenhum país válido. Ex.: --country belgium'); process.exit(1); }
-
-  const outDir = args.out ? String(args.out) : join(__dir, 'out');
-  const http = new HttpClient({ minDelayMs: Number(args.rate) || 1500 });
-
-  console.log(`=== theparking.eu | países: ${countries.join(', ')}`
+await defineRunCli({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  site: 'theparking',
+  HttpClient,
+  crawl,
+  parseArgs,
+  banner: (args) => `=== theparking.eu | países: ${args.countries.join(', ')}`
     + `${args.make ? ` | marca: ${args.make}` : ''}`
     + ` | max-pages: ${Number(args['max-pages']) || 5}`
-    + `${args.full ? ' | MODO COMPLETO' : ''} ===\n`);
-
-  const t0 = Date.now();
-  const { ndjsonPath, stats, queries } = await crawl({
+    + `${args.full ? ' | MODO COMPLETO' : ''} ===\n`,
+  buildConfig: (args, { http, outDir }) => ({
     http,
-    countries,
+    countries: args.countries,
     make: args.make ? String(args.make) : null,
     full: Boolean(args.full),
     maxPages: Number(args['max-pages']) || 5,
     outDir,
     resume: Boolean(args.resume),
-  });
-  const durationS = Math.round((Date.now() - t0) / 1000);
-
-  // Resumo persistido + impresso.
-  const avgPrice = stats.price.count ? Math.round(stats.price.sum / stats.price.count) : null;
-  const summary = {
-    generatedAt: new Date().toISOString(),
-    countries, queries, durationS,
-    total: stats.records, pages: stats.pages,
-    price: { min: stats.price.min, max: stats.price.max, avg: avgPrice },
-    byCountry: stats.byCountry, bySource: stats.bySource, nbResults: stats.nbResults,
-    ndjson: ndjsonPath,
-  };
-  mkdirSync(outDir, { recursive: true });
-  writeFileSync(join(outDir, 'theparking-summary.json'), JSON.stringify(summary, null, 2));
-
-  const top = (obj: Record<string, number>, n = 8) => Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n)
-    .map(([k, v]) => `${k}:${v}`).join('  ');
-  console.log(`\n✓ ${stats.records} anúncios | ${stats.pages} páginas | ${durationS}s`);
-  console.log(`preço €: min ${stats.price.min} · máx ${stats.price.max} · média ${avgPrice}`);
-  console.log(`países: ${top(stats.byCountry)}`);
-  console.log(`fontes: ${top(stats.bySource)}`);
-  console.log(`\nNDJSON → ${ndjsonPath}`);
-  console.log(`resumo → ${join(outDir, 'theparking-summary.json')}`);
-}
-
-main().catch((e) => { console.error(e); process.exit(1); });
+  }),
+  summarize: ({ ndjsonPath, stats, queries }, { durationS, args }) => {
+    const avgPrice = stats.price.count ? Math.round(stats.price.sum / stats.price.count) : null;
+    return {
+      generatedAt: new Date().toISOString(),
+      countries: args.countries, queries, durationS,
+      total: stats.records, pages: stats.pages,
+      price: { min: stats.price.min, max: stats.price.max, avg: avgPrice },
+      byCountry: stats.byCountry, bySource: stats.bySource, nbResults: stats.nbResults,
+      ndjson: ndjsonPath,
+    };
+  },
+  report: ({ ndjsonPath, stats }, { durationS, summaryPath }) => {
+    const avgPrice = stats.price.count ? Math.round(stats.price.sum / stats.price.count) : null;
+    console.log(`\n✓ ${stats.records} anúncios | ${stats.pages} páginas | ${durationS}s`);
+    console.log(`preço €: min ${stats.price.min} · máx ${stats.price.max} · média ${avgPrice}`);
+    console.log(`países: ${topN(stats.byCountry)}`);
+    console.log(`fontes: ${topN(stats.bySource)}`);
+    console.log(`\nNDJSON → ${ndjsonPath}`);
+    console.log(`resumo → ${summaryPath}`);
+  },
+}).catch((e) => { console.error(e); process.exit(1); });

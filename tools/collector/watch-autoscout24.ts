@@ -13,44 +13,22 @@
 //        --interval <seg> (60), --cycles <n> (0/omisso=contínuo), --online-since <1..14>,
 //        --rate <ms>, --out <dir>.
 
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpClient } from './autoscout24/http.ts';
 import { watch } from './autoscout24/watch.ts';
-import { slugify } from './autoscout24/parse.ts';
+import { defineWatchCli } from './lib/cli.ts';
+import { parseMake, parseWatchArgs } from './autoscout24/cli-args.ts';
 
-const __dir = dirname(fileURLToPath(import.meta.url));
-
-function parseArgs(argv: string[]): Record<string, string | true> {
-  const args: Record<string, string | true> = {};
-  for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith('--')) continue;
-    const key = argv[i].slice(2);
-    args[key] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
-  }
-  return args;
-}
-
-function parseMake(v: string | true | undefined): { id: string | null; slug: string | null } | null {
-  if (v == null || v === true) return null;
-  const s = String(v);
-  if (/^\d+$/.test(s)) return { id: s, slug: null };
-  return { id: null, slug: slugify(s) };
-}
-
-const args = parseArgs(process.argv.slice(2));
-const countries = args.country
-  ? String(args.country).split(',').map((s) => s.trim()).filter(Boolean)
-  : ['D'];
-
-await watch({
-  http: new HttpClient({ minDelayMs: Number(args.rate) || 1500 }),
-  countries,
-  make: parseMake(args.make),
-  pages: Number(args.pages) || 1,
-  size: Number(args.size) || 20,
-  intervalMs: (Number(args.interval) || 60) * 1000,
-  cycles: Number(args.cycles) || 0,
-  onlineSince: args['online-since'] ? Number(args['online-since']) : null,
-  outDir: args.out ? String(args.out) : join(__dir, 'out'),
+await defineWatchCli({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  HttpClient,
+  watch,
+  parseArgs: parseWatchArgs,
+  buildConfig: (args) => ({
+    countries: args.countries,
+    make: parseMake(args.make),
+    size: Number(args.size) || 20,
+    onlineSince: args['online-since'] ? Number(args['online-since']) : null,
+  }),
 });

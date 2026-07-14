@@ -8,29 +8,16 @@
 // Flags: --pages <n> (páginas/ciclo, default 1), --interval <seg> (default 60),
 //        --cycles <n> (0/omisso = contínuo), --rate <ms>, --out <dir>.
 
-import { join, dirname } from 'node:path';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpClient } from './aramisauto/http.ts';
 import { watch } from './aramisauto/watch.ts';
+import { defineWatchCli } from './lib/cli.ts';
 
-const __dir = dirname(fileURLToPath(import.meta.url));
-
-function parseArgs(argv: string[]): Record<string, string | true> {
-  const args: Record<string, string | true> = {};
-  for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith('--')) continue;
-    const key = argv[i].slice(2);
-    args[key] = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
-  }
-  return args;
-}
-
-const args = parseArgs(process.argv.slice(2));
-await watch({
+await defineWatchCli({
+  dir: dirname(fileURLToPath(import.meta.url)),
   // Crawl-delay 5s do robots → default 5000ms (afinável com --rate, com cautela).
-  http: new HttpClient({ minDelayMs: Number(args.rate) || 5000 }),
-  pages: Number(args.pages) || 1,
-  intervalMs: (Number(args.interval) || 60) * 1000,
-  cycles: Number(args.cycles) || 0,
-  outDir: args.out ? String(args.out) : join(__dir, 'out'),
+  defaultRate: 5000,
+  HttpClient,
+  watch,
 });
