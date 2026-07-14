@@ -88,11 +88,11 @@ deriva. Captura exaustiva de novos depende do **re-crawl batch periódico**.
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-13)
 
-1. `run-santogal.mjs --max-pages 3` → **119 anúncios** (40+40+39, 5s), todos `Usado`, com `price`,
+1. `run-santogal.ts --max-pages 3` → **119 anúncios** (40+40+39, 5s), todos `Usado`, com `price`,
    `make/model`, `year`, `km`, `fuel`, `color`, `image`, `detail_url` preenchidos a 40/40.
 2. `--resume --max-pages 4` → retomou em p4, +38, **157 registos, 157 ids únicos** (0 duplicados).
 3. `--make BMW --max-pages 2` → **77 anúncios, 100% BMW** (via `querytext=Usados BMW`).
-4. `watch-santogal.mjs --interval 12 --cycles 2` → ciclo 1: 40 novos; ciclo 2: 0 novos (dedupe pela
+4. `watch-santogal.ts --interval 12 --cycles 2` → ciclo 1: 40 novos; ciclo 2: 0 novos (dedupe pela
    tabela de estado); `maxCarroId` logado como sinal de recência; eventos escritos no sink.
 5. Guarda `assertAllowed`: a listagem passa (robots.txt sem disallow → nada bloqueado).
 6. Preço com desconto correto: 1 card com `first-price` → `price=39990`, `price_old=40990`.

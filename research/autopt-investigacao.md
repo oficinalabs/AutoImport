@@ -126,7 +126,7 @@ combustível), não por posição — imune a reordenação.
 
 ## Verificação (dados reais, 2026-07-12)
 
-- `run-autopt.mjs --max-pages 3` → **60 anúncios**, 3 páginas, 4s. Cobertura: make/model/variant/
+- `run-autopt.ts --max-pages 3` → **60 anúncios**, 3 páginas, 4s. Cobertura: make/model/variant/
   year/km/fuel/price/currency/country/region/source/detail_url/image/id/owner_type/condition =
   **60/60**; dealer 54/60 (null nos 6 particulares); gearbox/engine/color/doors/category/postalCode
   = 0/60 (esperado — não estão na listagem). Preço €: min 2.990 · máx 65.750 · média 22.347.

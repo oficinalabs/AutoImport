@@ -110,7 +110,7 @@ carplus.pt, cujo robots já validámos). `api.gsci.pt/robots.txt` responde JSON 
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-13)
 
-1. `run-carplus.mjs --max-pages 3` → **48 anúncios** (12s). Cobertura /48: make/model/variant/year/
+1. `run-carplus.ts --max-pages 3` → **48 anúncios** (12s). Cobertura /48: make/model/variant/year/
    km/fuel/gearbox/color/doors/price/region/source/detail_url/image/vin/license_plate/monthly_price/
    taeg/power_cv/condition/availability/update_time/stock/origin = **48/48**; `engine` 47/48;
    `category` 0/48 (não exposto, por design).
@@ -119,7 +119,7 @@ carplus.pt, cujo robots já validámos). `api.gsci.pt/robots.txt` responde JSON 
    com stands específicos (Caetano Audi - Aveiro/Setúbal/Vila Nova de Gaia).
 4. `--full --max-pages 120` → percorre a listagem geral até à página vazia → **catálogo completo**
    (~1.037 viaturas), dedupe global por VIN.
-5. `watch-carplus.mjs --interval 12 --cycles 2` → ciclo 1: 16 novos; ciclo 2: 0 novos (dedupe);
+5. `watch-carplus.ts --interval 12 --cycles 2` → ciclo 1: 16 novos; ciclo 2: 0 novos (dedupe);
    `maxUpdate` logado por ciclo.
 6. Guarda robots: `assertAllowed` **bloqueia** `/backoffice/…` e **permite** `/carros-usados/…` e
    `/veiculo/…`.

@@ -99,14 +99,14 @@ ciclo para priorizar/detetar deriva. Captura exaustiva de novos depende do **re-
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-flexicar.mjs --max-pages 3` → **25 anúncios** ES (6s; base + 2 marcas). Cobertura por campo
+1. `run-flexicar.ts --max-pages 3` → **25 anúncios** ES (6s; base + 2 marcas). Cobertura por campo
    (25 registos): `make/model/variant/year/km/fuel/gearbox/color/price/region/postalCode/source/`
    `detail_url/image` **25/25**; `eco_sticker` 24/25; `power_hp` 13/25 (versões só-kW, ex. elétricos,
    não trazem CV — mas `power_kw` fica preenchido).
 2. `--resume --max-pages 6` → retomou nas facetas 4–9, **25 → 85** anúncios, **0 duplicados** (mesmo NDJSON).
 3. `--brand audi --max-pages 1` → **12 anúncios, todos AUDI** (rota `/audi/segunda-mano/`).
 4. `--full --max-pages N` → seed de **9.684 facetas** do sitemap (log: "9684 facetas a percorrer").
-5. `watch-flexicar.mjs --interval 12 --cycles 2` → ciclo 1: **12 novos**; ciclo 2: **0 novos** (dedupe);
+5. `watch-flexicar.ts --interval 12 --cycles 2` → ciclo 1: **12 novos**; ciclo 2: **0 novos** (dedupe);
    `maxId` logado por ciclo (903000000257765).
 6. Guarda robots (`assertAllowed`): `/coches-segunda-mano/`, `/audi/segunda-mano/`,
    `/audi/q3/coches-madrid/segunda-mano/`, `/sitemap.xml` → **ALLOW**; `/api/…`, `/admin/…`,

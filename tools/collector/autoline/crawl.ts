@@ -1,0 +1,115 @@
+// autoline/crawl.ts — recolha batch do autoline.pt: paginação, dedupe, checkpoint, NDJSON.
+// Mesma forma do autocasion/crawl.ts (dedupe global por id, checkpoint/resume, stats).
+//
+// ÂMBITO: categoria CARROS (ligeiros, `--c1169`) filtrada por PAÍS. Rota de listagem:
+// `/-/carros/{Pais}--c1169cnt{CC}?page=N`. Por defeito recolhe a Bélgica (cntBE, ~590 anúncios,
+// que a paginação cobre por inteiro — ~26 págs de 23).
+//
+// COBERTURA (--full): o site NÃO deixa ordenar (`Disallow: /-/*sort=`) e o sidebar de MARCAS é
+// truncado ("Ver todas" → endpoint sob `/search/`, proibido). A partição limpa e path-based é por
+// PAÍS: o modo --full sonda a página geral da categoria, lê os facets de país europeus
+// (DE/BE/ES/FR/GB/CH…) e itera-os — cobrindo TODO o stock UE de ligeiros (cada país pagina até ao
+// fim, ~centenas). Sem --full, uma só query (país via --country, default BE).
+
+import { BASE } from './http.ts';
+import { parseListingPage, extractCountryFacets, recordId } from './parse.ts';
+import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
+import type { HttpClient } from '../lib/http.ts';
+import type { AutolineRecord } from './schema.ts';
+
+const CAP_PAGINAS = 500;   // salvaguarda; na prática cada país esgota bem antes (páginas vazias)
+
+// Estatísticas acumuladas ao longo do crawl.
+interface Stats {
+  records: number;
+  pages: number;
+  byCountry: Record<string, number>;
+  bySource: Record<string, number>;
+  byRegion: Record<string, number>;
+  byFuel: Record<string, number>;
+  auctions: number;
+  price: { count: number; sum: number; min: number | null; max: number | null };
+  nbResults: Record<string, number | null>;
+  maxId: string | null;
+}
+
+interface CrawlConfig {
+  http: HttpClient;
+  full?: boolean;
+  country?: string;
+  maxPages?: number;
+  outDir: string;
+  resume?: boolean;
+}
+
+// Categoria default: CARROS (passenger cars). slug + id do path `--c{id}`.
+const CAT = { slug: 'carros', id: 1169 };
+
+// Fallback de slug (nome PT do país no path) por código ISO — os facets europeus do autoline.pt.
+// Usado quando o utilizador passa --country <CC> sem sondar a página.
+const SLUG_PT: Record<string, string> = { BE: 'Belgica', DE: 'Alemanha', ES: 'Espanha', FR: 'Franca', GB: 'Gra-Bretanha', CH: 'Suica' };
+
+// URL de listagem. `country` = { cc, slug } (país) ou null (todos); page>1 acrescenta ?page=N.
+function urlListagem(cat: { slug: string; id: number }, country: { cc: string; slug: string } | null, page: number) {
+  const seg = country ? `/-/${cat.slug}/${country.slug}--c${cat.id}cnt${country.cc}`
+    : `/-/${cat.slug}--c${cat.id}`;
+  const qs = page > 1 ? `?page=${page}` : '';
+  return `${BASE}${seg}${qs}`;
+}
+
+const temItemList = (t: string) => t.includes('ItemList');
+
+function statsVazias(): Stats {
+  return { records: 0, pages: 0, byCountry: {}, bySource: {}, byRegion: {}, byFuel: {}, auctions: 0, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {}, maxId: null };
+}
+function atualizaStats(stats: Stats, r: AutolineRecord) {
+  stats.records++;
+  stats.byCountry[r.country || '?'] = (stats.byCountry[r.country || '?'] || 0) + 1;
+  stats.bySource[r.source || '?'] = (stats.bySource[r.source || '?'] || 0) + 1;
+  stats.byRegion[r.region || '?'] = (stats.byRegion[r.region || '?'] || 0) + 1;
+  stats.byFuel[r.fuel || '?'] = (stats.byFuel[r.fuel || '?'] || 0) + 1;
+  if (r.is_auction) stats.auctions++;
+  if (r.id != null && (stats.maxId === null || String(r.id) > String(stats.maxId))) stats.maxId = r.id;
+  if (r.price != null && r.price > 0) { const p = stats.price; p.count++; p.sum += r.price; p.min = p.min === null ? r.price : Math.min(p.min, r.price); p.max = p.max === null ? r.price : Math.max(p.max, r.price); }
+}
+
+// config: { http, full?, country?, maxPages, outDir, resume? }
+// country: código ISO (ex. 'BE'); default 'BE'. Ignorado em --full (itera todos os países).
+export async function crawl(config: CrawlConfig) {
+  const { http, full = false, country = 'BE', maxPages = 5, outDir, resume = false } = config;
+  const writer = createCrawlWriter<AutolineRecord, Stats>({
+    outDir, source: 'autoline', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+  });
+
+  // --- plano de queries ---
+  // --full: uma query por PAÍS europeu (descobre os facets na página geral da categoria).
+  // Sem --full: uma só query, o país pedido (--country, default BE).
+  let queries: { label: string; country: { cc: string; slug: string } }[];
+  if (full) {
+    const probe = await http.fetchText(urlListagem(CAT, null, 1), { validate: temItemList });
+    const facets = probe ? extractCountryFacets(probe) : [];
+    queries = facets.map((f) => ({ label: f.cc, country: f }));
+    if (!queries.length) { // fallback: pelo menos o país pedido
+      const cc = String(country).toUpperCase();
+      queries = [{ label: cc, country: { cc, slug: SLUG_PT[cc] || cc } }];
+    }
+    console.log(`--full: ${queries.length} países a percorrer (${queries.map((q) => q.label).join(', ')})`);
+  } else {
+    const cc = String(country).toUpperCase();
+    queries = [{ label: cc, country: { cc, slug: SLUG_PT[cc] || cc } }];
+  }
+
+  const cursor = (writer.cursor as Record<string, number>) ?? {};
+  await runPagedCrawl({
+    writer, queries, cursor, maxPages, cap: CAP_PAGINAS,
+    fetchPage: async (q, page, collectedAt) => {
+      const html = await http.fetchText(urlListagem(CAT, q.country, page), { validate: temItemList });
+      if (!html) return null;
+      const { listings, total } = parseListingPage(html, { collectedAt, countryCode: q.country?.cc });
+      if (page === 1) writer.stats.nbResults[q.label] = total;
+      return { listings };
+    },
+  });
+
+  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
+}

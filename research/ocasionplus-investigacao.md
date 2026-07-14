@@ -112,11 +112,11 @@ batch periódico**. (Mesma decisão do AutoTrader/autocasion.)
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-ocasionplus.mjs --max-pages 3` → **60 anúncios** ES (3s), com `price`, `make/model`, `year`,
+1. `run-ocasionplus.ts --max-pages 3` → **60 anúncios** ES (3s), com `price`, `make/model`, `year`,
    `km`, `fuel`, `gearbox`, `region`, `center`, `power_hp`, `image` preenchidos 60/60.
 2. `--resume --max-pages 5` → retomou em 60, +40 (p4+p5) sem duplicar (**100 linhas = 100 ids únicos**).
 3. `--brand audi --max-pages 2` → **40 anúncios, todos AUDI** (via path `/coches-segunda-mano/audi`).
-4. `watch-ocasionplus.mjs --interval 12 --cycles 2` → ciclo 1: 20 novos; ciclo 2: **0 novos** (dedupe).
+4. `watch-ocasionplus.ts --interval 12 --cycles 2` → ciclo 1: 20 novos; ciclo 2: **0 novos** (dedupe).
 5. Guarda robots: `/coches-segunda-mano`, `/coches-segunda-mano/audi` e `?page=5` **permitidos**;
    `/vender-mi-coche/cambio/*` **bloqueado**. Só emitimos paths de listagem + `?page` (sem query-filtros).
 6. `--full` seed: **76 slugs de marca** extraídos de `/marcas`.

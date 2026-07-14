@@ -1,0 +1,21 @@
+// watch-autoboerse.ts — CLI da recolha CONTÍNUA do autoboerse.de (poll de recentes).
+//
+// Uso:
+//   node watch-autoboerse.ts                     # 1 em 1 min, contínuo
+//   node watch-autoboerse.ts --interval 60 --pages 2
+//   node watch-autoboerse.ts --interval 12 --cycles 2   # teste
+//
+// Flags: --pages <n> (páginas de recentes/ciclo, default 1), --interval <seg> (default 60),
+//        --cycles <n> (0/omisso = contínuo), --rate <ms>, --out <dir>.
+
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { HttpClient } from './autoboerse/http.ts';
+import { watch } from './autoboerse/watch.ts';
+import { defineWatchCli } from './lib/cli.ts';
+
+await defineWatchCli({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  HttpClient,
+  watch,
+});
