@@ -225,3 +225,75 @@ export function ForgotPasswordForm() {
     </form>
   );
 }
+
+/** Define a nova password a partir do token do email. */
+export function ResetPasswordForm({ token }: { token?: string }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  if (!token) {
+    return (
+      <div className="flex flex-col gap-4">
+        <FormError message="Este link é inválido ou já foi usado." />
+        <Button asChild variant="outline" size="lg">
+          <Link href="/recuperar">Pedir um novo link</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const password = String(fd.get("password"));
+    const confirm = String(fd.get("confirm"));
+
+    if (password.length < 8) {
+      setError("A password tem de ter pelo menos 8 caracteres.");
+      return;
+    }
+    if (password !== confirm) {
+      setError("As passwords não coincidem.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const { error } = await authClient.resetPassword({ newPassword: password, token });
+    setLoading(false);
+
+    if (error) {
+      setError(
+        error.code === "INVALID_TOKEN" || error.status === 400
+          ? "Este link expirou ou já foi usado. Pede um novo."
+          : messageFor(error),
+      );
+      return;
+    }
+    router.push("/entrar?reset=1");
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+      {error && <FormError message={error} />}
+      <Field
+        label="Nova password"
+        id="password"
+        type="password"
+        placeholder="Mínimo 8 caracteres"
+        autoComplete="new-password"
+      />
+      <Field
+        label="Confirmar password"
+        id="confirm"
+        type="password"
+        placeholder="Repete a password"
+        autoComplete="new-password"
+      />
+      <Button type="submit" variant="accent" size="lg" disabled={loading}>
+        {loading ? "A guardar…" : "Guardar nova password"}
+      </Button>
+    </form>
+  );
+}

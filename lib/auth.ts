@@ -1,5 +1,7 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { ResetPasswordEmail } from "@/emails/reset-password";
+import { sendEmail } from "@/lib/email";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -19,8 +21,19 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
-    // TODO(email): ligar o envio real via Resend quando a chave existir (docs/06).
-    // sendResetPassword: async ({ user, url }) => { ... },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 hora (o email diz o mesmo)
+    sendResetPassword: async ({ user, url }) => {
+      // Em dev sem RESEND_API_KEY, o sendEmail avisa e o link fica no log abaixo.
+      if (!process.env.RESEND_API_KEY) {
+        console.info(`[auth] link de reset para ${user.email}: ${url}`);
+      }
+      await sendEmail({
+        to: user.email,
+        subject: "Define uma nova password no AutoImport",
+        react: ResetPasswordEmail({ url, name: user.name }),
+        text: `Define uma nova password no AutoImport: ${url}\n\nO link é válido durante 1 hora. Se não foste tu que pediste, ignora este email.`,
+      });
+    },
   },
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 dias
