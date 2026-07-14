@@ -92,12 +92,12 @@ detetar deriva. Captura exaustiva de novos depende do **re-crawl batch periódic
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-aramisauto.mjs --max-pages 3` → **72 anúncios** FR (5s), **cobertura 100%** em todos os
+1. `run-aramisauto.ts --max-pages 3` → **72 anúncios** FR (5s), **cobertura 100%** em todos os
    campos-base (price/make/model/variant/year/km/fuel/gearbox/engine/color/category/…).
 2. `--resume --max-pages 5` → retomou em 72, +48 sem duplicar (**120**, 120 ids únicos).
 3. `--slice diesel --max-pages 2` → **48 anúncios, todos `fuel=Diesel`** (via silo `/achat/diesel/`).
    `--full --max-pages 1` → percorreu as **10 categorias** (192 registos, 1 pág/categoria).
-4. `watch-aramisauto.mjs --interval 12 --cycles 2` → ciclo 1: **24 novos** (maxId 1009425); ciclo 2:
+4. `watch-aramisauto.ts --interval 12 --cycles 2` → ciclo 1: **24 novos** (maxId 1009425); ciclo 2:
    **0 novos** (dedupe), maxId estável.
 5. Guarda robots: pedidos a `/agence/`, `/cms/`, `/offre/`, `/voiture-neuve/`, `/clients/`,
    `/cdn-cgi/` são **bloqueados**; `/achat/`, `/achat/?page=2`, `/achat/diesel/` passam.

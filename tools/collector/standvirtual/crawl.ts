@@ -1,0 +1,98 @@
+// standvirtual/crawl.ts — recolha batch do standvirtual.com: paginação, dedupe, checkpoint,
+// NDJSON, stats. Mesma forma do autoboerse/crawl.ts.
+//
+// COBERTURA (--full): AO CONTRÁRIO do que a investigação previa, o StandVirtual NÃO tem cap de
+// ~500 páginas — a paginação por `?page=N` chega ao FIM do catálogo (probes: página 1324 =
+// offset 42336 devolve o último anúncio de 42.337; página ≥1400 vem vazia). Por isso o modo
+// `--full` PAGINA DIRETO a listagem geral `/carros` até esgotar (~1324 páginas de 32), com
+// cobertura completa — SEM precisar de fatiar por marca. O fatiamento por marca continua
+// disponível via `--brand {slug}` (ex. `bmw`, `mercedes-benz`), útil para corridas dirigidas.
+//
+// SORT DETERMINÍSTICO: forçamos `search[order]=created_at_first:desc` em todas as páginas. O
+// default do site (`relevance_web`) é embaralhado/personalizado → produziria lacunas na
+// paginação por offset. Com ordenação por data de criação (desc), anúncios novos inseridos
+// durante a corrida só empurram para baixo (geram duplicados, filtrados pelo dedupe) e não
+// abrem lacunas. Serve também de sinal de recência.
+
+import { BASE } from './http.ts';
+import { parseListingPage, recordId } from './parse.ts';
+import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
+import type { HttpClient } from '../lib/http.ts';
+import type { StandvirtualRecord } from './schema.ts';
+
+const ORDER = 'created_at_first:desc';
+const CAP_PAGINAS = 1500;   // salvaguarda > 1324 (catálogo completo); na prática esgota antes
+
+// Estatísticas acumuladas ao longo do crawl.
+interface Stats {
+  records: number;
+  pages: number;
+  byCountry: Record<string, number>;
+  bySource: Record<string, number>;
+  byRegion: Record<string, number>;
+  bySellerType: Record<string, number>;
+  byFuel: Record<string, number>;
+  price: { count: number; sum: number; min: number | null; max: number | null };
+  nbResults: Record<string, number | null>;
+}
+
+interface CrawlConfig {
+  http: HttpClient;
+  full?: boolean;
+  brand?: string | null;
+  maxPages?: number;
+  outDir: string;
+  resume?: boolean;
+}
+
+// URL de listagem. `brand` (slug, ex. "bmw") fatia via path; page>1 acrescenta ?page=N.
+function urlListagem(brand: string | null, page: number) {
+  const path = brand ? `/carros/${brand}` : '/carros';
+  const qs = new URLSearchParams({ 'search[order]': ORDER });
+  if (page > 1) qs.set('page', String(page));
+  return `${BASE}${path}?${qs}`;
+}
+
+function statsVazias(): Stats {
+  return { records: 0, pages: 0, byCountry: {}, bySource: {}, byRegion: {}, bySellerType: {}, byFuel: {}, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {} };
+}
+function atualizaStats(stats: Stats, r: StandvirtualRecord) {
+  stats.records++;
+  stats.byCountry[r.country || '?'] = (stats.byCountry[r.country || '?'] || 0) + 1;
+  stats.bySource[r.source || '?'] = (stats.bySource[r.source || '?'] || 0) + 1;
+  stats.byRegion[r.region || '?'] = (stats.byRegion[r.region || '?'] || 0) + 1;
+  stats.bySellerType[r.seller_type || '?'] = (stats.bySellerType[r.seller_type || '?'] || 0) + 1;
+  stats.byFuel[r.fuel || '?'] = (stats.byFuel[r.fuel || '?'] || 0) + 1;
+  if (r.price != null && r.price > 0) { const p = stats.price; p.count++; p.sum += r.price; p.min = p.min === null ? r.price : Math.min(p.min, r.price); p.max = p.max === null ? r.price : Math.max(p.max, r.price); }
+}
+
+const temAdvertSearch = (t: string) => t.includes('advertSearch');
+
+// config: { http, full?, brand?, maxPages, outDir, resume? }
+export async function crawl(config: CrawlConfig) {
+  const { http, full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
+  const writer = createCrawlWriter<StandvirtualRecord, Stats>({
+    outDir, source: 'standvirtual', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+  });
+
+  // --- plano de queries ---
+  // Uma única query (listagem geral, ou uma marca via --brand). Sem fan-out por marca porque a
+  // paginação direta já cobre o catálogo todo (ver cabeçalho).
+  const label = brand || 'carros';
+  const queries = [{ label, brand }];
+
+  // Limite efetivo de páginas: --full percorre até esgotar (cap de salvaguarda); senão maxPages.
+  const cursor = (writer.cursor as Record<string, number>) ?? {};
+  await runPagedCrawl({
+    writer, queries, cursor, maxPages: full ? CAP_PAGINAS : maxPages, cap: CAP_PAGINAS,
+    fetchPage: async (q, page, collectedAt) => {
+      const html = await http.fetchText(urlListagem(q.brand, page), { validate: temAdvertSearch });
+      if (!html) return null;
+      const { listings, total } = parseListingPage(html, { collectedAt });
+      if (page === 1) writer.stats.nbResults[q.label] = total;
+      return { listings };
+    },
+  });
+
+  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
+}

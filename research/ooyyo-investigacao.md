@@ -92,7 +92,7 @@ Captura exaustiva de novos depende do **re-crawl batch periódico** (`--full`).
 
 ## Verificação (ponta-a-ponta, dados reais — 2026-07-11)
 
-1. `run-ooyyo.mjs --max-pages 3` → **45 anúncios** BE (14s a `--rate 4000`). Cobertura (45):
+1. `run-ooyyo.ts --max-pages 3` → **45 anúncios** BE (14s a `--rate 4000`). Cobertura (45):
    make/model/variant/year/price/currency/country/source/detail_url/image/id/deal/image_count 45/45;
    category 44/45; fuel 32/45; engine 27/45; km 30/45; region(cidade) 13/45; color 18/45 (numa
    fatia BMW). `gearbox` 0/45 (não exposto). Fontes: autolive.be, autoline.be, moniteurautomobile.be,
@@ -101,7 +101,7 @@ Captura exaustiva de novos depende do **re-crawl batch periódico** (`--full`).
    duplicados**.
 3. `--make bmw --max-pages 3` → **45 anúncios, todos BMW** (via `qselements idMake` → SRP da marca +
    "Next").
-4. `watch-ooyyo.mjs --interval 12 --cycles 2` → ciclo 1: 15 novos; ciclo 2: 0 novos (dedupe por
+4. `watch-ooyyo.ts --interval 12 --cycles 2` → ciclo 1: 15 novos; ciclo 2: 0 novos (dedupe por
    estado). Eventos `new` escritos em `ooyyo-events.ndjson`.
 5. Guarda robots (`assertAllowed`): `/automobili/`, `/counter`, `/outlet-service-web/` bloqueados; a
    SRP e a API passam. `minDelayMs` default = **30000** (honra Crawl-delay: 30).

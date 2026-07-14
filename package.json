@@ -10,6 +10,8 @@
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
+    "typecheck:tools": "tsc -p tools/collector/tsconfig.json",
+    "typecheck:net-capture": "tsc -p tools/net-capture/tsconfig.json",
     "auth:generate": "npx @better-auth/cli generate --config lib/auth.ts --output db/schema.ts --yes",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
