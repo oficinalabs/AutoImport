@@ -39,6 +39,7 @@ export async function computeCosts() {
     left join import_cost_estimates e on e.listing_id = l.id
     where l.country = any(${`{${FOREIGN.join(",")}}`}::text[])
       and l.deleted_at is null
+      and l.is_damaged is not true -- sinistrado barato ≠ oportunidade
       and l.price is not null
       and l.year is not null
       and l.km is not null

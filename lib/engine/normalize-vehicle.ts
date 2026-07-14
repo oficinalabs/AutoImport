@@ -133,6 +133,7 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
   suzuki: [[/^(swift|vitara|s-cross|ignis|jimny|swace|across)(?:$|-)/, "$1"]],
   lexus: [[/^([lrnu]x|es|is|ct|gs|ls|lbx|rz)(?:$|-)/, "$1"]],
   byd: [
+    [/^atto-?2(?:$|-)/, "atto-2"],
     [/^atto-?3(?:$|-)/, "atto-3"],
     [/^(dolphin|seal|han|tang|sealion)(?:$|-)/, "$1"],
   ],
@@ -167,18 +168,30 @@ export function normModel(
 // Multi-língua (PT/DE/FR/NL/ES/EN). GPL/GN/hidrogénio → null (fora do
 // âmbito de comparação; FuelType não os cobre). "Gas" sozinho é ambíguo → null.
 //
-// `variantRaw` desambigua HEV vs PHEV: muitos sites PT dizem só "Hibrido" no
-// campo combustível e escondem o "Plug-in" na variante ("Allure Plug-in
-// Hybrid 195cv") — sem isto, um HEV barato compara com o mercado PHEV e a
-// poupança sai inflacionada (caso real: Peugeot 3008 Hybrid 145 vs PHEV 195).
+// `variantRaw` e `co2` desambiguam o que o campo combustível esconde
+// (casos reais da auditoria de oportunidades):
+//   - PT diz "Hibrido" e o "Plug-in" está na variante ("Allure Plug-in Hybrid")
+//   - Mercedes/BMW marcam PHEV só no sufixo ("E 300 e", "300 de", "330e");
+//     o (?!-) evita o falso positivo "Hybrid 145 e-DCS6" (caixa Peugeot)
+//   - AS24 diz "Elektro/Benzin" para HEV E PHEV — CO₂ ≤ 60 g só existe em PHEV
+//   - Caetano diz "Gasolina" em Tucson HEV e o "HEV" está na variante
+// Sem isto, HEVs comparam com o mercado PHEV (e vice-versa) e a poupança sai errada.
+
+/** Sufixos/selos PHEV na variante: "300 e", "300 de", "330e", "225xe", GTE, Recharge. */
+const PHEV_VARIANT = /(\b\d{3}\s?[xd]?e\b(?![-–])|\bgte\b|recharge)/i;
+/** Selos HEV na variante quando o campo diz gasolina/diesel (exclui mild/48V). */
+const HEV_VARIANT = /\b(hev|hybrid|hibrido|híbrido)\b/i;
+const MILD_VARIANT = /mild|mhev|48\s?v/i;
 
 export function normFuel(
   raw: string | null | undefined,
   variantRaw?: string | null,
+  co2?: number | null,
 ): FuelType | null {
   if (!raw) return null;
   const s = slugify(raw);
   if (!s) return null;
+  const variant = variantRaw ?? "";
 
   // plug-in primeiro (contém também "hybrid")
   if (/plug|phev/.test(s)) return "phev";
@@ -187,12 +200,18 @@ export function normFuel(
     /hybrid|hibrid|hybride/.test(s) ||
     (/elektro|electr|eletr/.test(s) && /benzin|gasolina|diesel|essence|petrol/.test(s));
   if (isHybrid) {
-    const v = variantRaw ? slugify(variantRaw) : "";
-    return /plug-?in|phev/.test(v) ? "phev" : "híbrido";
+    if (/plug-?in|phev/i.test(variant)) return "phev";
+    if (co2 != null && co2 <= 60) return "phev"; // HEVs reais andam nos 90–130 g
+    if (PHEV_VARIANT.test(variant)) return "phev";
+    return "híbrido";
   }
   if (/^(electr|elektr|eletr)/.test(s)) return "elétrico";
-  if (/gasoleo|gazole|gasoil|gasolio|^diesel|^dizel/.test(s) || s === "d") return "diesel";
-  if (/gasolina|benzin|essence|petrol|gasoline|benzina|^super$/.test(s)) return "gasolina";
+  if (/gasoleo|gazole|gasoil|gasolio|^diesel|^dizel/.test(s) || s === "d") {
+    return HEV_VARIANT.test(variant) && !MILD_VARIANT.test(variant) ? "híbrido" : "diesel";
+  }
+  if (/gasolina|benzin|essence|petrol|gasoline|benzina|^super$/.test(s)) {
+    return HEV_VARIANT.test(variant) && !MILD_VARIANT.test(variant) ? "híbrido" : "gasolina";
+  }
   // GPL, LPG, CNG, "gas" ambíguo, hidrogénio, etc.
   return null;
 }
@@ -211,10 +230,11 @@ export function normalizeVehicle(
   modelRaw: string | null | undefined,
   fuelRaw: string | null | undefined,
   variantRaw?: string | null,
+  co2?: number | null,
 ): NormalizedVehicle | null {
   const make = normMake(makeRaw);
   const model = normModel(make, modelRaw);
-  const fuel = normFuel(fuelRaw, variantRaw);
+  const fuel = normFuel(fuelRaw, variantRaw, co2);
   if (!make || !model || !fuel) return null;
   return { make, model, fuel, normKey: `${make}|${model}|${fuel}` };
 }

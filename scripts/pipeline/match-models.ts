@@ -18,9 +18,9 @@ export async function matchModels() {
   const { listings, vehicleModels } = await import("../../db/schema");
   const { normalizeVehicle } = await import("../../lib/engine/normalize-vehicle");
 
-  // Anúncios ativos ainda sem modelo (variant desambigua HEV vs PHEV)
+  // Anúncios ativos ainda sem modelo (variant e co2 desambiguam HEV vs PHEV)
   const pending = (await db.execute(sql`
-    select id, make_raw, model_raw, fuel_raw, variant
+    select id, make_raw, model_raw, fuel_raw, variant, co2
     from listings
     where model_id is null and deleted_at is null
   `)) as unknown as {
@@ -29,13 +29,14 @@ export async function matchModels() {
     model_raw: string | null;
     fuel_raw: string | null;
     variant: string | null;
+    co2: number | null;
   }[];
 
   // norm_key → ids de listings; contagem de não-mapeados por (make, model, fuel) cru
   const byKey = new Map<string, { make: string; model: string; fuel: string; ids: string[] }>();
   const unmapped = new Map<string, number>();
   for (const row of pending) {
-    const v = normalizeVehicle(row.make_raw, row.model_raw, row.fuel_raw, row.variant);
+    const v = normalizeVehicle(row.make_raw, row.model_raw, row.fuel_raw, row.variant, row.co2);
     if (!v) {
       const k = `${row.make_raw} | ${row.model_raw} | ${row.fuel_raw}`;
       unmapped.set(k, (unmapped.get(k) ?? 0) + 1);

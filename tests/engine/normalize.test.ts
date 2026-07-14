@@ -87,6 +87,22 @@ test("normFuel multi-língua", () => {
   assert.equal(normFuel("Elektro/Benzin", "GT PlugIn Hybrid"), "phev");
   assert.equal(normFuel("Hibrido", "1.2i Hybrid 145 e-DCS6 Allure"), "híbrido");
   assert.equal(normFuel("Diesel", "Plug-in Edition"), "diesel"); // variante só desambigua híbridos
+  // sufixos PHEV de marca (auditoria: Mercedes E 300 e/de, BMW 330e/225xe, VW GTE)
+  assert.equal(normFuel("Hibrido", "300 e Station Auto"), "phev");
+  assert.equal(normFuel("Hibrido (Diesel)", "300 de Limo tec hibrida EQ"), "phev");
+  assert.equal(normFuel("Elektro/Benzin", "330e Touring"), "phev");
+  assert.equal(normFuel("Elektro/Benzin", "225xe Active Tourer"), "phev");
+  assert.equal(normFuel("Hibrido", "Golf GTE"), "phev");
+  // …mas "Hybrid 145 e-DCS6" (caixa Peugeot) NÃO é sufixo PHEV
+  assert.equal(normFuel("Hibrido", "Hybrid 145 e-DCS6"), "híbrido");
+  // CO₂ desambigua o "Elektro/Benzin" do AS24 (PHEV ≤ 60 g; HEV ~90–130 g)
+  assert.equal(normFuel("Elektro/Benzin", "E 300 e AVANTGARDE", 12), "phev");
+  assert.equal(normFuel("Elektro/Benzin", "Yaris Comfort", 92), "híbrido");
+  // HEV escondido na variante com fuel=Gasolina (caso real: Tucson HEV Caetano)
+  assert.equal(normFuel("Gasolina", "HEV 1.6 TGDI AT Vanguard MY25"), "híbrido");
+  // mild-hybrid 48V continua gasolina
+  assert.equal(normFuel("Gasolina", "1.6 TGDi 48V Vanguard DCT"), "gasolina");
+  assert.equal(normFuel("Gasolina", "Mild Hybrid 130cv"), "gasolina");
   // fora de âmbito / ambíguo → null
   for (const raw of ["GPL", "LPG", "Gas", "CNG", "Hidrogénio"]) {
     assert.equal(normFuel(raw), null, raw);

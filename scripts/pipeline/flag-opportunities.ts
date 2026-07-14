@@ -22,6 +22,7 @@ export async function flagOpportunities() {
     where e.verdict = 'compensa'
       and e.pt_confidence = 'normal'
       and l.deleted_at is null
+      and l.is_damaged is not true
     on conflict (listing_id) do update set
       savings = excluded.savings,
       savings_pct = excluded.savings_pct,
@@ -40,6 +41,7 @@ export async function flagOpportunities() {
           and e.verdict = 'compensa'
           and e.pt_confidence = 'normal'
           and l.deleted_at is null
+          and l.is_damaged is not true
       )
     returning o.id
   `)) as unknown as { id: string }[];
