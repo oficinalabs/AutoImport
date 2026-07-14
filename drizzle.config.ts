@@ -14,4 +14,9 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL ?? "",
   },
+  // Só olhar para o nosso schema. Sem isto, o drizzle-kit tenta introspecionar
+  // os schemas internos do Supabase (auth, storage, realtime…), onde não temos
+  // permissão para ler as definições dos constraints — e rebenta.
+  schemaFilter: ["public"],
+  extensionsFilters: ["postgis"],
 });

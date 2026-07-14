@@ -114,12 +114,12 @@ export default function LandingPage() {
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Button asChild variant="accent" size="lg">
-              <Link href="/registar">Começar — 1.º mês grátis</Link>
+              <Link href="/registar">
+                Começar — 1.º mês grátis <ArrowRight className="size-4" />
+              </Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link href="/painel">
-                Ver demonstração <ArrowRight className="size-4" />
-              </Link>
+              <Link href="#como-funciona">Como funciona</Link>
             </Button>
           </div>
           <p className="mt-3 text-xs text-ink-soft">

@@ -16,7 +16,9 @@
   - [ ] Supabase Auth (RLS)
   - [ ] Clerk (SSO / SAML enterprise)
   - [ ] Nenhuma (site público)
-- ✏️ **Métodos de login:** email + password (verificação por email). Google opcional numa fase seguinte. _Magic link é possível, mas password funciona melhor para donos de stand a partilhar acesso._
+- ✏️ **Métodos de login:** email + password com **verificação de email obrigatória** (sem confirmar, não há login). **Google opcional** — o botão só aparece se `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` existirem (ver `.env.example`).
+- 🔒 **Regras de password** (`lib/password.ts`, impostas no cliente *e* no servidor): mín. 10 caracteres, maiúscula, minúscula, número, símbolo, e blocklist de palavras óbvias.
+- 🔒 **Rate limiting** (Better Auth): login 5/min, registo e pedido de reset 3/10min — trava brute-force e enumeração.
 - ☑️ **Multi-tenant (equipas / workspaces):** [ ] Não · [x] Sim
   - _Cada **stand** é um tenant. Um stand pode ter vários utilizadores (dono + comprador/vendedores). Todos os dados de negócio (alertas, pesquisas guardadas, faturação) pertencem ao stand, não ao utilizador._
 - ✏️ **Papéis / permissões:**

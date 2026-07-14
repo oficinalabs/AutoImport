@@ -96,6 +96,15 @@ Quando `Listing.images` trouxer URLs reais:
 1. trocar o placeholder por `<Image>` do Next;
 2. adicionar os hosts em [`next.config.mjs`](../next.config.mjs) → `images.remotePatterns`.
 
+## Notas de segurança (já implementado)
+
+- **Headers** em `next.config.mjs`: X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, COOP, HSTS; `poweredByHeader: false`.
+- **Rate limiting** e **regras de password** — ver [03](03-BACKEND.md). As regras vivem em `lib/password.ts` e são impostas nos dois lados.
+- **Verificação de email obrigatória**: o registo não cria sessão; o stand (organização) é criado no **servidor** (`databaseHook` em `lib/auth.ts`), não no cliente.
+- **Segredos**: nunca em `NEXT_PUBLIC_*`; `.env.local` está no gitignore. Só o `.env.example` é commitado.
+
+⚠️ **Dívida conhecida:** `pnpm db:push` rebenta contra esta Supabase (bug do drizzle-kit 0.31 a introspecionar CHECK constraints dos schemas internos do Supabase). A coluna `user.stand_name` foi aplicada por `ALTER TABLE` direto. Para mudanças de schema futuras, preferir migrations versionadas (`pnpm db:generate` + `db:migrate`), como manda o [04](04-BASE-DE-DADOS.md).
+
 ## Convenções úteis
 
 - **Idioma:** só PT (sem i18n) — ver [02](02-FRONTEND.md).

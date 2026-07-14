@@ -12,6 +12,7 @@ export const user = pgTable("user", {
     .defaultNow()
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
+  standName: text("stand_name"),
 });
 
 export const session = pgTable(
