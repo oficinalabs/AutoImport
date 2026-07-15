@@ -61,12 +61,17 @@ os stands, e os anúncios morrem (vendem-se) ao fim de semanas.
 
 ### O que nos vai matar primeiro
 
-1. **Egress (5 GB/mês)** — cada página servida conta. É o limite mais provável de bater
-   antes do disco, sobretudo com o painel a renderizar no servidor a cada pedido.
-2. **Histórico sem fim** — `listing_price_history` e `pt_price_observations` crescem para
-   sempre. **Uma linha por anúncio por dia** enche 500 MB muito antes dos anúncios.
-3. **Pausa por inatividade** — o Free pausa o projeto ao fim de 1 semana sem atividade.
-   Com a engine a correr todos os dias isto não acontece, mas convém saber.
+1. **Histórico sem fim** ← o mais provável. `listing_price_history` e
+   `pt_price_observations` crescem para sempre: **uma linha por anúncio por dia** enche os
+   500 MB muito antes de o número de anúncios ser um problema.
+2. **Pausa por inatividade** — o Free pausa o projeto ao fim de 1 semana sem atividade.
+   A engine diária evita isto, mas convém saber.
+3. **Egress (5 GB/mês)** — menos crítico do que parece. É o que as *queries devolvem*
+   (não o tráfego do site, que é da Vercel). As queries do painel agregam no SQL
+   (`count`/`sum`), têm `limit` e selecionam colunas → uns KB por render. 5 GB ÷ ~20 KB
+   ≈ **250 000 renders/mês**; com 10 stands andamos nos ~30 000. **O risco real é a
+   engine**: se um dia reler a tabela toda a cada run (ex.: 100k linhas × 2 KB = 200 MB ×
+   30 dias = 6 GB), passa a ser o egress a rebentar, não o disco. Ler por lotes/incremental.
 
 ### Decisões 🔒
 
@@ -80,6 +85,30 @@ os stands, e os anúncios morrem (vendem-se) ao fim de semanas.
 - ✏️ **Quando passar a Pro:** ao ter os primeiros stands a pagar. Aos 100 €/mês por stand,
   os $25 pagam-se com um quarto de cliente — e trazem **backups diários**, que hoje **não
   existem** (ver secção seguinte).
+
+### Alternativas consideradas (e porque ficamos no Supabase)
+
+| Opção | Free | Veredito |
+|---|---|---|
+| **Supabase Pro** | $25/mês → 8 GB + backups | ✅ **o caminho quando houver clientes** |
+| Neon | ~0,5 GB | Postgres serverless; **mesmo teto**, não resolve nada |
+| Turso / Cloudflare D1 | ~5 GB | mais espaço, mas é **SQLite** — reescrever schema e reconfigurar Better Auth/Drizzle |
+| Self-host (Hetzner + Coolify) | ~5 €/mês → 40+ GB | mais barato e maior, mas **passamos a gerir backups, updates, segurança e uptime** |
+| Railway / Render | sem free útil | equivalente a pagar, sem vantagem |
+
+**Decisão:** ficar no Supabase. Migrar custa dias de trabalho para poupar $25/mês — que
+um único stand paga 4×. O self-host só faz sentido se um dia o custo de BD passar a ser
+material (dezenas de GB), e mesmo aí troca dinheiro por tempo de manutenção, que é o
+recurso mais escasso numa equipa de dois.
+
+### Engenharia antes de dinheiro
+
+- **Retenção** (acima) — resolve o disco, que é o limite real.
+- **Engine incremental** — processar por lotes / só o que mudou desde a última run;
+  nunca reler a tabela toda a cada execução.
+- **Cache das agregações do painel** (`unstable_cache`, revalidate ~60 s) — corta egress e
+  torna a app mais rápida. ⚠️ **A chave de cache tem de incluir o `standId`**: sem isso um
+  stand vê os números de outro — deixa de ser performance e passa a ser fuga de dados.
 
 ## Dados & conformidade
 - ✏️ **Dados pessoais (PII) guardados:** nome e email do utilizador; dados do stand (nome comercial, **NIF**, morada, telefone). **Sem dados de cartão** — pagamento tratado pelo Polar. Anúncios de viaturas não são dados pessoais.
