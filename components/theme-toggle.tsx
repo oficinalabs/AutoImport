@@ -11,18 +11,23 @@ const OPTIONS = [
   { value: "dark", icon: Moon, label: "Escuro" },
 ] as const;
 
-export function ThemeToggle() {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {
-    return <div className="h-8 w-[92px] rounded-full border border-line" aria-hidden />;
+    return (
+      <div className={cn("h-8 w-[92px] rounded-full border border-line", className)} aria-hidden />
+    );
   }
 
   return (
     <fieldset
-      className="flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5"
+      className={cn(
+        "flex items-center gap-0.5 rounded-full border border-line bg-surface p-0.5",
+        className,
+      )}
       aria-label="Tema"
     >
       {OPTIONS.map(({ value, icon: Icon, label }) => (
