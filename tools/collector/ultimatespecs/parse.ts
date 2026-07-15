@@ -46,10 +46,21 @@ export function parseModelUrl(url: string): ModelRef | null {
   };
 }
 
+// URLs de imagem do próprio carro (CDN `cargallery`, protocolo-relativo → https).
+// Nas páginas de modelo o path contém o nº do modelo; os widgets "carros relacionados"
+// usam outros nºs — filtramos por `pathId` quando fornecido.
+export function parseGalleryImages(html: string, pathId?: string): string[] {
+  const urls = [...html.matchAll(/(?:src|href)="((?:https?:)?\/\/www\.ultimatespecs\.com\/cargallery\/[^"]+)"/g)]
+    .map((m) => m[1].replace(/^\/\//, 'https://'));
+  const filtered = pathId ? urls.filter((u) => u.includes(`/${pathId}/`)) : urls;
+  return [...new Set(filtered)];
+}
+
 // Página de modelo → versões. As secções `versions_div` têm id `{fuel}_engines`; dentro,
 // linhas <tr> com <a href="/car-specs/{Make}/{id}/{slug}.html">nome</a> | ano | hp/kW | cc.
 export function parseModelPage(html: string, ref: ModelRef, collectedAt: string): VersionRecord[] {
   const out: VersionRecord[] = [];
+  const modelImages = parseGalleryImages(html, ref.mid.slice(1)); // "M27110" → path /27110/
   const sections = [...html.matchAll(
     /<div class=['"]versions_div['"] id=['"](\w+)_engines['"]>([\s\S]*?)(?=<div class=['"]versions_div['"]|<\/section|$)/g,
   )];
@@ -66,10 +77,12 @@ export function parseModelPage(html: string, ref: ModelRef, collectedAt: string)
         source: 'ultimatespecs',
         versionId,
         url: new URL(path, BASE).toString(),
+        mid: ref.mid,
         make: ref.make,
         model: ref.model,
         modelSlug: ref.slug,
         modelYear: ref.modelYear,
+        modelImages,
         name: text(nameHtml),
         fuelSection,
         year: toNum(text(cells[1] ?? '')),
@@ -122,6 +135,8 @@ export function parseVersionPage(html: string): DeepSpecs {
     co2Nedc: co2Plain,
     emissionStandard: find(/^Emission standard/i),
     curbWeightKg: toNum(find(/^Curb Weight/i)),
+    // imagem principal (w800); os widgets "relacionados" usam w400
+    imageUrl: parseGalleryImages(html).find((u) => u.includes('w800_')) ?? null,
     specs,
   };
 }

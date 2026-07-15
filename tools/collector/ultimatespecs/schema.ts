@@ -20,10 +20,13 @@ export interface VersionRecord {
   source: 'ultimatespecs';
   versionId: string;          // "141870" (id numérico do URL da versão)
   url: string;                // absoluto .html
+  mid: string;                // "M27110" — página de modelo de origem (FK em us_models)
   make: string;
   model: string;              // do ModelRef (ex. "Stonic")
   modelSlug: string;          // "Stonic-2021" — distingue gerações/facelifts
   modelYear: number | null;
+  /** galeria da página de modelo — URLs diretos ultimatespecs (não descarregamos imagens) */
+  modelImages: string[];
   name: string;               // "Stonic 2021 1.0 T-GDI 100" — a designação para matching
   fuelSection: string;        // secção da tabela: petrol|diesel|electric|pluginhybrid|hybrid|...
   year: number | null;        // coluna "Year" da tabela de versões
@@ -50,5 +53,7 @@ export interface DeepSpecs {
   co2Nedc: number | null;        // g/km (linha "CO2 emissions" sem WLTP, carros antigos)
   emissionStandard: string | null; // "Euro 6e"
   curbWeightKg: number | null;
+  /** imagem principal da página da versão — URL direto ultimatespecs */
+  imageUrl: string | null;
   specs: Record<string, string>;
 }

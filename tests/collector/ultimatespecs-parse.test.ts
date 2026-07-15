@@ -63,6 +63,7 @@ test("parseModelPage extrai as versões com ano, potência e cilindrada", () => 
   const v = versions.find((x) => x.versionId === "141870");
   assert.ok(v, "versão 141870 (1.0 T-GDI 100) presente");
   assert.equal(v.name, "Stonic 2021 1.0 T-GDI 100");
+  assert.equal(v.mid, "M27110");
   assert.equal(v.make, "Kia");
   assert.equal(v.model, "Stonic");
   assert.equal(v.modelSlug, "Stonic-2021");
@@ -75,6 +76,12 @@ test("parseModelPage extrai as versões com ano, potência e cilindrada", () => 
     v.url,
     "https://www.ultimatespecs.com/car-specs/Kia/141870/Kia-Stonic-2021-10-T-GDI-100.html",
   );
+
+  // galeria do modelo: só imagens deste modelo (path /27110/), https absoluto
+  assert.ok(v.modelImages.length >= 3, `esperava ≥3 imagens, obtive ${v.modelImages.length}`);
+  for (const u of v.modelImages) {
+    assert.match(u, /^https:\/\/www\.ultimatespecs\.com\/cargallery\/\d+\/27110\//);
+  }
 
   // sem duplicados por versionId e todas com nome e URL .html
   const ids = new Set(versions.map((x) => x.versionId));
@@ -100,6 +107,7 @@ test("parseVersionPage normaliza a ficha técnica", () => {
   assert.equal(deep.co2Wltp, 125);
   assert.equal(deep.emissionStandard, "Euro 6e");
   assert.equal(deep.curbWeightKg, 1195);
+  assert.match(String(deep.imageUrl), /^https:\/\/www\.ultimatespecs\.com\/cargallery\/.*w800_/);
   // specs cruas preservadas (cilindrada com unidade original)
   assert.match(deep.specs["Engine displacement"], /^998 cm/);
   assert.match(deep.specs.Horsepower, /100 PS \/ 99 HP \/ 74 kW/);

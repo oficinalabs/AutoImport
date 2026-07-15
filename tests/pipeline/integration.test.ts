@@ -30,6 +30,8 @@ async function cleanup() {
     where listing_id in (select id from listings where external_id like 'fixture-%')
   `);
   await db.execute(sql`delete from listings where external_id like 'fixture-%'`);
+  // modelos da marca sintética criados pelo match-models — sem isto ficam na BD partilhada
+  await db.execute(sql`delete from vehicle_models where make = 'testmarke'`);
 }
 
 test(
