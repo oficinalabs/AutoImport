@@ -34,6 +34,7 @@ type ListingSeed = {
   kmTrust: Listing["kmTrust"];
   seenAt: string;
   isFavorite?: boolean;
+  unavailableSince?: string;
 };
 
 function history(base: number): { month: string; price: number }[] {
@@ -77,6 +78,7 @@ function build(s: ListingSeed): Listing {
     kmTrust: s.kmTrust,
     seenAt: s.seenAt,
     isFavorite: s.isFavorite ?? false,
+    unavailableSince: s.unavailableSince,
   };
 }
 
@@ -199,7 +201,10 @@ export const LISTINGS: Listing[] = [
     ptEstimate: 41_500,
     sample: 15,
     kmTrust: { level: "verificado", source: "carVertical" },
-    seenAt: "2026-07-10",
+    // Favorito que já saiu do mercado: exercita o estado "já não disponível"
+    // sem depender da engine (decisão em docs/08).
+    seenAt: "2026-06-20",
+    unavailableSince: "2026-07-04",
     isFavorite: true,
   }),
   build({
