@@ -16,6 +16,30 @@
 - 🔒 **GitHub Actions** em cada PR: `lint` → `typecheck` → `test` → `build`.
 - 🔒 **Ambientes:** preview por PR · (staging) · produção.
 - 🔒 **Deploy:** só a partir de `main` verde.
+
+### Migrations no deploy 🔒
+O deploy publica **código**; a base de dados **não muda sozinha**. Para não voltar a
+acontecer o que aconteceu (código a ler `listings` sem a tabela existir em produção),
+o `vercel.json` corre as migrations **antes** do build:
+
+```
+buildCommand: pnpm db:migrate:deploy && next build
+```
+
+`scripts/db/migrate-deploy.ts` tem duas guardas:
+- **Só aplica com `VERCEL_ENV=production`.** Previews de PR **não** tocam na base de
+  dados — Preview e Production partilham a mesma `DATABASE_URL`, e sem isto um PR
+  por rever alterava a produção.
+- **Sem `DATABASE_URL` não faz nada** (build sobre mocks).
+
+Se uma migration falhar, **o build falha e nada é publicado** — é intencional: mais vale
+não publicar do que publicar código que a base de dados não suporta. Nesse caso, corrige
+a migration e volta a fazer deploy (a Vercel mantém a versão anterior no ar).
+
+> **Nota histórica:** a Supabase foi criada com `db:push` antes de existirem migrations,
+> por isso a `0000` foi marcada como aplicada (baseline) — o estado da base de dados foi
+> verificado coluna a coluna contra ela antes disso. Daqui para a frente é só `db:generate`
+> + deploy.
 - _Workflows extra deste projeto: **cron diário da engine** (ingestão/recálculo) como Action separada, com o seu próprio conjunto de segredos._
 
 ## Variáveis & segredos

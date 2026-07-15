@@ -21,7 +21,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/db/seed.ts",
     "pipeline:daily": "tsx scripts/pipeline/run-daily.ts",
-    "pipeline:ingest": "tsx scripts/pipeline/ingest.ts"
+    "pipeline:ingest": "tsx scripts/pipeline/ingest.ts",
+    "db:migrate:deploy": "tsx scripts/db/migrate-deploy.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
