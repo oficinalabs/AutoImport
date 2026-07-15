@@ -111,6 +111,7 @@ export async function runWatch<T extends { price?: unknown }>(opts: RunWatchOpti
   }
 
   saveState();
+  await sink.close(); // liberta a ligação à BD (se ativa) para o processo terminar
   console.log(`⏹ parado. tabela com ${state.size} ${unit} · eventos em ${sink.eventsPath}`);
   return { total: state.size };
 }
