@@ -160,10 +160,61 @@ O `favorites` é o que incomoda: um stand marca um carro como favorito, o anúnc
 dias sem ser visto, e o favorito **desaparece do painel dele sem explicação**. Não é
 espaço poupado que justifique isso — a `favorites` é minúscula.
 
-**A2 depende da decisão 3** (lá em baixo) e não deve ir junto com A1. Opções, quando se
-lá chegar: apagar só anúncios sem favoritos/oportunidades associados; ou manter a listing
-e apagar só as tabelas pesadas; ou mostrar o favorito como "anúncio já não disponível"
-em vez de o apagar.
+#### ✅ Decidido (16 jul, Rui): mostrar "já não disponível"
+
+Um anúncio que morre **não desaparece do painel de quem o marcou** — passa a aparecer
+como *já não disponível*. O stand marcou-o por alguma razão; fazê-lo desaparecer é pior
+do que mostrá-lo morto.
+
+Como se implementa isto sem deitar a retenção fora:
+
+```sql
+-- A2: apagar só o que ninguém marcou.
+delete from listings l
+ where l.deleted_at < now() - interval '90 days'
+   and not exists (select 1 from favorites f     where f.listing_id = l.id)
+   and not exists (select 1 from opportunities o where o.listing_id = l.id and o.deleted_at is null);
+```
+
+- Anúncios **sem** favoritos → apagados aos 90 dias de morto. São a esmagadora maioria: é
+  daqui que vem o espaço.
+- Anúncios **com** favoritos → ficam. O `deleted_at` já lá está e diz que morreram; a UI
+  usa isso para mostrar "já não disponível". O custo é `~2 KB × (nº de favoritos)`, que é
+  nada.
+
+⚠️ **Atenção ao critério**: `l.deleted_at < now() - 90 dias` (90 dias **depois de morrer**),
+não `last_seen_at`. Um anúncio morre aos 14 dias sem sinal (ver abaixo); com
+`last_seen_at < 90 dias` estaríamos a apagar 90 dias depois da última vez que foi visto,
+o que é a mesma coisa contada de outra maneira mas menos explícita.
+
+**Falta no produto** (a UI ainda não sabe disto): o tipo `Listing` em `lib/types.ts` não
+tem estado de disponibilidade, e as queries em `lib/queries.ts` filtram
+`isNull(listings.deletedAt)` — ou seja, um favorito morto **já hoje desaparece da lista**,
+antes sequer de haver limpeza. Para a decisão acima ser verdade, a `favoritesQuery` tem de
+deixar passar os mortos e a UI tem de os marcar. É trabalho de frontend, não da engine.
+
+### Quando é que um anúncio morre?
+
+Já está definido no código, não é uma pergunta em aberto — mas convém estar escrito:
+
+```sql
+-- scripts/pipeline/run-daily.ts:57, passo "5/7 desaparecidos"
+update listings set deleted_at = now()
+where deleted_at is null
+  and last_seen_at < now() - make_interval(days => ${staleDays})   -- default 14
+```
+
+- **Morre**: 14 dias sem que nenhum coletor o veja (`--stale-days`, default 14).
+- **Vive**: o `db-sink` faz `last_seen_at = greatest(atual, novo)` sempre que o vê.
+- **Ressuscita**: o mesmo upsert faz `deleted_at = null` — se o anúncio reaparecer, volta
+  a ficar vivo. Não há morte definitiva enquanto a linha existir.
+
+⚠️ **"Morto" não quer dizer "vendido".** Um anúncio pode desaparecer porque foi vendido,
+porque o vendedor o retirou, **ou porque o nosso coletor falhou** (o site mudou o HTML,
+bloqueou-nos, o crawl não chegou lá por causa dos caps de recência). Se um coletor partir
+e ninguém der por isso durante duas semanas, **todos os anúncios daquela fonte morrem** —
+e a limpeza apaga-os 90 dias depois. Vale a pena o batch avisar quando uma fonte perde uma
+fatia grande do stock de uma vez, em vez de assumir que o mercado inteiro se vendeu.
 
 ### B — A1 + rollup mensal
 
@@ -253,12 +304,11 @@ and coalesce(
    teórico. Tudo acima depende dele.
 2. **Quanto tempo interessa o histórico de preço PT?** Hoje o código diz 6 meses
    (`ptPriceHistory`). É requisito ou foi um default?
-3. **Apagar anúncios inativos (A2): quando, e o que fazer aos favoritos?** Cinco tabelas
-   cascateiam de `listings`, e uma delas é a `favorites` — apagar o anúncio faz o favorito
-   de um stand desaparecer do painel sem explicação. A pergunta não é só "90 dias chega?",
-   é **o que acontece ao que o cliente vê**. A minha sugestão: não apagar anúncios com
-   favoritos ou oportunidades associadas, ou mostrá-los como "já não disponível" — mas é
-   decisão de produto, não minha.
+3. ~~**Apagar anúncios inativos (A2): o que fazer aos favoritos?**~~ ✅ **Decidido (16 jul,
+   Rui): mostrar "já não disponível".** Anúncios com favoritos ou oportunidades não se
+   apagam; os outros apagam-se 90 dias depois de morrerem. Ver A2. Fica por fazer a parte
+   de frontend: hoje a `favoritesQuery` filtra `deleted_at is null`, portanto um favorito
+   morto já desaparece — tem de passar a aparecer marcado.
 4. **Pergunta em aberto:** com a janela sobre `last_seen_at`, a
    `pt_price_observations` ainda precisa de existir para o `sample()`? Os dados que ele
    lê (`price`, `year`, `km_band`) estão todos na `listings`, e o `km_band` é
