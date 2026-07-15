@@ -82,7 +82,10 @@ os stands, e os anúncios morrem (vendem-se) ao fim de semanas.
   - `pt_price_observations` → ⚠️ **1 linha por anúncio PT por dia, sem limpeza**. É este
     o problema. Atenção: gravar "só mudanças" **parte** o `estimatePtPrice` (janela de
     60 dias sobre `observed_at`) — ver a análise no 08 antes de mexer;
-  - anúncios inativos há **> 90 dias** → apagar (o `deleted_at` não liberta espaço).
+  - anúncios inativos há **> 90 dias** → ⚠️ **não é tão simples como parecia**: cinco
+    tabelas cascateiam de `listings`, incluindo a **`favorites`** — apagar o anúncio faz
+    o favorito de um stand desaparecer sem aviso. Decidir primeiro o que mostrar ao
+    cliente (ver 08, opção A2 e decisão 3). O `deleted_at` não liberta espaço.
 - 🔒 **Vigiar o tamanho**: `select pg_size_pretty(pg_database_size(current_database()))`.
   Acima de **400 MB (80%)** → decidir entre limpar ou passar a Pro. Não deixar chegar aos
   500 MB: a base passa a **recusar escritas** e a engine começa a falhar inserts.

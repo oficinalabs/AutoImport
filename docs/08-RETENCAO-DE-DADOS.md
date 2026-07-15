@@ -110,33 +110,62 @@ exige.** Qualquer proposta tem de mexer nas leituras primeiro, ou não mexer em 
 
 **Nenhuma query lê observações com mais de 6 meses.** O `sample()` para nos 60 dias, o
 `ptPriceHistory` nos 6 meses. Tudo o que passe disso é peso morto garantido — não é uma
-opinião sobre o que é útil, é o que o código faz. Isso dá-nos a Opção A de graça.
+opinião sobre o que é útil, é o que o código faz.
 
 ## As opções
 
-### A — Só limpeza (mínima)
+> **Nota de revisão (16 jul).** A Opção A estava escrita como um bloco só, com dois
+> `delete` diferentes lá dentro. **São coisas diferentes e não têm o mesmo risco** — a
+> revisão apanhou isso e a secção passou a separá-los. Ver A1 e A2.
 
-Job semanal a apagar o que ninguém lê:
+### A1 — Apagar observações com mais de 6 meses (o passo barato)
+
+Job semanal:
 
 ```sql
 delete from pt_price_observations where observed_at < now() - interval '6 months';
-delete from listings
- where last_seen_at < now() - interval '90 days' and deleted_at is not null;
--- o cascade limpa o listing_price_history destes anúncios
 ```
 
-- ✅ ~10 linhas de SQL, zero risco, nenhuma leitura muda
-- ⚠️ **Não resolve acima de ~10k anúncios**: o teto em regime é `N × 180 dias × 200 B`
-  — 10k → 360 MB, 20k → **720 MB**, ou seja, rebenta na mesma, só mais devagar
+- ✅ Uma linha. Nenhuma leitura muda, porque **nenhuma query lê estas linhas** — é lixo
+  por construção, não é uma escolha sobre o que é útil.
+- ✅ Não depende de decidir mais nada. Pode ir hoje.
+- ⚠️ **Não chega acima de ~10k anúncios**: o teto em regime é `N × 180 dias × 200 B` —
+  10k → 360 MB, 20k → **720 MB**. Rebenta na mesma, só mais devagar.
 
-⚠️ **Cuidado com o `set null`:** ao contrário do `listing_price_history`, o
-`pt_price_observations.listing_id` é `onDelete: set null` (`db/schema.ts:338`). Apagar
-anúncios **não** apaga as observações — ficam órfãs. Isso é deliberado e correto (o
-`ptPriceHistory` não faz join, portanto continua a contá-las no gráfico), mas significa
-que a limpeza por idade **é a única coisa que as apaga**. Sem ela, acumulam-se para
-sempre e o `sample()` nem as vê (tem inner join).
+⚠️ **É a única coisa que apaga as observações.** Ao contrário do `listing_price_history`,
+o `pt_price_observations.listing_id` é `onDelete: set null` (`db/schema.ts:345`) — apagar
+o anúncio deixa a observação órfã, não a apaga. Isso é deliberado e correto (o
+`ptPriceHistory` não faz join, portanto continua a contá-las no gráfico), mas quer dizer
+que sem A1 acumulam-se para sempre — e o `sample()` nem as vê, porque faz inner join.
 
-### B — A + rollup mensal
+### A2 — Apagar anúncios inativos há mais de 90 dias (não é barato)
+
+```sql
+delete from listings
+ where last_seen_at < now() - interval '90 days' and deleted_at is not null;
+```
+
+**Isto não é o mesmo tipo de operação que A1, e não deve ir no mesmo job.** Cinco tabelas
+cascateiam de `listings`:
+
+| Tabela | `onDelete` | O que se perde |
+|---|---|---|
+| `listing_price_history` | cascade | histórico de preço do anúncio — ok, morre com ele |
+| `import_cost_estimates` | cascade | o cálculo — recomputável |
+| `opportunities` | cascade | oportunidades passadas do stand |
+| `alert_events` | cascade | o registo de que já notificámos este anúncio |
+| **`favorites`** | **cascade** | **o favorito de um cliente, sem aviso** |
+
+O `favorites` é o que incomoda: um stand marca um carro como favorito, o anúncio fica 90
+dias sem ser visto, e o favorito **desaparece do painel dele sem explicação**. Não é
+espaço poupado que justifique isso — a `favorites` é minúscula.
+
+**A2 depende da decisão 3** (lá em baixo) e não deve ir junto com A1. Opções, quando se
+lá chegar: apagar só anúncios sem favoritos/oportunidades associados; ou manter a listing
+e apagar só as tabelas pesadas; ou mostrar o favorito como "anúncio já não disponível"
+em vez de o apagar.
+
+### B — A1 + rollup mensal
 
 Nova tabela `pt_price_monthly (model_id, month, avg_price, n_obs)`, escrita pelo batch
 diário (upsert). O `ptPriceHistory` passa a ler de lá e deixa de precisar de observações
@@ -147,9 +176,9 @@ o `sample()` usa).
 - ✅ O gráfico fica mais rápido (lê linhas agregadas, não faz `avg` sobre milhares)
 - ⚠️ Ainda cresce com o número de anúncios; 50k continua a não caber
 
-### C — B + janela sobre `last_seen_at` (a que resolve de vez)
+### C — B + janela sobre `last_seen_at` (a que quebra a ligação tempo↔espaço)
 
-Muda **uma linha** no `sample()`:
+Muda a janela do `sample()`:
 
 ```sql
 -- de:
@@ -159,10 +188,30 @@ and l.last_seen_at > now() - make_interval(days => 60)
 ```
 
 A semântica passa a ser *"carros vistos no mercado nos últimos 60 dias, ao seu preço mais
-recente"* — que é **literalmente o que o comentário do ficheiro já diz querer**. O
+recente"* — que é o que o comentário do ficheiro já diz querer. O
 `distinct on (identity) order by observed_at desc` continua a pegar a observação mais
 recente, e o `identity` usa `l.price`/`l.vin`, não `o.observed_at`, portanto não se
 altera.
+
+⚠️ **Não é só uma linha — e a revisão apanhou porquê.** O `sample()` também filtra por
+`o.year` e `o.km_band`, que são **colunas da observação**:
+
+```sql
+and o.year     between ${year - spread}   and ${year + spread}
+and o.km_band  between ${kmBand - spread} and ${kmBand + spread}
+```
+
+Hoje o snapshot diário reescreve `floor(l.km / 25000)` **todos os dias**, portanto o
+`km_band` acompanha o anúncio. Com inserts só-em-mudança, o `km_band` e o `year` ficam
+**congelados no momento da última mudança de preço** — e o filtro passa a comparar contra
+um valor velho.
+
+Na prática o efeito é pequeno (um carro à venda quase não acumula quilómetros), mas é
+silencioso, que é o pior tipo de erro. **Se a C avançar, o `sample()` deve passar a ler
+`l.km`/`l.year` diretamente da `listings`** (`floor(l.km / 25000)` no filtro) em vez das
+cópias na observação. Isso converge com a pergunta 4 lá em baixo: se o `sample()` ler o
+`price` da listing e o `km`/`year` da listing, o que é que ainda vai buscar à
+`pt_price_observations`?
 
 Com a janela na *listing* e não na *observação*, gravar só mudanças deixa de partir a
 amostra — e o insert do `pt-market.ts` passa a ser o mesmo padrão do `db-sink.ts`:
@@ -184,16 +233,18 @@ and coalesce(
 
 ## Recomendação
 
-**A agora, C quando a engine estabilizar.** Razões:
+**A1 agora; A2, B e C só depois de decidido o que está em aberto.** Razões:
 
-1. A **A** é barata e não depende de acordo nenhum — as linhas > 6 meses são lixo por
-   construção. Faz-se hoje e compra meses.
-2. A **C** é a única que quebra a ligação entre *tempo* e *espaço*, mas mexe na lógica de
-   estimativa, que é o coração do produto. Não vale a pena fazê-la à pressa quando a
-   tabela está a 0 e não há um único stand a pagar.
-3. A **B** só faz sentido como degrau para a C, ou se o gráfico começar a ficar lento.
+1. A **A1** é uma linha e não depende de acordo nenhum — as observações com mais de 6
+   meses são lixo por construção. Faz-se hoje e compra meses.
+2. A **A2** parece do mesmo tamanho mas não é: apaga favoritos de clientes em cascata.
+   Precisa da decisão 3 primeiro.
+3. A **C** é a única que quebra a ligação entre *tempo* e *espaço*, mas mexe na lógica de
+   estimativa, que é o coração do produto. Não vale a pena fazê-la à pressa com a tabela
+   a 0 e nenhum stand a pagar.
+4. A **B** só faz sentido como degrau para a C, ou se o gráfico ficar lento.
 
-**Ordem sugerida:** A (job semanal) → medir 1 semana com dados reais para confirmar os
+**Ordem sugerida:** A1 (job semanal) → medir 1 semana com dados reais para confirmar os
 200 B/linha → decidir entre B e C com números em vez de estimativas.
 
 ## Decisões que são tuas (não minhas)
@@ -202,10 +253,13 @@ and coalesce(
    teórico. Tudo acima depende dele.
 2. **Quanto tempo interessa o histórico de preço PT?** Hoje o código diz 6 meses
    (`ptPriceHistory`). É requisito ou foi um default?
-3. **90 dias para apagar anúncios inativos** — chega? A `import_cost_estimates` e a
-   `opportunities` referenciam `listings`; apagar em cascata pode afetar histórico de
-   oportunidades que interessa a um stand ver.
-4. **Pergunta aberta, talvez a mais interessante:** com a janela sobre `last_seen_at`, a
+3. **Apagar anúncios inativos (A2): quando, e o que fazer aos favoritos?** Cinco tabelas
+   cascateiam de `listings`, e uma delas é a `favorites` — apagar o anúncio faz o favorito
+   de um stand desaparecer do painel sem explicação. A pergunta não é só "90 dias chega?",
+   é **o que acontece ao que o cliente vê**. A minha sugestão: não apagar anúncios com
+   favoritos ou oportunidades associadas, ou mostrá-los como "já não disponível" — mas é
+   decisão de produto, não minha.
+4. **Pergunta em aberto:** com a janela sobre `last_seen_at`, a
    `pt_price_observations` ainda precisa de existir para o `sample()`? Os dados que ele
    lê (`price`, `year`, `km_band`) estão todos na `listings`, e o `km_band` é
    `floor(km/25000)`. A tabela passaria a servir só o gráfico — que a `pt_price_monthly`
