@@ -96,6 +96,13 @@ export const organization = pgTable(
     logo: text("logo"),
     createdAt: timestamp("created_at").notNull(),
     metadata: text("metadata"),
+    // Dados do stand editáveis em /stand. Não são recolhidos no registo (que
+    // só pede nome do stand, nome, email e password) — ficam nulos até o dono
+    // os preencher, e a UI trata isso como "por preencher", não como erro.
+    nif: text("nif"),
+    address: text("address"),
+    phone: text("phone"),
+    updatedAt: timestamp("updated_at").defaultNow(),
   },
   (table) => [uniqueIndex("organization_slug_uidx").on(table.slug)],
 );

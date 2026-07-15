@@ -6,12 +6,16 @@
 import { and, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
+  alertEvents,
   alerts,
   favorites,
   importCostEstimates,
   listings,
+  member,
   opportunities,
+  organization,
   sources,
+  user,
   vehicleModels,
 } from "../db/schema";
 import type { SearchFilters } from "./data";
@@ -23,6 +27,8 @@ import type {
   CountryInsight,
   FuelType,
   Listing,
+  Notification,
+  Stand,
   Transmission,
   Verdict,
 } from "./types";
@@ -303,4 +309,103 @@ export async function toggleAlertMutation(
     .update(alerts)
     .set({ active })
     .where(and(eq(alerts.id, alertId), eq(alerts.standId, standId)));
+}
+
+// ── Notificações ────────────────────────────────────────────────
+/**
+ * O que o sino mostra: os matches que os alertas do stand já dispararam.
+ * É a única fonte real de notificações que existe (alert_events) — enquanto
+ * o job de alertas não correr, isto devolve vazio, e o sino diz isso.
+ */
+export async function notificationsQuery(standId: string, limit = 8): Promise<Notification[]> {
+  const rows = await db
+    .select({
+      id: alertEvents.id,
+      sentAt: alertEvents.sentAt,
+      alertName: alerts.name,
+      listingId: listings.id,
+      make: listings.makeRaw,
+      model: listings.modelRaw,
+      year: listings.year,
+    })
+    .from(alertEvents)
+    .innerJoin(alerts, eq(alerts.id, alertEvents.alertId))
+    .innerJoin(listings, eq(listings.id, alertEvents.listingId))
+    .where(eq(alerts.standId, standId))
+    .orderBy(desc(alertEvents.sentAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    alertName: r.alertName,
+    listingId: r.listingId,
+    title: [r.make, r.model, r.year].filter(Boolean).join(" ") || "Anúncio",
+    sentAt: r.sentAt.toISOString(),
+  }));
+}
+
+// ── Stand / conta ───────────────────────────────────────────────
+/** Duração do 1.º mês grátis, em dias. */
+const TRIAL_DAYS = 30;
+
+export async function getStandQuery(standId: string): Promise<Stand | null> {
+  const [org] = await db.select().from(organization).where(eq(organization.id, standId)).limit(1);
+  if (!org) return null;
+
+  const rows = await db
+    .select({ id: user.id, name: user.name, email: user.email, role: member.role })
+    .from(member)
+    .innerJoin(user, eq(user.id, member.userId))
+    .where(eq(member.organizationId, standId))
+    .orderBy(desc(member.role)); // owner antes de member
+
+  // Sem Polar ligado, a subscrição deriva da data de criação: 1.º mês grátis
+  // a contar do registo. É o que é verdade hoje — não inventamos "ativa".
+  const renewsAt = new Date(org.createdAt);
+  renewsAt.setDate(renewsAt.getDate() + TRIAL_DAYS);
+
+  return {
+    id: org.id,
+    name: org.name,
+    nif: org.nif ?? "",
+    address: org.address ?? "",
+    phone: org.phone ?? "",
+    members: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      email: r.email,
+      role: r.role === "owner" ? "owner" : "member",
+    })),
+    subscription: {
+      status: renewsAt.getTime() > Date.now() ? "trial" : "expirada",
+      pricePerMonth: 100, // euros (formatEuroCents não divide — só mostra cêntimos)
+      renewsAt: renewsAt.toISOString(),
+    },
+  };
+}
+
+/** Papel do utilizador no stand; null se não for membro. */
+export async function standRoleQuery(standId: string, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ role: member.role })
+    .from(member)
+    .where(and(eq(member.organizationId, standId), eq(member.userId, userId)))
+    .limit(1);
+  return row?.role ?? null;
+}
+
+export async function updateStandMutation(
+  standId: string,
+  data: { name: string; nif: string; address: string; phone: string },
+): Promise<void> {
+  await db
+    .update(organization)
+    .set({
+      name: data.name,
+      nif: data.nif || null,
+      address: data.address || null,
+      phone: data.phone || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(organization.id, standId));
 }

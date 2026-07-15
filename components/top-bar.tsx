@@ -1,12 +1,12 @@
 "use client";
 
 import { NavLink } from "@/components/nav-link";
+import { NotificationsMenu } from "@/components/notifications-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth-client";
 import { COUNTRY_LIST } from "@/lib/countries";
-import { cn } from "@/lib/utils";
+import type { Notification } from "@/lib/types";
 import {
-  Bell,
   BellRing,
   Car,
   ChevronDown,
@@ -32,22 +32,35 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
-export function TopBar() {
+export interface TopBarProps {
+  standName: string;
+  userName: string;
+  /** rótulo da subscrição, ex.: "Trial · termina 9 ago" */
+  subscriptionLabel: string;
+  notifications: Notification[];
+}
+
+export function TopBar({ standName, userName, subscriptionLabel, notifications }: TopBarProps) {
   const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1280px] items-center gap-2 px-4 sm:px-6">
         {/* Logo */}
-        <Link href="/painel" className="mr-2 flex items-center gap-2 font-display font-bold">
+        <Link
+          href="/painel"
+          className="mr-1 flex shrink-0 items-center gap-2 font-display font-bold sm:mr-2"
+        >
           <span className="flex size-7 items-center justify-center rounded-[6px] bg-petrol text-amber">
             <Car className="size-4" />
           </span>
           <span className="hidden sm:inline">AutoImport</span>
         </Link>
 
-        {/* Nav */}
-        <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto">
+        {/* Nav — sem overflow-x-auto: em ecrãs estreitos o NavLink já esconde
+            os rótulos e ficam só os ícones, que cabem sempre. Uma barra de
+            scroll na top bar é sempre um bug, não uma solução. */}
+        <nav className="flex min-w-0 flex-1 items-center gap-0.5">
           {NAV.map(({ href, label, icon }) => (
             <NavLink
               key={href}
@@ -59,19 +72,18 @@ export function TopBar() {
           ))}
         </nav>
 
-        {/* Direita */}
-        <div className="flex items-center gap-1.5">
+        {/* Direita. O seletor de tema ocupa 94px — em ecrãs estreitos isso é
+            mais do que sobra para a navegação, por isso passa para dentro do
+            menu da conta. */}
+        <div className="flex shrink-0 items-center gap-1.5">
           <CountryMenu />
-          <ThemeToggle />
-          <Link
-            href="/pesquisar"
-            aria-label="Notificações"
-            className="relative flex size-9 items-center justify-center rounded-full text-ink-soft hover:bg-surface-2 hover:text-ink"
-          >
-            <Bell className="size-4" />
-            <span className="absolute right-2 top-2 size-1.5 rounded-full bg-amber" />
-          </Link>
-          <AvatarMenu />
+          <ThemeToggle className="hidden sm:flex" />
+          <NotificationsMenu items={notifications} />
+          <AvatarMenu
+            standName={standName}
+            userName={userName}
+            subscriptionLabel={subscriptionLabel}
+          />
         </div>
       </div>
     </header>
@@ -107,7 +119,22 @@ const AVATAR_MENU = [
   { href: "/stand", label: "Stand / Perfil", icon: Store },
 ];
 
-function AvatarMenu() {
+/** Iniciais do nome, para o avatar. "Rui Costa" → "RC". */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+function AvatarMenu({
+  standName,
+  userName,
+  subscriptionLabel,
+}: {
+  standName: string;
+  userName: string;
+  subscriptionLabel: string;
+}) {
   const router = useRouter();
 
   async function handleSignOut() {
@@ -118,18 +145,29 @@ function AvatarMenu() {
 
   return (
     <details className="group relative">
-      <summary className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+      <summary
+        aria-label={`Conta de ${userName}`}
+        className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden"
+      >
         <span className="flex size-8 items-center justify-center rounded-full bg-steel/20 text-sm font-semibold text-steel">
-          RC
+          {initials(userName)}
         </span>
         <ChevronDown className="size-3.5 text-ink-soft" />
       </summary>
-      <div className="absolute right-0 mt-1 w-52 rounded-[8px] border border-line bg-surface p-1 shadow-lg">
+      <div className="absolute right-0 mt-1 w-56 rounded-[8px] border border-line bg-surface p-1 shadow-lg">
         <div className="px-2.5 py-2">
-          <div className="text-sm font-semibold">Stand Costa &amp; Filhos</div>
-          <div className="text-xs text-ink-soft">Trial · termina 9 ago</div>
+          <div className="truncate text-sm font-semibold" title={standName}>
+            {standName}
+          </div>
+          <div className="text-xs text-ink-soft">{subscriptionLabel}</div>
         </div>
         <div className="my-1 h-px bg-line" />
+        {/* Em ecrãs estreitos o tema não cabe na barra — vive aqui. */}
+        <div className="flex items-center justify-between px-2.5 py-1.5 sm:hidden">
+          <span className="text-sm text-ink-soft">Tema</span>
+          <ThemeToggle />
+        </div>
+        <div className="my-1 h-px bg-line sm:hidden" />
         {AVATAR_MENU.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
