@@ -146,7 +146,17 @@ export async function crawl(config: CrawlConfig) {
     + `${fast ? ` | FAST ×${concurrency} @ ${rateMs}ms` : ''}`);
 
   // Unidade de trabalho: 1 página de modelo + (--deep) as páginas das suas versões.
+  // Erros de uma unidade (parse inesperado, BD) não matam o run: contam como falha
+  // e o modelo fica para o próximo relançamento (não é marcado como feito).
   const unit = async (ref: ModelRef, client: HttpClient) => {
+    try {
+      await unitInner(ref, client);
+    } catch (err) {
+      stats.falhas++;
+      console.error(`✗ ${ref.make} ${ref.slug}: ${(err as Error).message} (fica para o próximo run)`);
+    }
+  };
+  const unitInner = async (ref: ModelRef, client: HttpClient) => {
     const html = await client.fetchText(ref.url);
     if (!html) {
       stats.falhas++;

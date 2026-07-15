@@ -14,6 +14,10 @@ import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
 import type { ModelRef, VersionRecord } from './schema.ts';
 
+// Colunas integer na BD; o site tem valores decimais (ex. binário "39.2 Nm") → arredondar.
+const int = (v: number | null | undefined): number | null =>
+  v == null || !Number.isFinite(v) ? null : Math.round(v);
+
 export class UsDbSink {
   private sql: postgres.Sql;
 
@@ -56,10 +60,10 @@ export class UsDbSink {
           name: v.name,
           url: v.url,
           fuel_section: v.fuelSection,
-          year: v.year,
-          power_hp: v.powerHp,
+          year: int(v.year),
+          power_hp: int(v.powerHp),
           power_kw: v.powerKw,
-          displacement_cc: v.displacementCc,
+          displacement_cc: int(v.displacementCc),
           collected_at: v.collectedAt,
         };
         if (v.deep) {
@@ -67,11 +71,11 @@ export class UsDbSink {
           await tx`
             insert into us_versions ${tx({
               ...base,
-              generation: d.generation, body: d.body, doors: d.doors, seats: d.seats,
+              generation: d.generation, body: d.body, doors: int(d.doors), seats: int(d.seats),
               fuel: d.fuel, engine_code: d.engineCode, cylinders: d.cylinders,
-              torque_nm: d.torqueNm, drivetrain: d.drivetrain, gearbox: d.gearbox,
-              co2_wltp: d.co2Wltp, co2_nedc: d.co2Nedc, emission_standard: d.emissionStandard,
-              curb_weight_kg: d.curbWeightKg, image_url: d.imageUrl, specs: tx.json(d.specs),
+              torque_nm: int(d.torqueNm), drivetrain: d.drivetrain, gearbox: d.gearbox,
+              co2_wltp: int(d.co2Wltp), co2_nedc: int(d.co2Nedc), emission_standard: d.emissionStandard,
+              curb_weight_kg: int(d.curbWeightKg), image_url: d.imageUrl, specs: tx.json(d.specs),
             })}
             on conflict (version_id) do update set
               mid = excluded.mid, name = excluded.name, url = excluded.url,

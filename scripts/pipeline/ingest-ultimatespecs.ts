@@ -29,6 +29,10 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+// Colunas integer na BD; o site tem valores decimais (ex. binário "39.2 Nm") → arredondar.
+const int = (v: number | null | undefined): number | null =>
+  v == null || !Number.isFinite(v) ? null : Math.round(v);
+
 /** URL da página de modelo, reconstruído do URL da versão (o NDJSON não o traz). */
 function modelUrlOf(r: VersionRecord): string {
   const makeSeg = r.url.split("/car-specs/")[1]?.split("/")[0] ?? r.make.replace(/ /g, "-");
@@ -117,10 +121,10 @@ async function main() {
     name: r.name,
     url: r.url,
     fuelSection: r.fuelSection,
-    year: r.year,
-    powerHp: r.powerHp,
+    year: int(r.year),
+    powerHp: int(r.powerHp),
     powerKw: r.powerKw,
-    displacementCc: r.displacementCc,
+    displacementCc: int(r.displacementCc),
     collectedAt: new Date(r.collectedAt),
   });
   const summarySet = {
@@ -153,18 +157,18 @@ async function main() {
           ...summaryOf(r),
           generation: r.deep?.generation,
           body: r.deep?.body,
-          doors: r.deep?.doors,
-          seats: r.deep?.seats,
+          doors: int(r.deep?.doors),
+          seats: int(r.deep?.seats),
           fuel: r.deep?.fuel,
           engineCode: r.deep?.engineCode,
           cylinders: r.deep?.cylinders,
-          torqueNm: r.deep?.torqueNm,
+          torqueNm: int(r.deep?.torqueNm),
           drivetrain: r.deep?.drivetrain,
           gearbox: r.deep?.gearbox,
-          co2Wltp: r.deep?.co2Wltp,
-          co2Nedc: r.deep?.co2Nedc,
+          co2Wltp: int(r.deep?.co2Wltp),
+          co2Nedc: int(r.deep?.co2Nedc),
           emissionStandard: r.deep?.emissionStandard,
-          curbWeightKg: r.deep?.curbWeightKg,
+          curbWeightKg: int(r.deep?.curbWeightKg),
           imageUrl: r.deep?.imageUrl,
           specs: r.deep?.specs,
         })),
