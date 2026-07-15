@@ -7,14 +7,36 @@ import { SavingsBadge } from "@/components/savings-badge";
 import { Button } from "@/components/ui/button";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { getListing } from "@/lib/data";
-import { formatCc, formatEuro, formatKm, formatNumber } from "@/lib/format";
+import { formatCc, formatEuro, formatKm, formatNumber, relativeDay } from "@/lib/format";
 import type { Listing } from "@/lib/types";
-import { ArrowLeft, BellPlus, Heart, MessagesSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ArrowLeft, BellPlus, Heart, MessagesSquare, PackageX } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/**
+ * Um anúncio que deixou de aparecer nas fontes. Chega-se aqui pelos favoritos.
+ * Dizemos "já não aparece", não "vendido": a engine só sabe que o anúncio
+ * desapareceu — pode ter sido vendido, retirado, ou o coletor pode ter falhado.
+ */
+function AvisoIndisponivel({ seenAt }: { seenAt: string }) {
+  return (
+    <div className="flex gap-3 rounded-[10px] border border-line-strong bg-surface-2 p-4">
+      <PackageX className="mt-0.5 size-4 shrink-0 text-ink-soft" aria-hidden />
+      <div className="text-sm">
+        <p className="font-semibold">Este anúncio já não aparece na fonte</p>
+        <p className="mt-1 text-ink-soft">
+          Visto pela última vez {relativeDay(seenAt)}. Pode ter sido vendido, retirado pelo
+          vendedor, ou apenas ter deixado de ser publicado. Os números abaixo são os da última vez
+          que o vimos — servem de referência, não são uma oferta.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function specs(l: Listing): { label: string; value: string }[] {
@@ -37,6 +59,8 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
   const listing = await getListing(id);
   if (!listing) notFound();
 
+  const indisponivel = Boolean(listing.unavailableSince);
+
   return (
     <div className="flex flex-col gap-5">
       <Link
@@ -46,13 +70,17 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
         <ArrowLeft className="size-4" /> Voltar à pesquisa
       </Link>
 
+      {indisponivel && <AvisoIndisponivel seenAt={listing.seenAt} />}
+
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         {/* Coluna esquerda: fotos + ficha */}
         <div className="flex flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <VerdictBadge verdict={listing.verdict} />
+                {/* Sem veredito num anúncio que já saiu do mercado: dizer
+                    "compensa" sobre um carro que já não se compra é enganador. */}
+                {!indisponivel && <VerdictBadge verdict={listing.verdict} />}
                 <span className="text-xs text-ink-soft">
                   <CountryFlag code={listing.country} /> · {listing.source}
                 </span>
@@ -100,12 +128,20 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
 
         {/* Coluna direita: dinheiro + ações */}
         <div className="flex flex-col gap-4">
-          {/* Poupança em destaque */}
-          <div className="rounded-[10px] border border-line bg-surface p-5">
+          {/* Poupança em destaque. Num anúncio que já saiu do mercado isto é
+              referência histórica, não uma oferta — daí o rótulo diferente e o
+              destaque atenuado. Um "−9070 € POUPANÇA" verde e garrido sobre um
+              carro que já não se compra contradiz o aviso lá em cima. */}
+          <div
+            className={cn(
+              "rounded-[10px] border border-line bg-surface p-5",
+              indisponivel && "opacity-70",
+            )}
+          >
             <div className="flex items-end justify-between">
               <div>
                 <div className="text-xs uppercase tracking-wide text-ink-soft">
-                  Custo final em PT
+                  {indisponivel ? "Custo final estimado" : "Custo final em PT"}
                 </div>
                 <div className="tnum font-display text-2xl font-bold">
                   {formatEuro(listing.cost.totalPt)}
@@ -140,19 +176,36 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
 
           {/* Ações */}
           <div className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-4">
-            <Button asChild variant="accent" size="lg">
-              <Link href="/negociacoes">
-                <MessagesSquare className="size-4" /> Iniciar negociação
-              </Link>
-            </Button>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline">
-                <Heart className="size-4" /> Favoritar
-              </Button>
-              <Button variant="outline">
-                <BellPlus className="size-4" /> Criar alerta
-              </Button>
-            </div>
+            {/* Não convidamos ninguém a negociar um carro que já não está à
+                venda — o alerta é que faz sentido, para apanhar outro igual. */}
+            {indisponivel ? (
+              <>
+                <Button asChild variant="accent" size="lg">
+                  <Link href="/alertas">
+                    <BellPlus className="size-4" /> Avisar-me se aparecer outro igual
+                  </Link>
+                </Button>
+                <Button variant="outline">
+                  <Heart className="size-4" /> Tirar dos favoritos
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button asChild variant="accent" size="lg">
+                  <Link href="/negociacoes">
+                    <MessagesSquare className="size-4" /> Iniciar negociação
+                  </Link>
+                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline">
+                    <Heart className="size-4" /> Favoritar
+                  </Button>
+                  <Button variant="outline">
+                    <BellPlus className="size-4" /> Criar alerta
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

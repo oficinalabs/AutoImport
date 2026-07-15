@@ -56,7 +56,10 @@ export function relativeDay(iso: string): string {
   if (diff <= 0) return "hoje";
   if (diff === 1) return "ontem";
   if (diff < 7) return `há ${diff} dias`;
-  if (diff < 30) return `há ${Math.floor(diff / 7)} semana(s)`;
+  if (diff < 30) {
+    const semanas = Math.floor(diff / 7);
+    return `há ${semanas} ${semanas === 1 ? "semana" : "semanas"}`;
+  }
   return new Date(iso).toLocaleDateString("pt-PT", { day: "2-digit", month: "short" });
 }
 
