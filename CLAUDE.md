@@ -4,6 +4,51 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 **Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
+---
+
+# ⚠️ Este projeto (AutoImport) — regras críticas
+
+Ler antes de mexer na base de dados ou no deploy. Isto não é teoria: **já partiu a produção**.
+
+## Base de dados e deploy
+
+**O deploy publica código. A base de dados não muda sozinha.**
+Foi assim que a produção rebentou: o painel passou a ler `listings`, o merge publicou o
+código, mas as tabelas nunca foram criadas na Supabase → `relation "listings" does not exist`.
+
+- **Mudar o schema:** editar `db/schema.ts` → `pnpm db:generate` → **commitar a migration**.
+- **Aplicar em produção:** *não corras nada à mão*. O `vercel.json` corre
+  `pnpm db:migrate:deploy` antes do build, e o script só aplica quando `VERCEL_ENV=production`.
+- **`pnpm db:push` NÃO funciona** com esta Supabase (bug do drizzle-kit ao introspecionar os
+  schemas internos do Supabase). Usar **sempre** migrations.
+- **Previews de PR não migram** — Preview e Production partilham a `DATABASE_URL`, e um PR
+  por rever não pode alterar a produção. Se um PR trouxer migration + código que dependa
+  dela, **o preview vai dar erro: é esperado, não é bug**.
+- **CI verde ≠ produção OK.** O CI migra uma Postgres descartável; nunca prova o estado da
+  Supabase real.
+- Migration a falhar **falha o build de propósito** — a Vercel mantém a versão anterior no ar.
+
+## ☠️ O `.env.local` aponta para a Supabase de PRODUÇÃO
+
+Não há base de dados de desenvolvimento separada. Qualquer `pnpm db:seed`, `db:migrate` ou
+script com `--env-file=.env.local` **mexe em dados reais de clientes**. Confirma para onde
+aponta a `DATABASE_URL` **antes** de correres o que quer que seja contra a base de dados.
+Em caso de dúvida, pergunta em vez de correr.
+
+## Segredos
+
+Nunca leias nem imprimas o `.env.local`, e nunca coles connection strings ou API keys no
+chat. Vivem na Vercel (produção) e no `.env.local` (local); o `.env.example` documenta
+quais são precisas.
+
+## Onde está o detalhe
+
+- `docs/05-INFRA-E-DEPLOY.md` — deploy, migrations, domínio, rollback
+- `docs/07-FRONTEND-HANDOFF.md` — fronteira frontend/backend, `lib/data.ts`, segurança
+- `docs/03-BACKEND.md` — auth, regras de password, rate limiting
+
+---
+
 ## 1. Think Before Coding
 
 **Don't assume. Don't hide confusion. Surface tradeoffs.**
