@@ -1104,3 +1104,49 @@ Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que
   anúncio do theparking (ID), não por veículo físico entre fontes.
 - O `checkpoint.json` guarda o conjunto de IDs vistos; em recolhas `--full` muito
   grandes esse ficheiro cresce (aceitável nesta fase).
+
+## ultimatespecs.com (coletor de CATÁLOGO — referência de versões, não anúncios)
+
+Ao contrário de todos os anteriores, não recolhe carros à venda: recolhe a **ficha de
+versões de modelo** (designação, ano, potência hp/kW, cilindrada, combustível) para
+alimentar o matching do pipeline (designação + potência obrigatória). ~6 300 páginas de
+modelo no sitemap; cada uma lista as versões numa tabela agrupada por combustível.
+
+### Como usar
+
+```bash
+# marcas dirigidas (o modo normal — recolha para o matching)
+node run-ultimatespecs.ts --make kia --make hyundai --since-year 2010
+
+# fatia diária do catálogo completo (retomável)
+node run-ultimatespecs.ts --since-year 2008 --max-models 200
+node run-ultimatespecs.ts --resume
+
+# ficha técnica completa por versão (CO₂ WLTP/NEDC, código do motor, caixa, norma Euro…)
+node run-ultimatespecs.ts --make bmw --deep
+```
+
+Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--max-models <n>`,
+`--rate <ms>`, `--resume`, `--out <dir>`.
+
+### Ritmo — Crawl-delay 30 s (inegociável)
+
+O robots.txt permite as páginas de specs mas impõe `Crawl-delay: 30`. O `http.ts` faz
+**clamp**: `--rate` pode subir o intervalo, nunca descer dos 30 000 ms → ~2 880 páginas/dia.
+Catálogo completo ≈ 2,2 dias (só resumos) — daí o checkpoint por página de modelo e os
+filtros por marca/ano para recolhas dirigidas. `--deep` multiplica os pedidos (~10-20
+versões/modelo): usar só em marcas-alvo.
+
+### Saída (em `out/`, gitignored)
+- `ultimatespecs-<timestamp>.ndjson` — um registo por VERSÃO (ver `ultimatespecs/schema.ts`;
+  com `--deep`, campo `deep` com a ficha normalizada + `specs` cruas label→valor).
+- `ultimatespecs-models.json` — inventário de páginas de modelo (cache dos sitemaps).
+- `ultimatespecs-summary.json` / `ultimatespecs-checkpoint.json` — como nos restantes.
+
+### Notas
+- A página de modelo já traz o essencial para o matching (nome/ano/potência/cc/combustível)
+  → o default evita as ~50 000 páginas de versão; `--deep` é opt-in.
+- O ano no slug do modelo é o da geração/facelift (ex. `Stonic-2021`); a coluna *Year* da
+  tabela é o ano-modelo da versão. Slugs sem ano (`Q7-3rd-Generation`) passam o filtro
+  `--since-year` de propósito (não dá para saber sem abrir a página).
+- Dedupe global por `versionId` (estável no site); re-runs com `--resume` não duplicam.
