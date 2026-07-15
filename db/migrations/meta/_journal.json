@@ -19,8 +19,15 @@
     {
       "idx": 2,
       "version": "7",
+      "when": 1784129809160,
+      "tag": "0002_whole_zuras",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
       "when": 1784112939118,
-      "tag": "0002_famous_pepper_potts",
+      "tag": "0003_famous_pepper_potts",
       "breakpoints": true
     }
   ]

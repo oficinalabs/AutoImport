@@ -14,6 +14,7 @@
  * │  pipeline — ver docs/07-FRONTEND-HANDOFF.md).                     │
  * └─────────────────────────────────────────────────────────────────┘
  */
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { auth } from "./auth";
 import {
@@ -26,6 +27,7 @@ import {
   findListing,
 } from "./mock";
 import * as q from "./queries";
+import { checkStandFields } from "./stand-fields";
 import type {
   Alert,
   Conversation,
@@ -34,6 +36,7 @@ import type {
   DashboardStats,
   Deal,
   Listing,
+  Notification,
   Stand,
 } from "./types";
 
@@ -223,7 +226,116 @@ export async function getDeal(id: string): Promise<Deal | null> {
   return settle(DEALS.find((d) => d.id === id) ?? null);
 }
 
-// ── Stand / conta (mock — passar a vir da organização da sessão) ─
+// ── Stand / conta ───────────────────────────────────────────────
 export async function getStand(): Promise<Stand> {
+  if (hasDb()) {
+    const standId = await activeStandId();
+    if (standId) {
+      const stand = await q.getStandQuery(standId);
+      if (stand) return stand;
+    }
+  }
   return settle(STAND);
+}
+
+// ── Notificações ────────────────────────────────────────────────
+/**
+ * Matches que os alertas do stand dispararam. Sem BD, ou enquanto o job de
+ * alertas não correr, devolve vazio — e o sino mostra o estado vazio. Não
+ * inventamos notificações.
+ */
+export async function getNotifications(): Promise<Notification[]> {
+  if (!hasDb()) return settle([]);
+  try {
+    const standId = await activeStandId();
+    if (!standId) return [];
+    return await q.notificationsQuery(standId);
+  } catch (error) {
+    console.error("[notificações] falha ao ler:", error);
+    return [];
+  }
+}
+
+/**
+ * Nome e email de quem está com sessão iniciada. Sem sessão (dev/preview sobre
+ * mock), devolve o primeiro membro do stand mock — coerente com o getStand().
+ */
+export async function getSessionUser(): Promise<{ name: string; email: string }> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (session?.user) {
+      return { name: session.user.name, email: session.user.email };
+    }
+  } catch {
+    // cai no mock
+  }
+  const fallback = STAND.members[0];
+  return { name: fallback.name, email: fallback.email };
+}
+
+/**
+ * Papel do utilizador da sessão no stand ativo ("owner" | "member" | null).
+ *
+ * Sempre que o `getStand()` cai no mock (sem BD, sem sessão, sem organização)
+ * devolvemos "owner" — senão a UI ficava incoerente: dados de exemplo que não
+ * se conseguem editar. Isto só decide se o botão aparece; quem manda é o
+ * servidor, que volta a verificar o papel em `updateStand()` antes de gravar.
+ */
+export async function getStandRole(): Promise<string | null> {
+  if (!hasDb()) return "owner";
+  try {
+    const [standId, session] = await Promise.all([
+      activeStandId(),
+      auth.api.getSession({ headers: await headers() }),
+    ]);
+    if (!standId || !session?.user) return "owner";
+    return q.standRoleQuery(standId, session.user.id);
+  } catch {
+    return "owner";
+  }
+}
+
+export type UpdateStandResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Grava os dados do stand. Server Action — chamada do formulário em /stand.
+ * Só o **dono** pode alterar, e só a organização da PRÓPRIA sessão: o standId
+ * nunca vem do cliente, é resolvido aqui a partir da sessão.
+ */
+export async function updateStand(input: {
+  name: string;
+  nif: string;
+  address: string;
+  phone: string;
+}): Promise<UpdateStandResult> {
+  if (!hasDb()) return { ok: false, error: "Base de dados indisponível." };
+
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  const check = checkStandFields(input);
+  if (check) return { ok: false, error: check };
+
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+    const role = await q.standRoleQuery(standId, session.user.id);
+    if (role !== "owner") {
+      return { ok: false, error: "Só o dono do stand pode alterar estes dados." };
+    }
+
+    await q.updateStandMutation(standId, {
+      name: input.name.trim(),
+      nif: input.nif.trim(),
+      address: input.address.trim(),
+      phone: input.phone.trim(),
+    });
+    revalidatePath("/stand");
+    return { ok: true };
+  } catch (error) {
+    // Nunca devolver o erro cru ao cliente (pode trazer SQL/tabelas) — ver CLAUDE.md.
+    console.error("[stand] falha ao gravar:", error);
+    return { ok: false, error: "Não foi possível gravar. Tenta outra vez." };
+  }
 }

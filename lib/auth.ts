@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
+import { ChangeEmailVerification } from "@/emails/change-email";
 import { ResetPasswordEmail } from "@/emails/reset-password";
 import { VerifyEmail } from "@/emails/verify-email";
 import { sendEmail } from "@/lib/email";
@@ -88,6 +89,30 @@ export const auth = betterAuth({
       // Nome do stand recolhido no registo; usado para criar a organização.
       standName: { type: "string", required: false, input: true },
     },
+    changeEmail: {
+      enabled: true,
+      // O email novo só passa a valer depois de confirmado — o link vai para o
+      // endereço NOVO. Sem isto, bastava mudar o email para tomar conta alheia.
+      sendChangeEmailVerification: async ({
+        user,
+        newEmail,
+        url,
+      }: {
+        user: { name: string; email: string };
+        newEmail: string;
+        url: string;
+      }) => {
+        if (!process.env.RESEND_API_KEY) {
+          console.info(`[auth] link de troca de email para ${newEmail}: ${url}`);
+        }
+        await sendEmail({
+          to: newEmail,
+          subject: "Confirme o novo email da sua conta AutoImport",
+          react: ChangeEmailVerification({ url, name: user.name, newEmail }),
+          text: `Pediu para passar a usar este endereço na sua conta AutoImport.\n\nConfirme aqui: ${url}\n\nAté confirmar, a conta continua com o email antigo. Se não foi o utilizador que pediu, ignore este email.`,
+        });
+      },
+    },
   },
 
   databaseHooks: {
@@ -126,10 +151,13 @@ export const auth = betterAuth({
 
   hooks: {
     // Regras de password impostas no SERVIDOR (a UI é só conveniência).
+    // TODAS as rotas que definem uma password têm de passar por aqui — deixar
+    // uma de fora abre a porta a contornar as regras por essa rota.
     before: createAuthMiddleware(async (ctx) => {
       const isSignUp = ctx.path === "/sign-up/email";
       const isReset = ctx.path === "/reset-password";
-      if (!isSignUp && !isReset) return;
+      const isChange = ctx.path === "/change-password";
+      if (!isSignUp && !isReset && !isChange) return;
 
       const body = ctx.body as { password?: string; newPassword?: string } | undefined;
       const password = isSignUp ? body?.password : body?.newPassword;
@@ -156,6 +184,11 @@ export const auth = betterAuth({
       "/request-password-reset": { window: 60 * 10, max: 3 },
       "/reset-password": { window: 60 * 10, max: 5 },
       "/send-verification-email": { window: 60 * 10, max: 3 },
+      // Operações sensíveis sobre uma conta já autenticada: mudar a password
+      // exige a atual, portanto isto trava também a adivinhação dela.
+      "/change-password": { window: 60 * 10, max: 5 },
+      "/change-email": { window: 60 * 10, max: 3 },
+      "/update-user": { window: 60, max: 10 },
     },
   },
 
@@ -175,7 +208,13 @@ export const auth = betterAuth({
     useSecureCookies: process.env.NODE_ENV === "production",
   },
 
-  trustedOrigins: [process.env.BETTER_AUTH_URL ?? "http://localhost:3000"],
+  // Em produção só a origem oficial. Em desenvolvimento aceitamos qualquer
+  // porta local — senão correr o dev noutra porta dá um 403 INVALID_ORIGIN
+  // difícil de diagnosticar.
+  trustedOrigins:
+    process.env.NODE_ENV === "production"
+      ? [process.env.BETTER_AUTH_URL].filter((o): o is string => Boolean(o))
+      : ["http://localhost:*", "http://127.0.0.1:*"],
 
   plugins: [organization(), nextCookies()],
 });

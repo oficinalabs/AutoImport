@@ -175,6 +175,18 @@ export interface Member {
 
 export type SubscriptionStatus = "trial" | "ativa" | "expirada";
 
+/** Um match que um alerta do stand disparou — o que o sino mostra. */
+export interface Notification {
+  id: string;
+  /** nome do alerta que disparou */
+  alertName: string;
+  listingId: string;
+  /** marca modelo ano do anúncio encontrado */
+  title: string;
+  /** ISO */
+  sentAt: string;
+}
+
 export interface Stand {
   id: string;
   name: string;
