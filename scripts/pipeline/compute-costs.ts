@@ -45,6 +45,7 @@ export async function computeCosts() {
     where l.country = any(${`{${FOREIGN.join(",")}}`}::text[])
       and l.deleted_at is null
       and l.is_damaged is not true -- sinistrado barato ≠ oportunidade
+      and l.detail_url not like '%/leilao/%' -- leilões (autoline): o preço é a licitação corrente, não um preço de venda
       and l.price is not null
       and l.year is not null
       and l.km is not null

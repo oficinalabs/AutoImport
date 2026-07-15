@@ -75,7 +75,7 @@ test(
       isv: number | null;
     }[];
 
-    assert.equal(estimates.length, 4);
+    assert.equal(estimates.length, 5);
     const byId = new Map(estimates.map((e) => [e.external_id, e]));
 
     const compensa = byId.get("fixture-de-1");
@@ -89,6 +89,8 @@ test(
     assert.equal(byId.get("fixture-de-3")?.verdict, "nao_compensa");
     // modelo sem amostra PT → sem estimativa (nunca adivinhar)
     assert.equal(byId.get("fixture-de-4")?.verdict, null);
+    // leilão (autoline /leilao/): o preço é licitação corrente, nunca há estimativa
+    assert.equal(byId.get("fixture-de-5")?.verdict, null);
 
     // Oportunidade ativa apenas para o compensa
     const opps = (await db.execute(sql`
