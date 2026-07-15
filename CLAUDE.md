@@ -42,6 +42,17 @@ Ao criar rotas novas: se a página puder falhar (lê a BD, chama uma API), confi
 coberta por um `error.tsx`. Testar um erro real em `next start` (não `dev` — em
 desenvolvimento o Next mostra o overlay com tudo, e isso engana).
 
+## A base de dados tem 500 MB — não é infinita
+
+Plano **Free**: **500 MB de disco** e **5 GB/mês de egress**, sem backups. Medido: ~2 KB por
+linha → cabem **~150 000 anúncios**, não milhões. Aos 500 MB a base **recusa escritas**.
+
+Ao escrever código que insere dados (engine, pipeline, seeds): **não guardar histórico
+diário sem limite** (`listing_price_history` só em mudança de preço; `pt_price_observations`
+agregado). Anúncios inativos há >90 dias apagam-se — `deleted_at` não liberta espaço.
+Vigiar com `select pg_size_pretty(pg_database_size(current_database()))`; acima de 400 MB,
+falar com o Rui. Detalhe e política em `docs/04-BASE-DE-DADOS.md`.
+
 ## ☠️ O `.env.local` aponta para a Supabase de PRODUÇÃO
 
 Não há base de dados de desenvolvimento separada. Qualquer `pnpm db:seed`, `db:migrate` ou
