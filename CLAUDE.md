@@ -48,10 +48,17 @@ Plano **Free**: **500 MB de disco** e **5 GB/mês de egress**, sem backups. Medi
 linha → cabem **~150 000 anúncios**, não milhões. Aos 500 MB a base **recusa escritas**.
 
 Ao escrever código que insere dados (engine, pipeline, seeds): **não guardar histórico
-diário sem limite** (`listing_price_history` só em mudança de preço; `pt_price_observations`
-agregado). Anúncios inativos há >90 dias apagam-se — `deleted_at` não liberta espaço.
-Vigiar com `select pg_size_pretty(pg_database_size(current_database()))`; acima de 400 MB,
-falar com o Rui. Detalhe e política em `docs/04-BASE-DE-DADOS.md`.
+diário sem limite**. Anúncios inativos há >90 dias apagam-se — `deleted_at` não liberta
+espaço. Vigiar com `select pg_size_pretty(pg_database_size(current_database()))`; acima de
+400 MB, falar com o Rui. Detalhe em `docs/04-BASE-DE-DADOS.md`.
+
+⚠️ **Não "otimizes" o `pt_price_observations` sem ler `docs/08-RETENCAO-DE-DADOS.md`.**
+A tabela grava 1 linha por anúncio PT por dia e parece desperdício óbvio — mas a correção
+óbvia (*"grava só mudanças de preço, como o `db-sink.ts` faz"*) **parte o produto em
+silêncio**: o `estimatePtPrice` filtra por `observed_at > now() - 60 dias`, portanto
+anúncios de preço estável sairiam da amostra e a mediana do mercado PT ficaria enviesada
+para baixo. Há uma proposta em aberto (08) com a análise e as opções; a decisão é do dono
+da engine.
 
 ## ☠️ O `.env.local` aponta para a Supabase de PRODUÇÃO
 
