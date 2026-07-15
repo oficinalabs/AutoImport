@@ -1,21 +1,25 @@
 // crawl.ts — recolha do catálogo de versões do ultimatespecs.com.
 //
-// FORMA: inventário (sitemaps, 3 pedidos, cache em disco) → filtro por marca/ano →
-// 1 pedido por página de MODELO (≈10-20 versões/página) → NDJSON. Com --deep, mais
-// 1 pedido por VERSÃO para a ficha completa (CO₂, código do motor, caixa…).
+// FORMA: inventário (sitemaps, 3 pedidos) → filtro por marca/ano → 1 pedido por página
+// de MODELO (≈10-20 versões/página). Com --deep, mais 1 pedido por VERSÃO para a ficha
+// completa (CO₂, código do motor, caixa…).
 //
-// RITMO: por omissão respeita o Crawl-delay: 30 s do robots.txt (~2 880 páginas/dia;
-// catálogo completo com --deep ≈ 20 dias) → o crawl é RETOMÁVEL (--resume, checkpoint
-// por página de modelo) e FILTRÁVEL (--make/--since-year). O modo --fast corre um POOL
-// de workers com throttle próprio (exceção deliberada ao crawl-delay, ver README):
-// a unidade de trabalho é a página de modelo + as suas versões, distribuída pelos
-// workers; o dedupe/checkpoint (síncronos) são partilhados e seguros entre workers.
+// DESTINO: com DATABASE_URL (default) o upsert é DIRETO na BD (us_models/us_versions)
+// — nada em disco; o resume deriva da própria BD (mid em us_models = modelo feito,
+// version_id em us_versions = dedupe), pelo que interromper e relançar nunca duplica.
+// Sem DATABASE_URL (ou com --ndjson) escreve NDJSON + checkpoint local (replay via
+// scripts/pipeline/ingest-ultimatespecs.ts).
+//
+// RITMO: por omissão respeita o Crawl-delay: 30 s do robots.txt; o modo --fast corre
+// um POOL de workers com throttle próprio (exceção deliberada, ver README). A unidade
+// de trabalho é a página de modelo + as suas versões, distribuída pelos workers.
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createCrawlWriter } from '../lib/crawl.ts';
+import type { UsDbSink } from './db-sink.ts';
 import { BASE, HttpClient } from './http.ts';
-import { parseModelPage, parseModelUrl, parseSitemapLocs, parseVersionPage } from './parse.ts';
+import { parseGalleryImages, parseModelPage, parseModelUrl, parseSitemapLocs, parseVersionPage } from './parse.ts';
 import type { ModelRef, VersionRecord } from './schema.ts';
 
 export interface CrawlConfig {
@@ -27,8 +31,9 @@ export interface CrawlConfig {
   concurrency: number;         // nº de workers (1 = sequencial educado; >1 só com --fast)
   rateMs: number;              // throttle POR WORKER (em --fast; senão o crawl-delay manda)
   fast: boolean;               // ignorar o crawl-delay do robots (exceção deliberada)
+  db: UsDbSink | null;         // destino: BD direta (default) ou null → NDJSON local
   outDir: string;
-  resume: boolean;
+  resume: boolean;             // só no modo NDJSON (na BD o resume é implícito)
 }
 
 export interface CrawlStats {
@@ -38,16 +43,28 @@ export interface CrawlStats {
   byMake: Record<string, number>;
   byFuel: Record<string, number>;
   semPotencia: number;
-  falhas: number;              // páginas sem resposta (ficam para o próximo resume)
+  falhas: number;              // páginas sem resposta (ficam para o próximo run)
 }
 
 const SITEMAP_INDEX = `${BASE}/sitemapversions.xml`;
 
-// Inventário de páginas de modelo a partir dos sitemaps, com cache em disco:
-// o inventário muda pouco e assim os resumes não gastam pedidos.
-async function loadInventory(http: HttpClient, outDir: string): Promise<ModelRef[]> {
-  const cachePath = join(outDir, 'ultimatespecs-models.json');
-  if (existsSync(cachePath)) {
+const newStats = (): CrawlStats => ({
+  records: 0, pages: 0, deepPages: 0, byMake: {}, byFuel: {}, semPotencia: 0, falhas: 0,
+});
+
+function updateStats(s: CrawlStats, r: VersionRecord) {
+  s.records++;
+  s.byMake[r.make] = (s.byMake[r.make] ?? 0) + 1;
+  s.byFuel[r.fuelSection] = (s.byFuel[r.fuelSection] ?? 0) + 1;
+  if (r.powerHp == null && r.powerKw == null) s.semPotencia++;
+}
+
+// Inventário de páginas de modelo a partir dos sitemaps. `cacheDir` (modo NDJSON):
+// guarda em disco para os resumes não gastarem pedidos; no modo BD é null — 3 pedidos
+// por run é barato e não fica nada em disco.
+async function loadInventory(http: HttpClient, cacheDir: string | null): Promise<ModelRef[]> {
+  const cachePath = cacheDir ? join(cacheDir, 'ultimatespecs-models.json') : null;
+  if (cachePath && existsSync(cachePath)) {
     const refs = JSON.parse(readFileSync(cachePath, 'utf8')) as ModelRef[];
     console.log(`≡ inventário em cache: ${refs.length} páginas de modelo (${cachePath})`);
     return refs;
@@ -63,8 +80,12 @@ async function loadInventory(http: HttpClient, outDir: string): Promise<ModelRef
       if (ref) refs.push(ref);
     }
   }
-  writeFileSync(cachePath, JSON.stringify(refs));
-  console.log(`≡ inventário: ${refs.length} páginas de modelo (guardado em ${cachePath})`);
+  if (cachePath) {
+    writeFileSync(cachePath, JSON.stringify(refs));
+    console.log(`≡ inventário: ${refs.length} páginas de modelo (guardado em ${cachePath})`);
+  } else {
+    console.log(`≡ inventário: ${refs.length} páginas de modelo (sitemaps, sem cache local)`);
+  }
   return refs;
 }
 
@@ -81,35 +102,40 @@ async function inPool<T>(items: T[], size: number, fn: (item: T, worker: number)
 }
 
 export async function crawl(config: CrawlConfig) {
-  const { http, makes, sinceYear, deep, maxModels, concurrency, rateMs, fast, outDir, resume } = config;
+  const { http, makes, sinceYear, deep, maxModels, concurrency, rateMs, fast, db, outDir, resume } = config;
 
-  const writer = createCrawlWriter<VersionRecord, CrawlStats>({
-    outDir,
-    source: 'ultimatespecs',
-    resume,
-    recordId: (r) => r.versionId,
-    newStats: () => ({
-      records: 0, pages: 0, deepPages: 0, byMake: {}, byFuel: {}, semPotencia: 0, falhas: 0,
-    }),
-    updateStats: (s, r) => {
-      s.records++;
-      s.byMake[r.make] = (s.byMake[r.make] ?? 0) + 1;
-      s.byFuel[r.fuelSection] = (s.byFuel[r.fuelSection] ?? 0) + 1;
-      if (r.powerHp == null && r.powerKw == null) s.semPotencia++;
-    },
-    resumeLog: (w) => `↻ resume: ${w.stats.records} versões de ${w.stats.pages} modelos já recolhidas`,
-  });
+  // ── estado inicial: da BD (modo direto) ou do checkpoint local (modo NDJSON) ──
+  const writer = db
+    ? null
+    : createCrawlWriter<VersionRecord, CrawlStats>({
+        outDir,
+        source: 'ultimatespecs',
+        resume,
+        recordId: (r) => r.versionId,
+        newStats,
+        updateStats,
+        resumeLog: (w) => `↻ resume: ${w.stats.records} versões de ${w.stats.pages} modelos já recolhidas`,
+      });
+  const stats = writer ? writer.stats : newStats();
+  const collectedAt = writer ? writer.collectedAt : new Date().toISOString();
 
-  const inventory = await loadInventory(http, outDir);
+  let doneMids: Set<string>;
+  let seenVersions: Set<string> | null = null; // modo BD (no NDJSON o writer é dono do seen)
+  if (db) {
+    const done = await db.loadDone();
+    doneMids = done.doneMids;
+    seenVersions = done.seenVersions;
+    console.log(`⛁ destino: Postgres (us_models/us_versions) — ${doneMids.size} modelos e ${seenVersions.size} versões já na BD`);
+  } else {
+    doneMids = new Set<string>((writer?.cursor as string[] | null) ?? []);
+  }
+
+  const inventory = await loadInventory(http, db ? null : outDir);
   const alvo = inventory.filter((ref) => {
     if (makes && !makes.includes(ref.make.toLowerCase())) return false;
     if (sinceYear && ref.modelYear !== null && ref.modelYear < sinceYear) return false;
     return true;
   });
-
-  // cursor = mids de páginas de modelo já processadas (a unidade modelo+versões é
-  // atómica do ponto de vista do checkpoint: o mid só entra no fim da unidade).
-  const doneMids = new Set<string>((writer.cursor as string[] | null) ?? []);
   const pendentes = alvo.filter((ref) => !doneMids.has(ref.mid));
   const fatia = maxModels ? pendentes.slice(0, maxModels) : pendentes;
 
@@ -123,30 +149,37 @@ export async function crawl(config: CrawlConfig) {
   const unit = async (ref: ModelRef, client: HttpClient) => {
     const html = await client.fetchText(ref.url);
     if (!html) {
-      writer.stats.falhas++;
-      console.error(`✗ sem resposta: ${ref.url} (fica para o próximo resume)`);
+      stats.falhas++;
+      console.error(`✗ sem resposta: ${ref.url} (fica para o próximo run)`);
       return;
     }
-    const versions = parseModelPage(html, ref, writer.collectedAt);
-    let novos = 0;
-    for (const v of versions) {
-      if (writer.has(v.versionId)) continue;
-      if (deep) {
-        const page = await client.fetchText(v.url);
-        if (page) {
-          v.deep = parseVersionPage(page);
-          writer.stats.deepPages++;
-        } else {
-          writer.stats.falhas++;
-          console.error(`✗ deep sem resposta: ${v.url} (versão fica só com o resumo)`);
-        }
+    const parsed = parseModelPage(html, ref, collectedAt);
+    const novosArr = parsed.filter((v) =>
+      writer ? !writer.has(v.versionId) : !(seenVersions as Set<string>).has(v.versionId));
+    for (const v of novosArr) {
+      if (!deep) continue;
+      const page = await client.fetchText(v.url);
+      if (page) {
+        v.deep = parseVersionPage(page);
+        stats.deepPages++;
+      } else {
+        stats.falhas++;
+        console.error(`✗ deep sem resposta: ${v.url} (versão fica só com o resumo)`);
       }
-      if (writer.add(v)) novos++;
     }
-    writer.stats.pages++;
+    if (db) {
+      await db.upsertUnit(ref, parseGalleryImages(html, ref.mid.slice(1)), novosArr);
+      for (const v of novosArr) {
+        (seenVersions as Set<string>).add(v.versionId);
+        updateStats(stats, v);
+      }
+    } else if (writer) {
+      for (const v of novosArr) writer.add(v);
+    }
+    stats.pages++;
     doneMids.add(ref.mid);
-    writer.save([...doneMids]);
-    console.log(`  ${ref.make} ${ref.slug}: +${novos} versões (total ${writer.stats.records})`);
+    writer?.save([...doneMids]);
+    console.log(`  ${ref.make} ${ref.slug}: +${novosArr.length} versões (total ${stats.records})`);
   };
 
   if (fast && concurrency > 1) {
@@ -158,8 +191,13 @@ export async function crawl(config: CrawlConfig) {
     for (const ref of fatia) await unit(ref, http);
   }
   if (maxModels && pendentes.length > fatia.length) {
-    console.log(`■ limite --max-models (${maxModels}) atingido; retomar com --resume`);
+    console.log(`■ limite --max-models (${maxModels}) atingido; relançar para continuar`);
   }
+  await db?.close();
 
-  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, alvo: alvo.length };
+  return {
+    ndjsonPath: writer ? writer.ndjsonPath : '(direto na BD — sem NDJSON)',
+    stats,
+    alvo: alvo.length,
+  };
 }

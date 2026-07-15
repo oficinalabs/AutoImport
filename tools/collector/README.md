@@ -1112,6 +1112,12 @@ versões de modelo** (designação, ano, potência hp/kW, cilindrada, combustív
 alimentar o matching do pipeline (designação + potência obrigatória). ~6 300 páginas de
 modelo no sitemap; cada uma lista as versões numa tabela agrupada por combustível.
 
+**Destino**: com `DATABASE_URL` (env ou `.env.local` da raiz) o upsert é **direto na BD**
+(`us_models`/`us_versions`, ver `ultimatespecs/db-sink.ts`) e não fica nada em disco — o
+resume é implícito (deriva da BD: relançar continua onde ficou, sem duplicar). Sem
+`DATABASE_URL`, ou com `--ndjson`, escreve NDJSON + checkpoint local e a carga faz-se
+por replay (`scripts/pipeline/ingest-ultimatespecs.ts`).
+
 ### Como usar
 
 ```bash
@@ -1127,11 +1133,15 @@ node run-ultimatespecs.ts --make bmw --deep
 
 # CATÁLOGO COMPLETO em horas — ⚠️ ignora o crawl-delay do robots (ver "Ritmo")
 node run-ultimatespecs.ts --deep --fast
-node run-ultimatespecs.ts --resume --deep --fast     # retomar (idempotente)
+node run-ultimatespecs.ts --deep --fast              # relançar = retomar (resume via BD)
+
+# modo local (sem BD): NDJSON + checkpoint, retomar com --resume
+node run-ultimatespecs.ts --ndjson --deep --resume
 ```
 
 Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--max-models <n>`,
-`--fast`, `--concurrency <n>`, `--rate <ms>`, `--resume`, `--out <dir>`.
+`--ndjson`, `--fast`, `--concurrency <n>`, `--rate <ms>`, `--resume` (só NDJSON),
+`--out <dir>` (só NDJSON).
 
 ### Ritmo — Crawl-delay 30 s por omissão; `--fast` é exceção deliberada
 
@@ -1147,11 +1157,14 @@ Riscos de quem o liga: viola o crawl-delay pedido pelo site e o Cloudflare pode
 bloquear o IP a meio (o checkpoint + `--resume` retomam sem perder nada; as páginas
 falhadas ficam para o run seguinte). Para recolhas pequenas/dirigidas, ficar no default.
 
-### Saída (em `out/`, gitignored)
-- `ultimatespecs-<timestamp>.ndjson` — um registo por VERSÃO (ver `ultimatespecs/schema.ts`;
-  com `--deep`, campo `deep` com a ficha normalizada + `specs` cruas label→valor).
-- `ultimatespecs-models.json` — inventário de páginas de modelo (cache dos sitemaps).
-- `ultimatespecs-summary.json` / `ultimatespecs-checkpoint.json` — como nos restantes.
+### Saída
+- **Modo BD (default)**: upsert direto em `us_models`/`us_versions`; em disco fica só o
+  `ultimatespecs-summary.json` (relatório do run, escrito pela casca comum dos CLIs).
+- **Modo NDJSON** (`--ndjson` ou sem `DATABASE_URL`), em `out/` (gitignored):
+  - `ultimatespecs-<timestamp>.ndjson` — um registo por VERSÃO (ver `ultimatespecs/schema.ts`;
+    com `--deep`, campo `deep` com a ficha normalizada + `specs` cruas label→valor).
+  - `ultimatespecs-models.json` — inventário de páginas de modelo (cache dos sitemaps).
+  - `ultimatespecs-summary.json` / `ultimatespecs-checkpoint.json` — como nos restantes.
 
 ### Notas
 - A página de modelo já traz o essencial para o matching (nome/ano/potência/cc/combustível)
