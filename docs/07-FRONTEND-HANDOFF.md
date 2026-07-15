@@ -96,6 +96,20 @@ Quando `Listing.images` trouxer URLs reais:
 1. trocar o placeholder por `<Image>` do Next;
 2. adicionar os hosts em [`next.config.mjs`](../next.config.mjs) → `images.remotePatterns`.
 
+## Tratamento de erros
+
+| Ficheiro | Apanha |
+|---|---|
+| `app/(app)/error.tsx` | erros na app autenticada (mantém a top bar; dá "tentar de novo") |
+| `app/error.tsx` | erros na landing/auth e rede de segurança geral |
+| `app/global-error.tsx` | erros no **root layout** — os outros não os apanham; é o buraco que dava o ecrã cru do Next |
+| `app/not-found.tsx` | 404 |
+
+Todos usam `components/error-state.tsx`. **Nunca** expor `error.message`/stack — só o
+`digest`, que o utilizador pode dar ao suporte para cruzar com os logs da Vercel.
+Verificado em `next start`: o HTML entregue ao cliente não continha SQL, nomes de tabelas,
+`postgresql://`, stack nem código de erro Postgres — só `E{"digest":"…"}`.
+
 ## Notas de segurança (já implementado)
 
 - **Headers** em `next.config.mjs`: X-Frame-Options, nosniff, Referrer-Policy, Permissions-Policy, COOP, HSTS; `poweredByHeader: false`.

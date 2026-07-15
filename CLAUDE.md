@@ -28,6 +28,20 @@ código, mas as tabelas nunca foram criadas na Supabase → `relation "listings"
   Supabase real.
 - Migration a falhar **falha o build de propósito** — a Vercel mantém a versão anterior no ar.
 
+## Erros nunca expõem detalhes ao cliente
+
+Um erro na produção mostrava *"Application error: a server-side exception has occurred…"* —
+o ecrã cru do Next. Agora há boundaries próprios (`app/error.tsx`, `app/(app)/error.tsx`,
+`app/global-error.tsx`, `app/not-found.tsx`), todos sobre `components/error-state.tsx`.
+
+**Regra: nunca mostrar `error.message` nem stack traces na UI.** Podem trazer SQL, nomes de
+tabelas ou caminhos internos. Só o **`digest`** — opaco, e serve para cruzar com os logs.
+O detalhe fica nos logs do servidor (Vercel), que só a equipa vê.
+
+Ao criar rotas novas: se a página puder falhar (lê a BD, chama uma API), confirma que está
+coberta por um `error.tsx`. Testar um erro real em `next start` (não `dev` — em
+desenvolvimento o Next mostra o overlay com tudo, e isso engana).
+
 ## ☠️ O `.env.local` aponta para a Supabase de PRODUÇÃO
 
 Não há base de dados de desenvolvimento separada. Qualquer `pnpm db:seed`, `db:migrate` ou
