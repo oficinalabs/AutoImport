@@ -18,7 +18,8 @@ pnpm dev            # a UI passa a mostrar dados reais (sem DATABASE_URL → moc
 
 | # | Passo | O que faz |
 |---|---|---|
-| 1 | `ingest.ts` | replay dos NDJSON de `tools/collector/out` → upsert em `listings` (chave `source_site`+`external_id`) + `listing_price_history`. Idempotente. O modo watch dos coletores escreve direto na BD via `tools/collector/lib/db-sink.ts` quando há `DATABASE_URL`. |
+| 1 | `ingest.ts` | replay dos NDJSON de `tools/collector/out` → upsert em `listings` (chave `source_site`+`external_id`) + `listing_price_history`. Idempotente. O modo watch dos coletores escreve direto na BD via `tools/collector/lib/db-sink.ts` quando há `DATABASE_URL`. Preço: fontes com contado estruturado (flexicar `cash_price`) usam-no em vez do financiado de montra; leilões (`/leilao/`) nunca geram estimativa. |
+| 1b | `enrich-es.ts` | stands ES anunciam o FINANCIADO; para anúncios AS24-ES com estimativa, busca a página de detalhe e extrai o "precio al contado" da descrição (`lib/engine/precio-contado.ts`), corrigindo o preço (1 visita por anúncio, rate 1,5 s). |
 | 2 | `match-models.ts` | normalização determinística (`lib/engine/normalize-vehicle.ts`): `norm_key = make\|model\|fuel` → `vehicle_models`; a variante desambigua HEV vs PHEV ("Plug-in" muitas vezes só aparece aí); loga taxa de match + top não-mapeados (alimentar o dicionário). GPL/GN ficam de fora por decisão. |
 | 3 | `pt-market.ts` | 1 observação de preço/dia por anúncio PT ativo → `pt_price_observations`. |
 | 4 | desaparecidos | soft-delete de anúncios sem sinal há 14+ dias (`--stale-days`). |

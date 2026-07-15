@@ -60,22 +60,24 @@ test(
 
     // Vereditos por anúncio da fixture
     const estimates = (await db.execute(sql`
-    select l.external_id, e.verdict, e.pt_confidence, e.pt_sample_size,
-           e.total_pt, e.pt_estimated_price, e.savings, e.isv, e.iuc
+    select l.external_id, l.price, e.verdict, e.pt_confidence, e.pt_sample_size,
+           e.total_pt, e.pt_estimated_price, e.savings, e.isv, e.iuc, e.origin_price
     from listings l
     left join import_cost_estimates e on e.listing_id = l.id
     where l.external_id like 'fixture-de-%'
     order by l.external_id
   `)) as unknown as {
       external_id: string;
+      price: number;
       verdict: string | null;
       pt_confidence: string | null;
       pt_sample_size: number | null;
       savings: number | null;
       isv: number | null;
+      origin_price: number | null;
     }[];
 
-    assert.equal(estimates.length, 5);
+    assert.equal(estimates.length, 6);
     const byId = new Map(estimates.map((e) => [e.external_id, e]));
 
     const compensa = byId.get("fixture-de-1");
@@ -91,6 +93,9 @@ test(
     assert.equal(byId.get("fixture-de-4")?.verdict, null);
     // leilão (autoline /leilao/): o preço é licitação corrente, nunca há estimativa
     assert.equal(byId.get("fixture-de-5")?.verdict, null);
+    // fonte ES com cash_price estruturado: o preço guardado/usado é o contado
+    assert.equal(byId.get("fixture-de-6")?.price, 24000);
+    assert.equal(byId.get("fixture-de-6")?.origin_price, 24000);
 
     // Oportunidade ativa apenas para o compensa
     const opps = (await db.execute(sql`

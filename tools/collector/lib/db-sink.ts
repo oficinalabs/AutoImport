@@ -119,7 +119,11 @@ export class DbSink {
     const seenAt =
       str(record.last_seen) ?? str(record.collected_at) ?? new Date().toISOString();
     const firstSeenAt = str(record.first_seen) ?? seenAt;
-    const price = int(record.price);
+    // Preço: fontes ES anunciam o FINANCIADO como destaque; quando a fonte
+    // dá o preço de compra direta estruturado (flexicar `cash_price`), é
+    // esse que vale — é o que um importador paga.
+    const cashPrice = int(record.cash_price);
+    const price = cashPrice != null && cashPrice > 0 ? cashPrice : int(record.price);
 
     const rows = await this.sql`
       insert into listings (

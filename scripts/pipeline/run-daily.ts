@@ -1,7 +1,7 @@
 /**
  * Batch diário — orquestrador sequencial do pipeline completo:
- *   ingest NDJSON → match-models → pt-market → soft-delete de desaparecidos
- *   → compute-costs → flag-opportunities
+ *   ingest NDJSON → precio al contado (ES) → match-models → pt-market →
+ *   soft-delete de desaparecidos → compute-costs → flag-opportunities
  *   pnpm pipeline:daily [--dir tools/collector/out] [--stale-days 14]
  * Cada passo loga o seu sumário; no fim sai o painel de saúde do matching.
  */
@@ -26,7 +26,7 @@ async function main() {
   const dir = arg("--dir", "tools/collector/out");
   const staleDays = Number(arg("--stale-days", "14"));
 
-  console.log("── 1/6 ingest ──");
+  console.log("── 1/7 ingest ──");
   if (existsSync(dir)) {
     // processo separado: o ingest gere a própria ligação/saída
     execFileSync("pnpm", ["exec", "tsx", "scripts/pipeline/ingest.ts", "--dir", dir], {
@@ -42,14 +42,18 @@ async function main() {
   const { collectPtObservations } = await import("./pt-market");
   const { computeCosts } = await import("./compute-costs");
   const { flagOpportunities } = await import("./flag-opportunities");
+  const { enrichEs } = await import("./enrich-es");
 
-  console.log("── 2/6 match-models ──");
+  console.log("── 2/7 precio al contado (ES) ──");
+  await enrichEs();
+
+  console.log("── 3/7 match-models ──");
   const match = await matchModels();
 
-  console.log("── 3/6 pt-market ──");
+  console.log("── 4/7 pt-market ──");
   await collectPtObservations();
 
-  console.log("── 4/6 desaparecidos ──");
+  console.log("── 5/7 desaparecidos ──");
   const stale = (await db.execute(sql`
     update listings set deleted_at = now()
     where deleted_at is null
@@ -58,10 +62,10 @@ async function main() {
   `)) as unknown as { id: string }[];
   console.log(`soft-delete: ${stale.length} anúncios sem sinal há ${staleDays}+ dias`);
 
-  console.log("── 5/6 compute-costs ──");
+  console.log("── 6/7 compute-costs ──");
   const costs = await computeCosts();
 
-  console.log("── 6/6 flag-opportunities ──");
+  console.log("── 7/7 flag-opportunities ──");
   const opps = await flagOpportunities();
 
   // Painel de saúde do pipeline (métricas de qualidade do matching)
