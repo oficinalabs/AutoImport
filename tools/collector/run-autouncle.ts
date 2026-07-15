@@ -1,19 +1,41 @@
-// run-autouncle.ts — CLI da recolha batch do autouncle.pt (meta-motor/agregador, versão PT).
+// run-autouncle.ts — CLI da recolha batch do AutoUncle (meta-motor/agregador, MULTI-PAÍS).
 //
 // Uso:
-//   node run-autouncle.ts --max-pages 3                 # amostra (3 páginas × 25 = 75)
-//   node run-autouncle.ts --brand Renault --max-pages 5 # só uma marca (slug canónico do path)
-//   node run-autouncle.ts --full --max-pages 100        # cobertura fatiada por marca (config API)
-//   node run-autouncle.ts --resume
+//   node run-autouncle.ts --max-pages 3                          # amostra PT (default)
+//   node run-autouncle.ts --market dk --max-pages 3              # amostra Dinamarca
+//   node run-autouncle.ts --market pt,fr,nl --max-pages 5        # vários mercados em sequência
+//   node run-autouncle.ts --market all --full --max-pages 100    # cobertura total, todos os domínios
+//   node run-autouncle.ts --market all --resume
 //
-// Flags: --max-pages <n> (default 5; cada página = 25 anúncios), --brand <Marca> (faceta de path),
-//        --full (fatia por todas as marcas), --resume, --rate <ms>, --out <dir>.
+// Flags: --market <code|csv|all> (default pt; códigos em MARKETS — pt,de,dk,se,it,at,es,pl,fi,ro,
+//        ch,uk,nl,fr), --max-pages <n> (default 5; cada página = 25 anúncios), --brand <Marca>
+//        (faceta de path), --full (fatia por todas as marcas), --resume, --rate <ms>, --out <dir>.
+// Saída: NDJSON/checkpoint POR MERCADO (`autouncle-{code}-*`) + um summary agregado.
 
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HttpClient } from './autouncle/http.ts';
-import { crawl } from './autouncle/crawl.ts';
+import { HttpClient, MARKETS, resolveMarket, type Market } from './autouncle/http.ts';
+import { crawl, type MarketResult } from './autouncle/crawl.ts';
 import { defineRunCli, topN } from './lib/cli.ts';
+
+// '--market pt,dk' / 'all' / omisso (pt) → Market[].
+function parseMarkets(spec: unknown): Market[] {
+  const s = spec ? String(spec) : 'pt';
+  if (s.toLowerCase() === 'all') return Object.values(MARKETS);
+  return s.split(',').map(resolveMarket);
+}
+
+// resumo de um mercado para o summary.json (mesma forma do summary single-market antigo).
+function marketSummary(m: MarketResult) {
+  const avgPrice = m.stats.price.count ? Math.round(m.stats.price.sum / m.stats.price.count) : null;
+  return {
+    total: m.stats.records, pages: m.stats.pages, queries: m.queries, minDaysOnMarket: m.stats.minDaysOnMarket,
+    price: { min: m.stats.price.min, max: m.stats.price.max, avg: avgPrice },
+    byCountry: m.stats.byCountry, bySource: m.stats.bySource, byMake: m.stats.byMake,
+    byFuel: m.stats.byFuel, byGearbox: m.stats.byGearbox, byRating: m.stats.byRating,
+    nbResults: m.stats.nbResults, ndjson: m.ndjsonPath,
+  };
+}
 
 await defineRunCli({
   dir: dirname(fileURLToPath(import.meta.url)),
@@ -22,37 +44,39 @@ await defineRunCli({
   crawl,
   banner: (args) => {
     const brand = args.brand ? String(args.brand) : null;
-    return `=== autouncle.pt | max-pages: ${Number(args['max-pages']) || 5} (×25)`
+    const markets = parseMarkets(args.market).map((m) => m.code).join(',');
+    return `=== autouncle [${markets}] | max-pages: ${Number(args['max-pages']) || 5} (×25)`
       + `${brand ? ` | marca ${brand}` : ''}${args.full ? ' | MODO COMPLETO (fatiado por marca)' : ''} ===\n`;
   },
   buildConfig: (args, { http, outDir }) => ({
     http,
+    markets: parseMarkets(args.market),
     full: Boolean(args.full),
     brand: args.brand ? String(args.brand) : null,
     maxPages: Number(args['max-pages']) || 5,
     outDir,
     resume: Boolean(args.resume),
   }),
-  summarize: ({ ndjsonPath, stats, queries }, { durationS }) => {
-    const avgPrice = stats.price.count ? Math.round(stats.price.sum / stats.price.count) : null;
-    return {
-      generatedAt: new Date().toISOString(), durationS,
-      total: stats.records, pages: stats.pages, queries, minDaysOnMarket: stats.minDaysOnMarket,
-      price: { min: stats.price.min, max: stats.price.max, avg: avgPrice },
-      byCountry: stats.byCountry, bySource: stats.bySource, byMake: stats.byMake,
-      byFuel: stats.byFuel, byGearbox: stats.byGearbox, byRating: stats.byRating,
-      nbResults: stats.nbResults, ndjson: ndjsonPath,
-    };
-  },
-  report: ({ ndjsonPath, stats, queries }, { durationS, summaryPath }) => {
-    const avgPrice = stats.price.count ? Math.round(stats.price.sum / stats.price.count) : null;
-    console.log(`\n✓ ${stats.records} anúncios | ${stats.pages} páginas | ${queries} query(s) | ${durationS}s`);
-    console.log(`preço €: min ${stats.price.min} · máx ${stats.price.max} · média ${avgPrice}`);
-    console.log(`top fontes: ${topN(stats.bySource)}`);
-    console.log(`top marcas: ${topN(stats.byMake)}`);
-    console.log(`combustível: ${topN(stats.byFuel)}`);
-    console.log(`AutoScore (1–5): ${topN(stats.byRating)}`);
-    console.log(`\nNDJSON → ${ndjsonPath}`);
+  summarize: ({ markets }, { durationS }) => ({
+    generatedAt: new Date().toISOString(), durationS,
+    total: markets.reduce((n, m) => n + m.stats.records, 0),
+    pages: markets.reduce((n, m) => n + m.stats.pages, 0),
+    markets: Object.fromEntries(markets.map((m) => [m.code, marketSummary(m)])),
+  }),
+  report: ({ markets }, { durationS, summaryPath }) => {
+    let total = 0;
+    for (const m of markets) {
+      total += m.stats.records;
+      const avgPrice = m.stats.price.count ? Math.round(m.stats.price.sum / m.stats.price.count) : null;
+      if (!m.stats.records) { console.log(`\n✗ ${m.sourceSite}: 0 anúncios (inacessível? ver avisos acima)`); continue; }
+      console.log(`\n✓ ${m.sourceSite}: ${m.stats.records} anúncios | ${m.stats.pages} páginas | ${m.queries} query(s)`);
+      console.log(`  preço: min ${m.stats.price.min} · máx ${m.stats.price.max} · média ${avgPrice}`);
+      console.log(`  top fontes: ${topN(m.stats.bySource, 5)}`);
+      console.log(`  top marcas: ${topN(m.stats.byMake, 5)}`);
+      console.log(`  AutoScore (1–5): ${topN(m.stats.byRating, 5)}`);
+      console.log(`  NDJSON → ${m.ndjsonPath}`);
+    }
+    console.log(`\nΣ ${total} anúncios em ${markets.length} mercado(s) | ${durationS}s`);
     console.log(`resumo → ${summaryPath}`);
   },
 }).catch((e) => { console.error(e); process.exit(1); });

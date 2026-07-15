@@ -743,37 +743,48 @@ node watch-encontracarros.ts --interval 60 --pages 2     # contínuo (recência 
 Saída: `encontracarros-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)).
 Extras: `source_url`, `dealer`, `condition`, `national`, `seats`, `listed_at`. postalCode não exposto.
 
-## autouncle.pt (vigésimo coletor — agregador PT)
+## autouncle (vigésimo coletor — agregador MULTI-PAÍS)
 
-Meta-motor/agregador dinamarquês **AutoUncle**, versão Portugal (~99k listagens PT de ~9 sites-fonte;
-o "93 sites" do título é o total global), com avaliação de preço própria (**AutoScore** 1–5).
-Segue o **molde theparking** (agregador). Investigação: [`../../research/autouncle-investigacao.md`](../../research/autouncle-investigacao.md).
+Meta-motor/agregador dinamarquês **AutoUncle**, com avaliação de preço própria (**AutoScore** 1–5).
+**14 domínios nacionais** (autouncle.pt/.de/.dk/.se/.it/.at/.es/.pl/.fi/.ro/.ch/.co.uk/.nl/.fr),
+todos a MESMA SPA Next.js com o mesmo molde SSR — a tabela `MARKETS` em `autouncle/http.ts` captura
+o que varia (domínio, locale, path do SRP, moeda, rótulo de país). Segue o **molde theparking**
+(agregador). Investigação: [`../../research/autouncle-investigacao.md`](../../research/autouncle-investigacao.md).
 
-- **Fonte = SSR de `/pt/carros-usados`, dois blocos juntos pelo carId**: (1) **JSON-LD**
-  (`@graph`→`ItemList.itemListElement[25].item` = `Product`+`Vehicle` rico + `numberOfItems` = total)
-  para o catálogo; (2) **payload RSC** (`self.__next_f`, ~250 chunks) para o que falta a um agregador —
-  a **fonte de origem** (`sourceName`), o **AutoScore** (`auRating`), a imagem real, a variante e os
-  dias em stock. `source`=site/stand de origem; `source_site='autouncle.pt'`; `country='PORTUGAL'`.
-- **Anti-bot Cloudflare passivo** (200 sem challenge com UA de browser). HTTP puro; rate-limit + retry.
+- **Fonte = SSR do SRP do mercado (ex. `/pt/carros-usados`, `/da/brugte-biler`), dois blocos juntos
+  pelo carId**: (1) **JSON-LD** (`@graph`→`ItemList.itemListElement[25].item` = `Product`+`Vehicle`
+  rico + `numberOfItems` = total) para o catálogo; (2) **payload RSC** (`self.__next_f`, ~250 chunks)
+  para o que falta a um agregador — a **fonte de origem** (`sourceName`), o **AutoScore** (`auRating`),
+  a imagem real, a variante e os dias em stock. `source`=site/stand de origem;
+  `source_site='autouncle.{tld}'`; `country`/`currency` do mercado.
+- **Unidades por mercado**: `enginePower` vem em HP (PT) ou kW (DK…) como valor principal — o schema
+  lê `unitText`/`unitCode` para não trocar `power_hp`/`power_kw`; `fuel_consumption` preserva a
+  unidade do site (`L/100km`, `Km/l`, `L/10mil`, `kWh/100 km`).
+- **Anti-bot varia por domínio** (sondado 2026-07-15): passivo em 10 (pt,dk,se,at,pl,fi,ro,ch,nl,fr
+  — ~1,6M anúncios; HTTP puro, rate-limit + retry) e **ATIVO em 4 (de,it,es,uk)** — Cloudflare
+  managed challenge, 403; ficam na tabela e o crawl salta-os gracioso (falha isolada por mercado).
 - **Paginação `?page=N`** (25/pág, teto ~pág 100). **⚠️ robots proíbe filtros/ordenação por query
-  `s[...]=`** → cobertura **só por facetas de PATH** (`/pt/carros-usados/{Marca}`) + `?page`. A saída
-  para a origem (`/pt/link-externo/`) é proibida → só se LÊ o slug, nunca se pede. A **config API**
-  (`/api/v4/car_search_form/config`, robots-permitida) semeia as marcas do `--full`.
+  `s[...]=`** (molde igual nos 14 domínios) → cobertura **só por facetas de PATH**
+  (`{srp}/{Marca}`) + `?page`. A saída para a origem (`outgoingPath`, slug localizado por país) é
+  proibida → só se LÊ o slug, nunca se pede. A **config API** (`/api/v4/car_search_form/config`,
+  igual nos 14) semeia as marcas do `--full`.
 
 ```bash
-node run-autouncle.ts --max-pages 3                    # amostra
-node run-autouncle.ts --brand Renault --max-pages 5    # só uma marca (slug canónico do path)
-node run-autouncle.ts --full --max-pages 100           # cobertura fatiada por marca (config API)
-node run-autouncle.ts --resume
-node watch-autouncle.ts --interval 60 --pages 2        # contínuo
+node run-autouncle.ts --max-pages 3                          # amostra PT (default)
+node run-autouncle.ts --market dk --max-pages 3              # amostra Dinamarca
+node run-autouncle.ts --market pt,fr,nl --brand Renault      # vários mercados, só uma marca
+node run-autouncle.ts --market all --full --max-pages 100    # cobertura total, todos os domínios
+node run-autouncle.ts --market all --resume
+node watch-autouncle.ts --market dk --interval 60 --pages 2  # contínuo (um mercado por processo)
 ```
 
-Saída: `autouncle-*` (batch/watch). Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O
-`--full` fatia por marca; as ~14 marcas densas (Peugeot/Renault/Mercedes/BMW…) saturam o teto de
-paginação (~2.500) — corte fino por modelo é frágil (slug do site ≠ config) e ficou por fazer.
-**Recência**: sem sort por data (robots) → proxy `days_on_market`. Extras: `price_rating` (AutoScore),
-`estimated_price` (preço-justo AutoUncle), `you_save`, `days_on_market`, `seller_type`,
-`source_slug`/`source_external_id`, `power_hp`/`power_kw`, `co2`, `model_generation`.
+Saída: **por mercado** — `autouncle-{code}-*` (NDJSON/checkpoint/state) + um `autouncle-summary.json`
+agregado. Pronto exceto o upsert na DB ([`lib/sink.mjs`](lib/sink.mjs)). O `--full` fatia por marca;
+as marcas densas (>2.500 por mercado) saturam o teto de paginação — corte fino por modelo é frágil
+(slug do site ≠ config) e ficou por fazer. **Recência**: sem sort por data (robots) → proxy
+`days_on_market`. Extras: `price_rating` (AutoScore), `estimated_price` (preço-justo AutoUncle),
+`you_save`, `days_on_market`, `seller_type`, `source_slug`/`source_external_id`,
+`power_hp`/`power_kw`, `co2`, `model_generation`.
 
 ## oparking.pt (investigado — BLOQUEADO, sem coletor)
 
@@ -1039,7 +1050,7 @@ autosapo/                 card HTML SSR ASP.NET (SAPO PT ~24k; recência via Obj
   http · parse · schema · crawl · watch
 encontracarros/           sitemap + detalhe SSR (agregador PT ~50k; JSON-LD + carListing RSC)
   http · sitemap · parse · schema · crawl · watch
-autouncle/                JSON-LD ItemList + RSC __next_f (agregador PT ~99k; molde theparking)
+autouncle/                JSON-LD ItemList + RSC __next_f (agregador multi-país, 14 domínios ~1,6M acessíveis; molde theparking)
   http · parse · schema · crawl · watch
 santogal/                 card HTML SSR Umbraco (rede stands PT ~1,5k; sem JSON-LD)
   http · parse · schema · crawl · watch

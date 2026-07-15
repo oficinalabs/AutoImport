@@ -1,26 +1,31 @@
-// autouncle/crawl.ts — recolha batch do autouncle.pt: paginação `?page=N`, dedupe, checkpoint,
-// NDJSON. Mesma FORMA do autoboerse (fatiamento por marca, dedupe global, checkpoint/resume, stats).
+// autouncle/crawl.ts — recolha batch do AutoUncle MULTI-PAÍS: um passo por mercado (domínio
+// nacional), cada um com paginação `?page=N`, dedupe, checkpoint e NDJSON PRÓPRIOS
+// (`autouncle-{code}-*`). Mesma FORMA do autoboerse (fatiamento por marca, dedupe global,
+// checkpoint/resume, stats), multiplicada pelos mercados pedidos.
 //
-// COBERTURA (--full): o meta-motor indexa ~99 mil anúncios PT, mas a paginação satura por volta da
-// página ~100 (25/pág → ~2.500 acessíveis por query; páginas mais fundas dão 404). E — crítico — o
-// robots proíbe os SRP com filtros/ordenação por query (`s[...]=`), pelo que NÃO podemos fatiar por
-// query. Fatiamos então por MARCA via PATH SEO canónico (`/pt/carros-usados/{Marca}`), com a lista de
-// marcas (e contagens) vinda da config API `/api/v4/car_search_form/config` (robots-permitida). Marcas
-// abaixo do teto ficam 100%; as ~14 densas (Peugeot/Renault/Mercedes/BMW…, >2.500) ficam pela primeira
-// fatia de ~2.500 — limitação honesta do teto de paginação (o slug de modelo do site NÃO mapeia 1:1
-// com o config, logo o sub-corte por modelo seria frágil). Ver research/autouncle-investigacao.md.
+// COBERTURA (--full, igual em todos os domínios): a paginação satura por volta da página ~100
+// (25/pág → ~2.500 acessíveis por query; páginas mais fundas dão 404). E — crítico — o robots
+// proíbe os SRP com filtros/ordenação por query (`s[...]=`), pelo que NÃO podemos fatiar por
+// query. Fatiamos então por MARCA via PATH SEO canónico (`{listPath}/{Marca}`), com a lista de
+// marcas (e contagens) vinda da config API `/api/v4/car_search_form/config` (igual nos 14
+// domínios). Marcas abaixo do teto ficam 100%; as densas (>2.500) ficam pela primeira fatia —
+// limitação honesta do teto de paginação. Ver research/autouncle-investigacao.md.
 //   • default : uma query (marca opcional via --brand), até `maxPages` páginas (amostra).
 //   • --full  : uma query por marca (semeadas do config), cada uma até `maxPages`/teto.
+//
+// ISOLAMENTO POR MERCADO: um domínio inacessível (4 estão atrás de Cloudflare ativo — de/it/es/uk,
+// ver http.ts) esgota os retries na 1ª página e o loop passa ao mercado seguinte; os restantes
+// não são afetados.
 
 import { parseListingPage, listingUrl, parseBrands, recordId } from './parse.ts';
-import { BASE, CONFIG_PATH } from './http.ts';
+import { marketBase, marketSourceSite, CONFIG_PATH, type Market } from './http.ts';
 import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { AutouncleRecord } from './schema.ts';
 
 const CAP_PAGINAS = 120;   // salvaguarda dura (o site esgota antes, ~100 → 404 → página vazia → break)
 
-// Estatísticas acumuladas ao longo do crawl.
+// Estatísticas acumuladas ao longo do crawl (por mercado).
 interface Stats {
   records: number;
   pages: number;
@@ -37,11 +42,21 @@ interface Stats {
 
 interface CrawlConfig {
   http: HttpClient;
+  markets: Market[];
   full?: boolean;
   brand?: string | null;
   maxPages?: number;
   outDir: string;
   resume?: boolean;
+}
+
+// Resultado de um mercado (o run-*.ts agrega e relata).
+export interface MarketResult {
+  code: string;
+  sourceSite: string;
+  ndjsonPath: string;
+  stats: Stats;
+  queries: number;
 }
 
 function statsVazias(): Stats {
@@ -64,11 +79,13 @@ function atualizaStats(stats: Stats, r: AutouncleRecord) {
   if (r.price != null && r.price > 0) { const p = stats.price; p.count++; p.sum += r.price; p.min = p.min === null ? r.price : Math.min(p.min, r.price); p.max = p.max === null ? r.price : Math.max(p.max, r.price); }
 }
 
-// config: { http, full?, brand?, maxPages, outDir, resume? }
-export async function crawl(config: CrawlConfig) {
-  const { http, full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
+// Um mercado: plano de queries (marca única ou --full via config API) → runPagedCrawl.
+async function crawlMarket(market: Market, config: CrawlConfig): Promise<MarketResult> {
+  const { full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
+  const http = config.http.forMarket(market);
   const writer = createCrawlWriter<AutouncleRecord, Stats>({
-    outDir, source: 'autouncle', resume, recordId, newStats: statsVazias, updateStats: atualizaStats,
+    outDir, source: `autouncle-${market.code}`, resume, recordId,
+    newStats: statsVazias, updateStats: atualizaStats,
   });
 
   // --- plano de queries ---
@@ -76,7 +93,7 @@ export async function crawl(config: CrawlConfig) {
   // (marca opcional via --brand).
   let queries: { label: string; brand: string | null; expected?: number }[];
   if (full) {
-    const cfg = await http.fetchJson(BASE + CONFIG_PATH);
+    const cfg = await http.fetchJson(marketBase(market) + CONFIG_PATH);
     const brands = parseBrands(cfg);
     queries = brands.map((b) => ({ label: b.brand, brand: b.brand, expected: b.count }));
     console.log(`--full: ${queries.length} marcas a percorrer (top: ${queries.slice(0, 5).map((q) => `${q.label}(${q.expected})`).join(', ')}…)`);
@@ -89,16 +106,26 @@ export async function crawl(config: CrawlConfig) {
   await runPagedCrawl({
     writer, queries, cursor, maxPages, cap: CAP_PAGINAS,
     fetchPage: async (q, page, collectedAt) => {
-      const html = await http.fetchText(listingUrl({ brand: q.brand, page }), { validate: (t) => t.includes('"@type":"ItemList"') });
-      if (!html) return null;                              // falha/404 (teto) → passa à próxima query
-      const { listings, total } = parseListingPage(html, { collectedAt, forcedMake: q.brand || null });
+      const html = await http.fetchText(listingUrl({ market, brand: q.brand, page }), { validate: (t) => t.includes('"@type":"ItemList"') });
+      if (!html) return null;                              // falha/404 (teto/anti-bot) → passa à próxima query
+      const { listings, total } = parseListingPage(html, { collectedAt, forcedMake: q.brand || null, market });
       if (page === 1) writer.stats.nbResults[q.label] = total;
       return { listings };
     },
     logLine: (q, page, novos, stats) =>
-      `  ${q.label} p${page}: +${novos} novos (total ${stats.records}${q.expected ? `/${q.expected}` : ''})`,
+      `  [${market.code}] ${q.label} p${page}: +${novos} novos (total ${stats.records}${q.expected ? `/${q.expected}` : ''})`,
     stop: ({ novos, page }) => novos === 0 && page > 1,   // página sem carros novos (repetição) → fim
   });
 
-  return { ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
+  return { code: market.code, sourceSite: marketSourceSite(market), ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
+}
+
+// config: { http, markets[], full?, brand?, maxPages, outDir, resume? }
+export async function crawl(config: CrawlConfig): Promise<{ markets: MarketResult[] }> {
+  const results: MarketResult[] = [];
+  for (const market of config.markets) {
+    console.log(`\n— mercado ${market.code} (${marketSourceSite(market)}) —`);
+    results.push(await crawlMarket(market, config));
+  }
+  return { markets: results };
 }
