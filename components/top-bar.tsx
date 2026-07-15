@@ -1,5 +1,6 @@
 "use client";
 
+import { NavLink } from "@/components/nav-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut } from "@/lib/auth-client";
 import { COUNTRY_LIST } from "@/lib/countries";
@@ -47,26 +48,15 @@ export function TopBar() {
 
         {/* Nav */}
         <nav className="flex flex-1 items-center gap-0.5 overflow-x-auto">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={cn(
-                  "relative flex items-center gap-1.5 whitespace-nowrap rounded-[6px] px-2.5 py-1.5 text-sm font-medium transition-colors",
-                  active ? "text-ink" : "text-ink-soft hover:text-ink",
-                )}
-              >
-                <Icon className="size-4" />
-                <span className="hidden md:inline">{label}</span>
-                {active && (
-                  <span className="absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-amber" />
-                )}
-              </Link>
-            );
-          })}
+          {NAV.map(({ href, label, icon }) => (
+            <NavLink
+              key={href}
+              href={href}
+              label={label}
+              icon={icon}
+              active={isActive(pathname, href)}
+            />
+          ))}
         </nav>
 
         {/* Direita */}

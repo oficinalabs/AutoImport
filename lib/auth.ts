@@ -175,7 +175,13 @@ export const auth = betterAuth({
     useSecureCookies: process.env.NODE_ENV === "production",
   },
 
-  trustedOrigins: [process.env.BETTER_AUTH_URL ?? "http://localhost:3000"],
+  // Em produção só a origem oficial. Em desenvolvimento aceitamos qualquer
+  // porta local — senão correr o dev noutra porta dá um 403 INVALID_ORIGIN
+  // difícil de diagnosticar.
+  trustedOrigins:
+    process.env.NODE_ENV === "production"
+      ? [process.env.BETTER_AUTH_URL].filter((o): o is string => Boolean(o))
+      : ["http://localhost:*", "http://127.0.0.1:*"],
 
   plugins: [organization(), nextCookies()],
 });

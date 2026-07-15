@@ -95,8 +95,9 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
 
     const { error } = await signIn.email({ email, password: String(fd.get("password")) });
     if (error) {
-      // Conta por verificar: oferecemos reenviar em vez de um erro seco.
-      if (error.status === 403 || error.code === "EMAIL_NOT_VERIFIED") {
+      // Só o código conta: outros 403 (ex.: INVALID_ORIGIN) não são falta de
+      // verificação e não podem mostrar "confirma o email".
+      if (error.code === "EMAIL_NOT_VERIFIED") {
         setUnverified(email);
       } else {
         setError(messageFor(error));
@@ -141,7 +142,7 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
             Esqueceste a password?
           </Link>
         </div>
-        <Button type="submit" variant="accent" size="lg" disabled={loading}>
+        <Button type="submit" variant="accent" size="lg" loading={loading}>
           {loading ? "A entrar…" : "Entrar"}
         </Button>
       </form>
@@ -221,7 +222,7 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
           />
           <PasswordRequirements password={password} />
         </div>
-        <Button type="submit" variant="accent" size="lg" disabled={loading || !passwordOk}>
+        <Button type="submit" variant="accent" size="lg" loading={loading} disabled={!passwordOk}>
           {loading ? "A criar conta…" : "Criar conta — 1.º mês grátis"}
         </Button>
       </form>
@@ -290,7 +291,7 @@ function ResendVerification({ email, onBack }: { email: string; onBack: () => vo
           conta.
         </span>
       </div>
-      <Button variant="accent" size="lg" onClick={resend} disabled={sending || resent}>
+      <Button variant="accent" size="lg" onClick={resend} loading={sending} disabled={resent}>
         {resent ? "Email reenviado" : sending ? "A reenviar…" : "Reenviar email de confirmação"}
       </Button>
       <button
@@ -311,7 +312,7 @@ function GoogleButton({ label }: { label: string }) {
       type="button"
       variant="outline"
       size="lg"
-      disabled={loading}
+      loading={loading}
       onClick={() => {
         setLoading(true);
         signIn.social({ provider: "google", callbackURL: "/painel" });
@@ -393,7 +394,7 @@ export function ForgotPasswordForm() {
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {error && <FormError message={error} />}
       <Field label="Email" id="email" type="email" placeholder="tu@stand.pt" autoComplete="email" />
-      <Button type="submit" variant="accent" size="lg" disabled={loading}>
+      <Button type="submit" variant="accent" size="lg" loading={loading}>
         {loading ? "A enviar…" : "Enviar link de recuperação"}
       </Button>
     </form>
@@ -471,7 +472,7 @@ export function ResetPasswordForm({ token }: { token?: string }) {
         placeholder="Repete a password"
         autoComplete="new-password"
       />
-      <Button type="submit" variant="accent" size="lg" disabled={loading}>
+      <Button type="submit" variant="accent" size="lg" loading={loading}>
         {loading ? "A guardar…" : "Guardar nova password"}
       </Button>
     </form>
