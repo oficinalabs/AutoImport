@@ -76,6 +76,12 @@ export async function computeCosts() {
       semDados++;
       continue;
     }
+    // Potência obrigatória (regra do produto: matching só com o mesmo
+    // modelo/designação — a potência é a assinatura que o garante).
+    if (l.power_hp == null) {
+      semDados++;
+      continue;
+    }
 
     const pt = await estimatePtPrice(db, l.model_id, l.year, kmBand(l.km), l.power_hp);
     if (!pt) {

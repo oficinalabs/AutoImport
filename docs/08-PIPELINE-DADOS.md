@@ -23,7 +23,7 @@ pnpm dev            # a UI passa a mostrar dados reais (sem DATABASE_URL → moc
 | 2 | `match-models.ts` | normalização determinística (`lib/engine/normalize-vehicle.ts`): `norm_key = make\|model\|fuel` → `vehicle_models`; a variante desambigua HEV vs PHEV ("Plug-in" muitas vezes só aparece aí); loga taxa de match + top não-mapeados (alimentar o dicionário). GPL/GN ficam de fora por decisão. |
 | 3 | `pt-market.ts` | 1 observação de preço/dia por anúncio PT ativo → `pt_price_observations`. |
 | 4 | desaparecidos | soft-delete de anúncios sem sinal há 14+ dias (`--stale-days`). |
-| 5 | `compute-costs.ts` | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5; fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km — porque grupos como Caetano/CarPlus cross-listam o mesmo stock) → `import_cost_estimates` com veredito (`lib/verdict.ts`). Sem CO₂/cilindrada ou sem amostra → **sem estimativa** (nunca adivinhar). |
+| 5 | `compute-costs.ts` | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos; fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). |
 | 6 | `flag-opportunities.ts` | veredito `compensa` + confiança `normal` → `opportunities`. |
 
 ## Tabelas fiscais (ISV/IUC)

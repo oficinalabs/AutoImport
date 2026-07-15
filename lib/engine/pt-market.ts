@@ -34,13 +34,15 @@ async function sample(
   spread: number,
   powerHp?: number | null,
 ): Promise<{ median: number; n: number; distinctPrices: number; distinctSellers: number } | null> {
-  // Filtro de potência (auditoria: mistura_trim): um GTI/R (245-320cv) não é
-  // comparável com um Golf 1.5 150cv. Tolerância = ±25% OU ±30cv, o que for
-  // mais largo; observações PT sem power_hp são mantidas (não excluir por
-  // falta de dado).
+  // Matching ESTRITO por designação (regra do produto: um veículo só compara
+  // com o mesmo modelo): a potência é a assinatura objetiva da designação
+  // (840i 333cv ≠ M850i 530cv; xDrive40 326 ≠ xDrive45 408; Golf 1.5 150 ≠
+  // GTI 245). Tolerância apertada ±10% OU ±15cv (facelifts/afinações da MESMA
+  // designação) e observações SEM potência conhecida ficam FORA — sem dado
+  // não há prova de que é o mesmo modelo (nunca adivinhar).
   const powerFilter =
     powerHp != null
-      ? sql`and (l.power_hp is null or abs(l.power_hp - ${powerHp}) <= ${Math.max(Math.round(powerHp * 0.25), 30)})`
+      ? sql`and l.power_hp is not null and abs(l.power_hp - ${powerHp}) <= ${Math.max(Math.round(powerHp * 0.1), 15)}`
       : sql``;
   // Dedupe por CARRO físico, não por anúncio: grupos como Caetano/CarPlus
   // listam o mesmo stock (mesmo VIN) em vários sites — contar 2× inflaciona

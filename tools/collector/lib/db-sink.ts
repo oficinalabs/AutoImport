@@ -80,11 +80,37 @@ function firstRegistrationDate(v: unknown): string | null {
   return null;
 }
 
+// Potência em texto livre (variante/título) — a potência é a assinatura
+// objetiva da designação do modelo (840i=333cv ≠ M850i=530cv) e o matching
+// exige-a; muitas fontes só a têm no texto:
+//   "145cv" / "333 CH" / "190 PS" / "100 kW" / theparking "3.0 333 XDRIVE"
+export function parsePowerFromText(text: string): number | null {
+  const cv = /(\d{2,3})\s?(?:cv|ch|hp|ps)\b/i.exec(text);
+  if (cv) {
+    const n = Number(cv[1]);
+    if (n >= 40 && n <= 1000) return n;
+  }
+  const kw = /(\d{2,3})\s?kw\b/i.exec(text);
+  if (kw) {
+    const n = Math.round(Number(kw[1]) * 1.35962);
+    if (n >= 40 && n <= 1000) return n;
+  }
+  // theparking: "840I 3.0 333 XDRIVE" — número imediatamente após a cilindrada
+  const afterCc = /\b\d[.,]\d\s+(\d{2,3})\b/.exec(text);
+  if (afterCc) {
+    const n = Number(afterCc[1]);
+    if (n >= 60 && n <= 700) return n;
+  }
+  return null;
+}
+
 function powerHp(record: Record<string, unknown>): number | null {
   const hp = int(record.power_hp ?? record.power_cv ?? record.power);
   if (hp != null && hp >= 20 && hp <= 2000) return hp;
   const kw = int(record.power_kw);
-  return kw != null && kw >= 15 && kw <= 1500 ? Math.round(kw * 1.35962) : null;
+  if (kw != null && kw >= 15 && kw <= 1500) return Math.round(kw * 1.35962);
+  const text = [record.variant, record.model, record.engine].filter(Boolean).join(' ');
+  return text ? parsePowerFromText(text) : null;
 }
 
 function sellerType(record: Record<string, unknown>): string | null {
