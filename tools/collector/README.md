@@ -1135,13 +1135,17 @@ node run-ultimatespecs.ts --make bmw --deep
 node run-ultimatespecs.ts --deep --fast
 node run-ultimatespecs.ts --deep --fast              # relançar = retomar (resume via BD)
 
+# SINCRONIZAR novidades (mensal): modelos novos do sitemap + versões novas em
+# páginas já recolhidas (revisita-as; só o que falta gasta pedidos deep) — ~40 min
+node run-ultimatespecs.ts --refresh --deep --fast
+
 # modo local (sem BD): NDJSON + checkpoint, retomar com --resume
 node run-ultimatespecs.ts --ndjson --deep --resume
 ```
 
-Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--max-models <n>`,
-`--ndjson`, `--fast`, `--concurrency <n>`, `--rate <ms>`, `--resume` (só NDJSON),
-`--out <dir>` (só NDJSON).
+Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--refresh`,
+`--max-models <n>`, `--ndjson`, `--fast`, `--concurrency <n>`, `--rate <ms>`,
+`--resume` (só NDJSON), `--out <dir>` (só NDJSON).
 
 ### Ritmo — Crawl-delay 30 s por omissão; `--fast` é exceção deliberada
 

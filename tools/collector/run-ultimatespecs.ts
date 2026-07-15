@@ -15,12 +15,17 @@
 //   node run-ultimatespecs.ts --since-year 2008 --max-models 200      # fatia diária
 //   node run-ultimatespecs.ts --make bmw --deep                       # + ficha completa (CO₂…)
 //   node run-ultimatespecs.ts --deep --fast                           # CATÁLOGO COMPLETO (~3 h)
+//   node run-ultimatespecs.ts --refresh --deep --fast                 # SINCRONIZAR novidades (~40 min)
 //   node run-ultimatespecs.ts --ndjson --resume                       # modo local + retomar
 //
 // Flags:
 //   --make <marca>     filtro por marca (repetível; ex. --make alfa-romeo).
 //   --since-year <n>   só modelos com ano ≥ n no slug (sem ano no slug passam sempre).
 //   --deep             além do resumo, a ficha completa de cada versão (1 pedido/versão).
+//   --refresh          revisita também páginas de modelo já recolhidas à procura de
+//                      versões novas; só o que ainda não está na BD gasta pedidos deep
+//                      e é inserido. (Modelos novos do sitemap entram sempre, com ou
+//                      sem --refresh.)
 //   --max-models <n>   máximo de páginas de modelo neste run (default: sem limite).
 //   --ndjson           força NDJSON local mesmo com DATABASE_URL.
 //   --resume           retomar do checkpoint (só modo NDJSON; na BD é automático).
@@ -84,6 +89,7 @@ await defineRunCli({
       rateMs,
       fast,
       db,
+      refresh: Boolean(args.refresh),
       outDir,
       resume: Boolean(args.resume),
     };

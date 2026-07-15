@@ -32,6 +32,8 @@ export interface CrawlConfig {
   rateMs: number;              // throttle POR WORKER (em --fast; senão o crawl-delay manda)
   fast: boolean;               // ignorar o crawl-delay do robots (exceção deliberada)
   db: UsDbSink | null;         // destino: BD direta (default) ou null → NDJSON local
+  refresh: boolean;            // revisitar páginas de modelo JÁ feitas à procura de versões
+                               // novas (o dedupe por version_id garante que só o novo entra)
   outDir: string;
   resume: boolean;             // só no modo NDJSON (na BD o resume é implícito)
 }
@@ -136,13 +138,16 @@ export async function crawl(config: CrawlConfig) {
     if (sinceYear && ref.modelYear !== null && ref.modelYear < sinceYear) return false;
     return true;
   });
-  const pendentes = alvo.filter((ref) => !doneMids.has(ref.mid));
+  // --refresh: revisitar também as páginas já feitas — o dedupe por version_id
+  // faz com que só as versões NOVAS gastem pedidos deep e entrem na BD.
+  const pendentes = config.refresh ? alvo : alvo.filter((ref) => !doneMids.has(ref.mid));
   const fatia = maxModels ? pendentes.slice(0, maxModels) : pendentes;
 
   console.log(`→ alvo: ${alvo.length}/${inventory.length} páginas de modelo`
-    + ` (${pendentes.length} pendentes${maxModels ? `, ${fatia.length} neste run` : ''})`
+    + ` (${pendentes.length} ${config.refresh ? 'a revisitar' : 'pendentes'}${maxModels ? `, ${fatia.length} neste run` : ''})`
     + `${makes ? ` | marcas: ${makes.join(', ')}` : ''}`
     + `${sinceYear ? ` | ano ≥ ${sinceYear}` : ''}${deep ? ' | DEEP' : ''}`
+    + `${config.refresh ? ' | REFRESH' : ''}`
     + `${fast ? ` | FAST ×${concurrency} @ ${rateMs}ms` : ''}`);
 
   // Unidade de trabalho: 1 página de modelo + (--deep) as páginas das suas versões.
@@ -189,7 +194,10 @@ export async function crawl(config: CrawlConfig) {
     stats.pages++;
     doneMids.add(ref.mid);
     writer?.save([...doneMids]);
-    console.log(`  ${ref.make} ${ref.slug}: +${novosArr.length} versões (total ${stats.records})`);
+    // Em --refresh a maioria das páginas não tem nada de novo — só logar as que têm.
+    if (!config.refresh || novosArr.length > 0) {
+      console.log(`  ${ref.make} ${ref.slug}: +${novosArr.length} versões (total ${stats.records})`);
+    }
   };
 
   if (fast && concurrency > 1) {
