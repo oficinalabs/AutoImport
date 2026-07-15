@@ -1124,18 +1124,28 @@ node run-ultimatespecs.ts --resume
 
 # ficha técnica completa por versão (CO₂ WLTP/NEDC, código do motor, caixa, norma Euro…)
 node run-ultimatespecs.ts --make bmw --deep
+
+# CATÁLOGO COMPLETO em horas — ⚠️ ignora o crawl-delay do robots (ver "Ritmo")
+node run-ultimatespecs.ts --deep --fast
+node run-ultimatespecs.ts --resume --deep --fast     # retomar (idempotente)
 ```
 
 Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--max-models <n>`,
-`--rate <ms>`, `--resume`, `--out <dir>`.
+`--fast`, `--concurrency <n>`, `--rate <ms>`, `--resume`, `--out <dir>`.
 
-### Ritmo — Crawl-delay 30 s (inegociável)
+### Ritmo — Crawl-delay 30 s por omissão; `--fast` é exceção deliberada
 
-O robots.txt permite as páginas de specs mas impõe `Crawl-delay: 30`. O `http.ts` faz
-**clamp**: `--rate` pode subir o intervalo, nunca descer dos 30 000 ms → ~2 880 páginas/dia.
-Catálogo completo ≈ 2,2 dias (só resumos) — daí o checkpoint por página de modelo e os
-filtros por marca/ano para recolhas dirigidas. `--deep` multiplica os pedidos (~10-20
-versões/modelo): usar só em marcas-alvo.
+O robots.txt permite as páginas de specs mas impõe `Crawl-delay: 30`. Por omissão o
+`http.ts` faz **clamp**: `--rate` pode subir o intervalo, nunca descer dos 30 000 ms →
+~2 880 páginas/dia; catálogo completo com `--deep` (~56 000 páginas) ≈ **20 dias**.
+
+`--fast` é a segunda exceção deliberada à norma (a primeira: piscapisca.pt): pool de
+N workers (default 6), cada um com throttle próprio (`--rate` por worker, default
+1 000 ms, piso 500 ms) → ~6 pedidos/s → catálogo completo ≈ **3 h**. Nunca é
+fogo-à-vontade: throttle por worker + retry/backoff do `lib/http.ts` mantêm-se.
+Riscos de quem o liga: viola o crawl-delay pedido pelo site e o Cloudflare pode
+bloquear o IP a meio (o checkpoint + `--resume` retomam sem perder nada; as páginas
+falhadas ficam para o run seguinte). Para recolhas pequenas/dirigidas, ficar no default.
 
 ### Saída (em `out/`, gitignored)
 - `ultimatespecs-<timestamp>.ndjson` — um registo por VERSÃO (ver `ultimatespecs/schema.ts`;

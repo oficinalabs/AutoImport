@@ -2,13 +2,15 @@
 //
 // Ao contrário dos outros coletores (anúncios), recolhe a REFERÊNCIA de versões de modelo
 // (designação, ano, potência, cilindrada, combustível) para alimentar o matching. Ver
-// ultimatespecs/crawl.ts para o desenho e o ritmo (robots Crawl-delay: 30 s — inegociável).
+// ultimatespecs/crawl.ts para o desenho; sobre o ritmo (Crawl-delay 30 s por omissão,
+// exceção --fast) ver a secção do README.
 //
 // Uso:
 //   node run-ultimatespecs.ts --make kia --make hyundai --since-year 2010
 //   node run-ultimatespecs.ts --since-year 2008 --max-models 200      # fatia diária
 //   node run-ultimatespecs.ts --resume                                # retomar
 //   node run-ultimatespecs.ts --make bmw --deep                       # + ficha completa (CO₂…)
+//   node run-ultimatespecs.ts --deep --fast                           # CATÁLOGO COMPLETO (~3 h)
 //
 // Flags:
 //   --make <marca>     filtro por marca (repetível; ex. --make alfa-romeo).
@@ -16,7 +18,10 @@
 //   --deep             além do resumo, a ficha completa de cada versão (1 pedido/versão).
 //   --max-models <n>   máximo de páginas de modelo neste run (default: sem limite).
 //   --resume           retomar do checkpoint.
-//   --rate <ms>        intervalo entre pedidos (mínimo 30000 — clamp ao robots).
+//   --fast             ignora o crawl-delay: pool de workers (exceção deliberada; README).
+//   --concurrency <n>  nº de workers em --fast (default 6).
+//   --rate <ms>        intervalo entre pedidos; sem --fast tem clamp a 30000; com --fast
+//                      é POR WORKER (default 1000, piso 500).
 //   --out <dir>        diretório de saída (default ./out).
 
 import { dirname } from 'node:path';
@@ -54,27 +59,38 @@ await defineRunCli({
   banner: (args) => `=== ultimatespecs.com | catálogo de versões`
     + `${args.make.length ? ` | marcas: ${args.make.join(', ')}` : ' | todas as marcas'}`
     + `${args['since-year'] ? ` | ano ≥ ${args['since-year']}` : ''}`
-    + `${args.deep ? ' | DEEP' : ''} ===\n`,
-  buildConfig: (args, { http, outDir }) => ({
-    http,
-    makes: args.make.length ? args.make : null,
-    sinceYear: Number(args['since-year']) || null,
-    deep: Boolean(args.deep),
-    maxModels: Number(args['max-models']) || 0,
-    outDir,
-    resume: Boolean(args.resume),
-  }),
+    + `${args.deep ? ' | DEEP' : ''}`
+    + `${args.fast ? ` | FAST (crawl-delay do robots IGNORADO — exceção deliberada)` : ''} ===\n`,
+  buildConfig: (args, { http, outDir }) => {
+    const fast = Boolean(args.fast);
+    const rateMs = Number(args.rate) || (fast ? 1000 : CRAWL_DELAY_MS);
+    return {
+      // Em --fast até o inventário (sitemaps) usa um cliente sem crawl-delay.
+      http: fast ? new HttpClient({ ignoreCrawlDelay: true, minDelayMs: rateMs }) : http,
+      makes: args.make.length ? args.make : null,
+      sinceYear: Number(args['since-year']) || null,
+      deep: Boolean(args.deep),
+      maxModels: Number(args['max-models']) || 0,
+      concurrency: fast ? Number(args.concurrency) || 6 : 1,
+      rateMs,
+      fast,
+      outDir,
+      resume: Boolean(args.resume),
+    };
+  },
   summarize: ({ ndjsonPath, stats, alvo }, { durationS, args }) => ({
     generatedAt: new Date().toISOString(),
     makes: args.make.length ? args.make : 'todas',
     sinceYear: Number(args['since-year']) || null,
     deep: Boolean(args.deep),
+    fast: Boolean(args.fast),
     durationS,
     total: stats.records,
     modelPages: stats.pages,
     deepPages: stats.deepPages,
     alvo,
     semPotencia: stats.semPotencia,
+    falhas: stats.falhas,
     byMake: stats.byMake,
     byFuel: stats.byFuel,
     ndjson: ndjsonPath,
@@ -85,5 +101,6 @@ await defineRunCli({
     console.log(`  por combustível: ${topN(stats.byFuel)}`);
     console.log(`  por marca: ${topN(stats.byMake)}`);
     if (stats.semPotencia) console.log(`  ⚠ sem potência: ${stats.semPotencia}`);
+    if (stats.falhas) console.log(`  ⚠ páginas sem resposta: ${stats.falhas} (retomar com --resume)`);
   },
 });
