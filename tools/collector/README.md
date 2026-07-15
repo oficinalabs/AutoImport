@@ -1104,3 +1104,76 @@ Cada site partilha `lib/` (HTTP, normalização, sink/DB) e implementa só o que
   anúncio do theparking (ID), não por veículo físico entre fontes.
 - O `checkpoint.json` guarda o conjunto de IDs vistos; em recolhas `--full` muito
   grandes esse ficheiro cresce (aceitável nesta fase).
+
+## ultimatespecs.com (coletor de CATÁLOGO — referência de versões, não anúncios)
+
+Ao contrário de todos os anteriores, não recolhe carros à venda: recolhe a **ficha de
+versões de modelo** (designação, ano, potência hp/kW, cilindrada, combustível) para
+alimentar o matching do pipeline (designação + potência obrigatória). ~6 300 páginas de
+modelo no sitemap; cada uma lista as versões numa tabela agrupada por combustível.
+
+**Destino**: com `DATABASE_URL` (env ou `.env.local` da raiz) o upsert é **direto na BD**
+(`us_models`/`us_versions`, ver `ultimatespecs/db-sink.ts`) e não fica nada em disco — o
+resume é implícito (deriva da BD: relançar continua onde ficou, sem duplicar). Sem
+`DATABASE_URL`, ou com `--ndjson`, escreve NDJSON + checkpoint local e a carga faz-se
+por replay (`scripts/pipeline/ingest-ultimatespecs.ts`).
+
+### Como usar
+
+```bash
+# marcas dirigidas (o modo normal — recolha para o matching)
+node run-ultimatespecs.ts --make kia --make hyundai --since-year 2010
+
+# fatia diária do catálogo completo (retomável)
+node run-ultimatespecs.ts --since-year 2008 --max-models 200
+node run-ultimatespecs.ts --resume
+
+# ficha técnica completa por versão (CO₂ WLTP/NEDC, código do motor, caixa, norma Euro…)
+node run-ultimatespecs.ts --make bmw --deep
+
+# CATÁLOGO COMPLETO em horas — ⚠️ ignora o crawl-delay do robots (ver "Ritmo")
+node run-ultimatespecs.ts --deep --fast
+node run-ultimatespecs.ts --deep --fast              # relançar = retomar (resume via BD)
+
+# SINCRONIZAR novidades (mensal): modelos novos do sitemap + versões novas em
+# páginas já recolhidas (revisita-as; só o que falta gasta pedidos deep) — ~40 min
+node run-ultimatespecs.ts --refresh --deep --fast
+
+# modo local (sem BD): NDJSON + checkpoint, retomar com --resume
+node run-ultimatespecs.ts --ndjson --deep --resume
+```
+
+Flags: `--make <marca>` (repetível), `--since-year <n>`, `--deep`, `--refresh`,
+`--max-models <n>`, `--ndjson`, `--fast`, `--concurrency <n>`, `--rate <ms>`,
+`--resume` (só NDJSON), `--out <dir>` (só NDJSON).
+
+### Ritmo — Crawl-delay 30 s por omissão; `--fast` é exceção deliberada
+
+O robots.txt permite as páginas de specs mas impõe `Crawl-delay: 30`. Por omissão o
+`http.ts` faz **clamp**: `--rate` pode subir o intervalo, nunca descer dos 30 000 ms →
+~2 880 páginas/dia; catálogo completo com `--deep` (~56 000 páginas) ≈ **20 dias**.
+
+`--fast` é a segunda exceção deliberada à norma (a primeira: piscapisca.pt): pool de
+N workers (default 6), cada um com throttle próprio (`--rate` por worker, default
+1 000 ms, piso 500 ms) → ~6 pedidos/s → catálogo completo ≈ **3 h**. Nunca é
+fogo-à-vontade: throttle por worker + retry/backoff do `lib/http.ts` mantêm-se.
+Riscos de quem o liga: viola o crawl-delay pedido pelo site e o Cloudflare pode
+bloquear o IP a meio (o checkpoint + `--resume` retomam sem perder nada; as páginas
+falhadas ficam para o run seguinte). Para recolhas pequenas/dirigidas, ficar no default.
+
+### Saída
+- **Modo BD (default)**: upsert direto em `us_models`/`us_versions`; em disco fica só o
+  `ultimatespecs-summary.json` (relatório do run, escrito pela casca comum dos CLIs).
+- **Modo NDJSON** (`--ndjson` ou sem `DATABASE_URL`), em `out/` (gitignored):
+  - `ultimatespecs-<timestamp>.ndjson` — um registo por VERSÃO (ver `ultimatespecs/schema.ts`;
+    com `--deep`, campo `deep` com a ficha normalizada + `specs` cruas label→valor).
+  - `ultimatespecs-models.json` — inventário de páginas de modelo (cache dos sitemaps).
+  - `ultimatespecs-summary.json` / `ultimatespecs-checkpoint.json` — como nos restantes.
+
+### Notas
+- A página de modelo já traz o essencial para o matching (nome/ano/potência/cc/combustível)
+  → o default evita as ~50 000 páginas de versão; `--deep` é opt-in.
+- O ano no slug do modelo é o da geração/facelift (ex. `Stonic-2021`); a coluna *Year* da
+  tabela é o ano-modelo da versão. Slugs sem ano (`Q7-3rd-Generation`) passam o filtro
+  `--since-year` de propósito (não dá para saber sem abrir a página).
+- Dedupe global por `versionId` (estável no site); re-runs com `--resume` não duplicam.
