@@ -1,7 +1,8 @@
+import { AccountForm } from "@/components/account-form";
 import { StandForm } from "@/components/stand-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getStand, getStandRole } from "@/lib/data";
+import { getSessionUser, getStand, getStandRole } from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
 import { Mail } from "lucide-react";
 
@@ -12,7 +13,11 @@ const SUB_LABEL = {
 };
 
 export default async function StandPage() {
-  const [stand, role] = await Promise.all([getStand(), getStandRole()]);
+  const [stand, role, utilizador] = await Promise.all([
+    getStand(),
+    getStandRole(),
+    getSessionUser(),
+  ]);
   const sub = SUB_LABEL[stand.subscription.status];
   const isOwner = role === "owner";
 
@@ -22,6 +27,16 @@ export default async function StandPage() {
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="flex flex-col gap-6">
+          {/* A tua conta */}
+          <Card>
+            <CardHeader>
+              <CardTitle>A tua conta</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AccountForm nome={utilizador.name} email={utilizador.email} />
+            </CardContent>
+          </Card>
+
           {/* Dados do stand */}
           <Card>
             <CardContent className="pt-6">

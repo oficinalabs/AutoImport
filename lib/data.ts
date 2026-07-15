@@ -257,6 +257,23 @@ export async function getNotifications(): Promise<Notification[]> {
 }
 
 /**
+ * Nome e email de quem está com sessão iniciada. Sem sessão (dev/preview sobre
+ * mock), devolve o primeiro membro do stand mock — coerente com o getStand().
+ */
+export async function getSessionUser(): Promise<{ name: string; email: string }> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (session?.user) {
+      return { name: session.user.name, email: session.user.email };
+    }
+  } catch {
+    // cai no mock
+  }
+  const fallback = STAND.members[0];
+  return { name: fallback.name, email: fallback.email };
+}
+
+/**
  * Papel do utilizador da sessão no stand ativo ("owner" | "member" | null).
  *
  * Sempre que o `getStand()` cai no mock (sem BD, sem sessão, sem organização)
