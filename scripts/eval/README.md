@@ -32,10 +32,14 @@ idempotentes: re-correr sobre a mesma BD dá um ficheiro byte-a-byte igual.
 - `pctPowerHp` / `pctDisplacementCc` / `pctCo2` / `pctVariant` — % com esse
   campo preenchido. A potência é a mais crítica: o matching estrito exclui
   observações sem ela.
+- `pctVersaoConfirmado` / `pctVersaoProvavel` — % de ativos com versão do
+  catálogo resolvida no tier `confirmado` / `provavel` (Fase 3).
 
 `global`:
 - `taxaMatch` — % de ativos com `model_id`.
 - `vehicleModels` — nº de modelos canónicos.
+- `versao` — matching de versão (Fase 3): ativos por tier do resolver estrito
+  (`confirmado` / `provavel` / `semMatch`).
 - `estimativas` — sobre anúncios estrangeiros elegíveis (espelha a
   elegibilidade do `compute-costs.ts`): `total`, `calculadas` (têm estimativa),
   `semDados` (sem cc/CO₂ nos não-elétricos, ou sem potência), `semAmostra`
@@ -56,6 +60,11 @@ dicionário `MODEL_RULES`/`MAKE_ALIASES` em `lib/engine/normalize-vehicle.ts`).
 - `01-baseline.json` — depois do quick-win (baseline oficial das fases
   seguintes). O diff para o `00` explica-se só pela potência recuperada de
   standvirtual (0,1→99,9%) e aramisauto (37,8→100%).
+- `02-fase3.json` — Fase 3 (matching de versão). O diff para o `01` são SÓ as
+  métricas novas de versão (`versao`, `pctVersao*`); taxaMatch/vehicleModels/
+  estimativas/vereditos ficam idênticos (esta fase não toca no consumo — a
+  correção de cc do theparking não mexe em estimativas porque esses anúncios
+  não têm CO₂, logo já eram `semDados`).
 
 **Regra:** um baseline só muda com justificação no commit. Mexer num baseline
 sem explicar a origem do diff é um erro — o objetivo é rastrear cada ganho/perda

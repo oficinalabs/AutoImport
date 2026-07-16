@@ -25,6 +25,9 @@ export interface SourceMetrics {
   pctDisplacementCc: number;
   pctCo2: number;
   pctVariant: number;
+  /** matching de versão (Fase 3): % de ativos com versão confirmada / provável */
+  pctVersaoConfirmado: number;
+  pctVersaoProvavel: number;
 }
 
 export interface Snapshot {
@@ -32,6 +35,8 @@ export interface Snapshot {
   global: {
     taxaMatch: number;
     vehicleModels: number;
+    /** matching de versão (Fase 3): ativos por tier do resolver estrito */
+    versao: { confirmado: number; provavel: number; semMatch: number };
     estimativas: { total: number; calculadas: number; semDados: number; semAmostra: number };
     vereditos: Record<string, number>;
     oportunidadesAtivas: number;
@@ -53,7 +58,9 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       count(*) filter (where deleted_at is null and power_hp is not null) as com_power,
       count(*) filter (where deleted_at is null and displacement_cc is not null) as com_cc,
       count(*) filter (where deleted_at is null and co2 is not null) as com_co2,
-      count(*) filter (where deleted_at is null and variant is not null) as com_variant
+      count(*) filter (where deleted_at is null and variant is not null) as com_variant,
+      count(*) filter (where deleted_at is null and match_confidence = 'confirmado') as com_confirmado,
+      count(*) filter (where deleted_at is null and match_confidence = 'provavel') as com_provavel
     from listings
     group by source_site
     having count(*) filter (where deleted_at is null) > 0
@@ -66,6 +73,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     com_cc: number;
     com_co2: number;
     com_variant: number;
+    com_confirmado: number;
+    com_provavel: number;
   }[];
 
   const porFonte: Record<string, SourceMetrics> = {};
@@ -77,6 +86,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       pctDisplacementCc: pct(Number(r.com_cc), Number(r.ativos)),
       pctCo2: pct(Number(r.com_co2), Number(r.ativos)),
       pctVariant: pct(Number(r.com_variant), Number(r.ativos)),
+      pctVersaoConfirmado: pct(Number(r.com_confirmado), Number(r.ativos)),
+      pctVersaoProvavel: pct(Number(r.com_provavel), Number(r.ativos)),
     };
   }
 
@@ -90,6 +101,15 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
   const [vm] = (await db.execute(sql`
     select count(*) as n from vehicle_models
   `)) as unknown as { n: number }[];
+
+  // Matching de versão: ativos por tier do resolver estrito (Fase 3).
+  const [ver] = (await db.execute(sql`
+    select
+      count(*) filter (where match_confidence = 'confirmado') as confirmado,
+      count(*) filter (where match_confidence = 'provavel') as provavel,
+      count(*) filter (where match_confidence is null) as sem_match
+    from listings where deleted_at is null
+  `)) as unknown as { confirmado: number; provavel: number; sem_match: number }[];
 
   // Estimativas: espelha a elegibilidade de compute-costs.ts.
   const [est] = (await db.execute(sql`
@@ -157,6 +177,11 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     global: {
       taxaMatch: pct(Number(tot.com_model), Number(tot.ativos)),
       vehicleModels: Number(vm.n),
+      versao: {
+        confirmado: Number(ver.confirmado),
+        provavel: Number(ver.provavel),
+        semMatch: Number(ver.sem_match),
+      },
       estimativas: {
         total: Number(est.total),
         calculadas: Number(est.calculadas),
