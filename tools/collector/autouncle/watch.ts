@@ -11,6 +11,7 @@
 
 import { parseListingPage, listingUrl, recordId } from './parse.ts';
 import { MARKETS, marketSourceSite, type Market } from './http.ts';
+import { StealthBridge, StealthHttpClient } from './stealth.ts';
 import { runWatch } from '../lib/watch.ts';
 import type { HttpClient } from './http.ts';
 import type { AutouncleRecord } from './schema.ts';
@@ -29,27 +30,33 @@ interface WatchConfig {
 //           cycles (0=infinito), brand?, outDir }
 export async function watch(config: WatchConfig) {
   const { market = MARKETS.pt, pages = 1, intervalMs = 60000, cycles = 0, brand = null, outDir } = config;
-  const http = config.http.forMarket(market);
-  return runWatch<AutouncleRecord>({
-    http, sourceName: `autouncle-${market.code}`, outDir, pages, intervalMs, cycles,
-    banner: `watch ${marketSourceSite(market)}${brand ? ` [${brand}]` : ''} | ${pages} pág×25 (ordem default)`,
-    recordId,
-    cycleTag: (seen, state) => {
-      let minDias: number | null = null;
-      for (const { record } of seen) {
-        if (record.days_on_market != null && (minDias === null || record.days_on_market < minDias)) minDias = record.days_on_market;
-      }
-      return ` · tabela ${state.size} · minDias ${minDias ?? '—'}`;
-    },
-    fetchCycle: async ({ http, nowIso, pages, stopped }) => {
-      const rows: AutouncleRecord[] = [];
-      for (let page = 1; page <= pages && !stopped(); page++) {
-        const html = await http.fetchText(listingUrl({ market, brand, page }), { validate: (t) => t.includes('"@type":"ItemList"') });
-        if (!html) continue;
-        const { listings } = parseListingPage(html, { collectedAt: nowIso, forcedMake: brand, market });
-        rows.push(...listings);
-      }
-      return rows;
-    },
-  });
+  // mercado com Cloudflare ativo → transporte browser (mesma sessão quente durante todo o watch).
+  const bridge = market.stealth ? new StealthBridge({ minDelayMs: config.http.minDelayMs }) : null;
+  const http: HttpClient = bridge ? new StealthHttpClient(market, bridge) : config.http.forMarket(market);
+  try {
+    return await runWatch<AutouncleRecord>({
+      http, sourceName: `autouncle-${market.code}`, outDir, pages, intervalMs, cycles,
+      banner: `watch ${marketSourceSite(market)}${brand ? ` [${brand}]` : ''}${bridge ? ' [stealth/browser]' : ''} | ${pages} pág×25 (ordem default)`,
+      recordId,
+      cycleTag: (seen, state) => {
+        let minDias: number | null = null;
+        for (const { record } of seen) {
+          if (record.days_on_market != null && (minDias === null || record.days_on_market < minDias)) minDias = record.days_on_market;
+        }
+        return ` · tabela ${state.size} · minDias ${minDias ?? '—'}`;
+      },
+      fetchCycle: async ({ http, nowIso, pages, stopped }) => {
+        const rows: AutouncleRecord[] = [];
+        for (let page = 1; page <= pages && !stopped(); page++) {
+          const html = await http.fetchText(listingUrl({ market, brand, page }), { validate: (t) => t.includes('"@type":"ItemList"') });
+          if (!html) continue;
+          const { listings } = parseListingPage(html, { collectedAt: nowIso, forcedMake: brand, market });
+          rows.push(...listings);
+        }
+        return rows;
+      },
+    });
+  } finally {
+    bridge?.close();
+  }
 }

@@ -6,10 +6,13 @@
 //   node run-autouncle.ts --market pt,fr,nl --max-pages 5        # vários mercados em sequência
 //   node run-autouncle.ts --market all --full --max-pages 100    # cobertura total, todos os domínios
 //   node run-autouncle.ts --market all --resume
+//   node run-autouncle.ts --market all --http-only               # só HTTP puro (salta de/it/es/uk)
 //
 // Flags: --market <code|csv|all> (default pt; códigos em MARKETS — pt,de,dk,se,it,at,es,pl,fi,ro,
 //        ch,uk,nl,fr), --max-pages <n> (default 5; cada página = 25 anúncios), --brand <Marca>
 //        (faceta de path), --full (fatia por todas as marcas), --resume, --rate <ms>, --out <dir>.
+// Stealth (browser p/ os domínios com Cloudflare ativo de/it/es/uk — automático): --http-only
+//        desliga o browser (salta esses 4); --stealth força o browser em TODOS os mercados.
 // Saída: NDJSON/checkpoint POR MERCADO (`autouncle-{code}-*`) + um summary agregado.
 
 import { dirname } from 'node:path';
@@ -45,8 +48,9 @@ await defineRunCli({
   banner: (args) => {
     const brand = args.brand ? String(args.brand) : null;
     const markets = parseMarkets(args.market).map((m) => m.code).join(',');
+    const mode = args['http-only'] ? ' | HTTP-ONLY' : args.stealth ? ' | STEALTH-ALL' : '';
     return `=== autouncle [${markets}] | max-pages: ${Number(args['max-pages']) || 5} (×25)`
-      + `${brand ? ` | marca ${brand}` : ''}${args.full ? ' | MODO COMPLETO (fatiado por marca)' : ''} ===\n`;
+      + `${brand ? ` | marca ${brand}` : ''}${args.full ? ' | MODO COMPLETO (fatiado por marca)' : ''}${mode} ===\n`;
   },
   buildConfig: (args, { http, outDir }) => ({
     http,
@@ -56,6 +60,8 @@ await defineRunCli({
     maxPages: Number(args['max-pages']) || 5,
     outDir,
     resume: Boolean(args.resume),
+    stealth: Boolean(args.stealth),
+    httpOnly: Boolean(args['http-only']),
   }),
   summarize: ({ markets }, { durationS }) => ({
     generatedAt: new Date().toISOString(), durationS,

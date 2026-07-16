@@ -13,12 +13,17 @@
 //   • default : uma query (marca opcional via --brand), até `maxPages` páginas (amostra).
 //   • --full  : uma query por marca (semeadas do config), cada uma até `maxPages`/teto.
 //
-// ISOLAMENTO POR MERCADO: um domínio inacessível (4 estão atrás de Cloudflare ativo — de/it/es/uk,
-// ver http.ts) esgota os retries na 1ª página e o loop passa ao mercado seguinte; os restantes
-// não são afetados.
+// STEALTH: 4 domínios (de/it/es/uk) têm Cloudflare ativo e devolvem 403 a HTTP puro. Marcados com
+// `stealth: true` na tabela MARKETS, são servidos por um transporte browser (autouncle/stealth.ts,
+// daemon Camoufox) — só o transporte muda; o parse/checkpoint é o mesmo. Uma StealthBridge por run
+// serve todos os mercados stealth (uma sessão resolve o challenge de cada domínio à 1.ª visita) e é
+// fechada no fim. `--stealth` força o browser mesmo nos 10 abertos; `--http-only` desliga o browser
+// (os stealth ficam a 0, isolados). ISOLAMENTO POR MERCADO mantém-se: uma falha num domínio esgota
+// os retries e o loop passa ao seguinte.
 
 import { parseListingPage, listingUrl, parseBrands, recordId } from './parse.ts';
 import { marketBase, marketSourceSite, CONFIG_PATH, type Market } from './http.ts';
+import { StealthBridge, StealthHttpClient } from './stealth.ts';
 import { createCrawlWriter, runPagedCrawl } from '../lib/crawl.ts';
 import type { HttpClient } from './http.ts';
 import type { AutouncleRecord } from './schema.ts';
@@ -48,6 +53,15 @@ interface CrawlConfig {
   maxPages?: number;
   outDir: string;
   resume?: boolean;
+  stealth?: boolean;     // --stealth: força o transporte browser mesmo nos mercados HTTP-puros
+  httpOnly?: boolean;    // --http-only: nunca usa browser (mercados stealth ficam a 0)
+}
+
+// Decide o transporte de um mercado: browser (stealth) vs HTTP puro. `--http-only` desliga o
+// browser; `--stealth` liga-o a todos; por default só os mercados marcados `stealth` o usam.
+function usaStealth(market: Market, config: CrawlConfig): boolean {
+  if (config.httpOnly) return false;
+  return Boolean(config.stealth || market.stealth);
 }
 
 // Resultado de um mercado (o run-*.ts agrega e relata).
@@ -80,9 +94,9 @@ function atualizaStats(stats: Stats, r: AutouncleRecord) {
 }
 
 // Um mercado: plano de queries (marca única ou --full via config API) → runPagedCrawl.
-async function crawlMarket(market: Market, config: CrawlConfig): Promise<MarketResult> {
+// `http` é o cliente já resolvido (stealth ou HTTP puro) para este mercado.
+async function crawlMarket(market: Market, http: HttpClient, config: CrawlConfig): Promise<MarketResult> {
   const { full = false, brand = null, maxPages = 5, outDir, resume = false } = config;
-  const http = config.http.forMarket(market);
   const writer = createCrawlWriter<AutouncleRecord, Stats>({
     outDir, source: `autouncle-${market.code}`, resume, recordId,
     newStats: statsVazias, updateStats: atualizaStats,
@@ -120,12 +134,25 @@ async function crawlMarket(market: Market, config: CrawlConfig): Promise<MarketR
   return { code: market.code, sourceSite: marketSourceSite(market), ndjsonPath: writer.ndjsonPath, stats: writer.stats, queries: queries.length };
 }
 
-// config: { http, markets[], full?, brand?, maxPages, outDir, resume? }
+// config: { http, markets[], full?, brand?, maxPages, outDir, resume?, stealth?, httpOnly? }
 export async function crawl(config: CrawlConfig): Promise<{ markets: MarketResult[] }> {
   const results: MarketResult[] = [];
-  for (const market of config.markets) {
-    console.log(`\n— mercado ${market.code} (${marketSourceSite(market)}) —`);
-    results.push(await crawlMarket(market, config));
+  let bridge: StealthBridge | null = null;   // criada à 1.ª necessidade, partilhada, fechada no fim
+  try {
+    for (const market of config.markets) {
+      const stealth = usaStealth(market, config);
+      console.log(`\n— mercado ${market.code} (${marketSourceSite(market)})${stealth ? ' [stealth/browser]' : ''} —`);
+      let http: HttpClient;
+      if (stealth) {
+        if (!bridge) bridge = new StealthBridge({ minDelayMs: config.http.minDelayMs });
+        http = new StealthHttpClient(market, bridge);
+      } else {
+        http = config.http.forMarket(market);
+      }
+      results.push(await crawlMarket(market, http, config));
+    }
+  } finally {
+    bridge?.close();
   }
   return { markets: results };
 }

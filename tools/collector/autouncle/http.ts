@@ -46,24 +46,26 @@ export interface Market {
   listPath: string;      // SRP humano (SSR) — a rota de listagem
   currency: string;      // fallback quando o JSON-LD não traz priceCurrency
   acceptLanguage: string;
+  stealth?: boolean;     // Cloudflare ATIVO (403 a HTTP puro) → transporte via browser (ver stealth.ts)
 }
 
-// Os 14 mercados (paths lidos do robots.txt de cada domínio a 2026-07-15). Totais na sonda:
-// nl 544k · fr 251k · ch 185k · at 151k · se 133k · ro 116k · pl 108k · pt 99k · fi 38k · dk 30k
-// (de/it/es/uk atrás de Cloudflare ativo — inacessíveis a HTTP puro, ver nota acima).
+// Os 14 mercados (paths lidos do robots.txt de cada domínio a 2026-07-15). Totais na sonda (HTTP
+// puro salvo indicação; os stealth foram medidos via Camoufox): de 1,94M · nl 544k · uk 456k ·
+// fr 251k · ch 185k · at 151k · se 133k · ro 116k · pl 108k · pt 99k · fi 38k · dk 30k (+ it/es).
+// `stealth: true` → domínio com Cloudflare ativo, servido pelo bridge browser (autouncle/stealth.ts).
 export const MARKETS: Record<string, Market> = {
   pt: { code: 'pt', tld: 'pt',    countryLabel: 'PORTUGAL',       locale: 'pt',    listPath: '/pt/carros-usados',         currency: 'EUR', acceptLanguage: 'pt-PT,pt;q=0.9,en;q=0.8' },
-  de: { code: 'de', tld: 'de',    countryLabel: 'GERMANY',        locale: 'de',    listPath: '/de/gebrauchtwagen',        currency: 'EUR', acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8' },
+  de: { code: 'de', tld: 'de',    countryLabel: 'GERMANY',        locale: 'de',    listPath: '/de/gebrauchtwagen',        currency: 'EUR', acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8', stealth: true },
   dk: { code: 'dk', tld: 'dk',    countryLabel: 'DENMARK',        locale: 'da',    listPath: '/da/brugte-biler',          currency: 'DKK', acceptLanguage: 'da-DK,da;q=0.9,en;q=0.8' },
   se: { code: 'se', tld: 'se',    countryLabel: 'SWEDEN',         locale: 'se',    listPath: '/se/begagnade-bilar',       currency: 'SEK', acceptLanguage: 'sv-SE,sv;q=0.9,en;q=0.8' },
-  it: { code: 'it', tld: 'it',    countryLabel: 'ITALY',          locale: 'it',    listPath: '/it/auto-usate',            currency: 'EUR', acceptLanguage: 'it-IT,it;q=0.9,en;q=0.8' },
+  it: { code: 'it', tld: 'it',    countryLabel: 'ITALY',          locale: 'it',    listPath: '/it/auto-usate',            currency: 'EUR', acceptLanguage: 'it-IT,it;q=0.9,en;q=0.8', stealth: true },
   at: { code: 'at', tld: 'at',    countryLabel: 'AUSTRIA',        locale: 'de-at', listPath: '/de-at/gebrauchtwagen',     currency: 'EUR', acceptLanguage: 'de-AT,de;q=0.9,en;q=0.8' },
-  es: { code: 'es', tld: 'es',    countryLabel: 'SPAIN',          locale: 'es',    listPath: '/es/coches-segunda-mano',   currency: 'EUR', acceptLanguage: 'es-ES,es;q=0.9,en;q=0.8' },
+  es: { code: 'es', tld: 'es',    countryLabel: 'SPAIN',          locale: 'es',    listPath: '/es/coches-segunda-mano',   currency: 'EUR', acceptLanguage: 'es-ES,es;q=0.9,en;q=0.8', stealth: true },
   pl: { code: 'pl', tld: 'pl',    countryLabel: 'POLAND',         locale: 'pl',    listPath: '/pl/samochody-uzywane',     currency: 'PLN', acceptLanguage: 'pl-PL,pl;q=0.9,en;q=0.8' },
   fi: { code: 'fi', tld: 'fi',    countryLabel: 'FINLAND',        locale: 'fi',    listPath: '/fi/kaytetyt-autot',        currency: 'EUR', acceptLanguage: 'fi-FI,fi;q=0.9,en;q=0.8' },
   ro: { code: 'ro', tld: 'ro',    countryLabel: 'ROMANIA',        locale: 'ro',    listPath: '/ro/masini-second-hand',    currency: 'EUR', acceptLanguage: 'ro-RO,ro;q=0.9,en;q=0.8' },
   ch: { code: 'ch', tld: 'ch',    countryLabel: 'SWITZERLAND',    locale: 'de-ch', listPath: '/de-ch/gebrauchtwagen',     currency: 'CHF', acceptLanguage: 'de-CH,de;q=0.9,en;q=0.8' },
-  uk: { code: 'uk', tld: 'co.uk', countryLabel: 'UNITED KINGDOM', locale: 'en-gb', listPath: '/en-gb/used-cars',          currency: 'GBP', acceptLanguage: 'en-GB,en;q=0.9' },
+  uk: { code: 'uk', tld: 'co.uk', countryLabel: 'UNITED KINGDOM', locale: 'en-gb', listPath: '/en-gb/used-cars',          currency: 'GBP', acceptLanguage: 'en-GB,en;q=0.9', stealth: true },
   nl: { code: 'nl', tld: 'nl',    countryLabel: 'NETHERLANDS',    locale: 'nl-nl', listPath: '/nl-nl/gebruikte-auto',     currency: 'EUR', acceptLanguage: 'nl-NL,nl;q=0.9,en;q=0.8' },
   fr: { code: 'fr', tld: 'fr',    countryLabel: 'FRANCE',         locale: 'fr',    listPath: '/fr/voitures-occasion',     currency: 'EUR', acceptLanguage: 'fr-FR,fr;q=0.9,en;q=0.8' },
 };
