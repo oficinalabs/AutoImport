@@ -60,9 +60,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^(i[3-8]|ix[1-3]?|m[2-8])(?:$|-)/, "$1"],
   ],
   mercedes: [
-    [/^(?:classe-|class-|)([abces])(?:-klasse|-class|-classe)?(?:$|-)/, "classe-$1"],
+    // "clase-" = grafia ES ("Clase A/GLC/CLA") dos stands PT/ES — igual a "classe-"
+    [/^(?:classe-|class-|clase-|)([abces])(?:-klasse|-class|-classe)?(?:$|-)/, "classe-$1"],
     [/^([abces])-?\d{2,3}[a-z]*(?:$|-)/, "classe-$1"], // A 180, C220d, E300…
-    [/^(?:classe-)?(cla|clb|cls|gla|glb|glc|gle|gls|slk|slc|sl|amg-gt|eq[abces]s?|citan|vito|classe-v)(?:$|-)/, "$1"],
+    [/^(?:classe-|clase-)?(cla|clb|cls|gla|glb|glc|gle|gls|slk|slc|sl|amg-gt|eq[abces]s?|citan|vito|classe-v)(?:$|-)/, "$1"],
   ],
   audi: [
     [/^(a[1-8]|q[2-8]|tt|r8|rs[3-7]|s[3-8])(?:$|-)/, "$1"],
@@ -92,6 +93,7 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^(yaris|corolla|aygo|auris|prius|camry|supra|hilux|proace|bz4x|land-cruiser)(?:$|-)/, "$1"],
   ],
   hyundai: [
+    [/^kauai(?:$|-)/, "kona"], // Kauai = nome PT do Kona (catálogo usa Kona)
     [/^(i[123]0|i40|kona|tucson|santa-fe|bayon|ioniq-?[56]?|staria|h-1)(?:$|-)/, "$1"],
   ],
   kia: [[/^(picanto|rio|ceed|xceed|stonic|niro|sportage|sorento|ev[3469]|soul|venga)(?:$|-)/, "$1"]],
