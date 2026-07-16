@@ -28,7 +28,7 @@ export function vehicleAgeYears(firstRegistration: Date, referenceDate: Date): n
  * ≤2018 → NEDC. 2018–2019 é zona de transição (a norma real vem do COC, que
  * não temos) — a assunção fica registada quando cai nesses anos.
  */
-function co2Norm(year: number): "wltp" | "nedc" {
+export function co2Norm(year: number): "wltp" | "nedc" {
   return year >= 2019 ? "wltp" : "nedc";
 }
 

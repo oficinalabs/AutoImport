@@ -15,9 +15,11 @@ import {
   opportunities,
   organization,
   sources,
+  usVersions,
   user,
   vehicleModels,
 } from "../db/schema";
+import { co2Norm } from "./cost-engine";
 import type { SearchFilters } from "./data";
 import { ptPriceHistory } from "./engine/pt-market";
 import type {
@@ -40,6 +42,7 @@ const SEARCH_LIMIT = 60;
 type ListingRow = typeof listings.$inferSelect;
 type EstimateRow = typeof importCostEstimates.$inferSelect;
 type ModelRow = typeof vehicleModels.$inferSelect;
+type VersionRow = typeof usVersions.$inferSelect;
 
 function transmissionOf(gearbox: string | null): Transmission {
   return gearbox && /auto/i.test(gearbox) ? "automática" : "manual";
@@ -49,6 +52,7 @@ function rowToListing(
   l: ListingRow,
   e: EstimateRow,
   vm: ModelRow,
+  usv: VersionRow | null,
   sourceName: string | null,
   isFavorite: boolean,
   history: { month: string; price: number }[] = [],
@@ -61,6 +65,15 @@ function rowToListing(
     legalization: e.legalization,
     totalPt: e.totalPt,
   };
+  // Fallbacks de display: valor do anúncio → versão confirmada do catálogo →
+  // mediana do vehicle_models (último recurso; pode misturar trims). O CO₂ da
+  // versão segue a norma do ano de matrícula (WLTP/NEDC).
+  const ver = usv && l.matchConfidence === "confirmado" ? usv : null;
+  const verCo2 = ver
+    ? co2Norm(l.year ?? new Date().getFullYear()) === "wltp"
+      ? ver.co2Wltp
+      : ver.co2Nedc
+    : null;
   return {
     id: l.id,
     model: {
@@ -70,9 +83,9 @@ function rowToListing(
       variant: l.variant ?? undefined,
       fuel: (l.fuel ?? vm.fuel) as FuelType,
       transmission: transmissionOf(l.gearbox),
-      displacementCc: l.displacementCc ?? vm.displacementCc ?? undefined,
-      co2: l.co2 ?? vm.co2 ?? undefined,
-      powerHp: l.powerHp ?? vm.powerHp ?? undefined,
+      displacementCc: l.displacementCc ?? ver?.displacementCc ?? vm.displacementCc ?? undefined,
+      co2: l.co2 ?? verCo2 ?? vm.co2 ?? undefined,
+      powerHp: l.powerHp ?? ver?.powerHp ?? vm.powerHp ?? undefined,
     },
     title: [l.makeRaw, l.variant ?? l.modelRaw].filter(Boolean).join(" ") || "Anúncio",
     year: l.year ?? 0,
@@ -105,12 +118,14 @@ function baseSelect(standId: string | null) {
       l: listings,
       e: importCostEstimates,
       vm: vehicleModels,
+      usv: usVersions,
       sourceName: sources.name,
       favoriteId: favorites.id,
     })
     .from(listings)
     .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
     .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
+    .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
     .leftJoin(sources, eq(sources.id, listings.sourceId))
     .leftJoin(
       favorites,
@@ -121,7 +136,7 @@ function baseSelect(standId: string | null) {
 type BaseRow = Awaited<ReturnType<ReturnType<typeof baseSelect>["execute"]>>[number];
 
 const toListing = (r: BaseRow, history: { month: string; price: number }[] = []) =>
-  rowToListing(r.l, r.e, r.vm, r.sourceName, r.favoriteId != null, history);
+  rowToListing(r.l, r.e, r.vm, r.usv, r.sourceName, r.favoriteId != null, history);
 
 // ── Pesquisa / detalhe ───────────────────────────────────────────
 

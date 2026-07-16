@@ -111,13 +111,25 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     from listings where deleted_at is null
   `)) as unknown as { confirmado: number; provavel: number; sem_match: number }[];
 
-  // Estimativas: espelha a elegibilidade de compute-costs.ts.
+  // Estimativas: espelha a elegibilidade de compute-costs.ts, incluindo as specs
+  // efetivas do catálogo (SÓ confirmado) — sem isto, um confirmado sem CO₂ próprio
+  // mas com CO₂ do catálogo apareceria como semDados em vez de calculadas/semAmostra.
   const [est] = (await db.execute(sql`
     with eligible as (
-      select l.fuel, l.displacement_cc as cc, l.co2, l.power_hp,
+      select l.fuel,
+             coalesce(l.displacement_cc,
+               case when l.match_confidence = 'confirmado' then v.displacement_cc end) as cc,
+             coalesce(l.co2,
+               case when l.match_confidence = 'confirmado' then
+                 case when coalesce(extract(year from l.first_registration)::int, l.year) >= 2019
+                      then v.co2_wltp else v.co2_nedc end
+               end) as co2,
+             coalesce(l.power_hp,
+               case when l.match_confidence = 'confirmado' then v.power_hp end) as power_hp,
              (e.id is not null) as tem_estimativa
       from listings l
       join vehicle_models m on m.id = l.model_id
+      left join us_versions v on v.version_id = l.us_version_id
       left join import_cost_estimates e on e.listing_id = l.id
       where l.country = any(${`{${FOREIGN.join(",")}}`}::text[])
         and l.deleted_at is null
