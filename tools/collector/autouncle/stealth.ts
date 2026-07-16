@@ -24,6 +24,10 @@ const DAEMON = join(HERE, 'stealth_fetch.py');
 interface BridgeResponse { status: number; b64?: string; error?: string; }
 interface BridgeOptions { minDelayMs?: number; jitterMs?: number; maxRetries?: number; headless?: boolean; }
 
+// Piso do ritmo do transporte browser: um Camoufox a resolver Cloudflare deve ser conservador
+// (o piscapisca usa 4000 ms). NÃO herdamos o default HTTP-puro de 1500 ms — seria agressivo de mais.
+const STEALTH_FLOOR_MS = 4000;
+
 // Dono do processo Python. Serializa nada (o daemon processa STDIN em ordem e responde em ordem);
 // casa respostas do FD 3 às promessas pendentes por FIFO.
 export class StealthBridge {
@@ -35,22 +39,25 @@ export class StealthBridge {
 
   constructor(opts: BridgeOptions = {}) { this.opts = opts; }
 
-  // Arranca o daemon (idempotente). Rejeita com instrução clara se o venv não existir.
+  // Arranca o daemon (idempotente; a promessa é cacheada — sucesso ou falha). Se o venv não existir,
+  // imprime as instruções UMA vez (evita repetir por cada marca no --full) e rejeita curto.
   start(): Promise<void> {
     if (this.ready) return this.ready;
-    if (!existsSync(VENV_PYTHON)) {
-      return Promise.reject(new Error(
-        `venv stealth em falta: ${VENV_PYTHON}\n`
-        + `  Instalar (uma vez): cd ${HERE} && python3.13 -m venv .venv `
-        + `&& .venv/bin/pip install -r requirements.txt && .venv/bin/scrapling install`));
-    }
     this.ready = new Promise<void>((resolve, reject) => {
+      if (!existsSync(VENV_PYTHON)) {
+        console.error(
+          `\n  ⚠ transporte stealth indisponível — venv em falta: ${VENV_PYTHON}\n`
+          + `    Instalar (uma vez): cd ${HERE} && python3.13 -m venv .venv `
+          + `&& .venv/bin/pip install -r requirements.txt && .venv/bin/scrapling install\n`);
+        reject(new Error('venv stealth em falta'));
+        return;
+      }
       // stdio: [stdin=pipe, stdout=ignore, stderr=herda (logs do browser), fd3=pipe (protocolo)]
       const proc = spawn(VENV_PYTHON, [DAEMON], {
         stdio: ['pipe', 'ignore', 'inherit', 'pipe'],
         env: {
           ...process.env,
-          AU_MIN_DELAY_MS: String(this.opts.minDelayMs ?? 4000),
+          AU_MIN_DELAY_MS: String(Math.max(this.opts.minDelayMs ?? STEALTH_FLOOR_MS, STEALTH_FLOOR_MS)),
           AU_JITTER_MS: String(this.opts.jitterMs ?? 1200),
           AU_MAX_RETRIES: String(this.opts.maxRetries ?? 3),
           AU_HEADLESS: this.opts.headless === false ? '0' : '1',
@@ -118,9 +125,13 @@ export class StealthHttpClient extends HttpClient {
     return new StealthHttpClient(market, this.bridge);
   }
 
+  // Devolve null em QUALQUER falha (incl. o daemon não arrancar — venv em falta) em vez de propagar:
+  // preserva o isolamento por mercado (o crawl salta este e segue para os HTTP-puros), igual ao 403.
   async fetchText(url: string, { validate }: { validate?: (t: string) => boolean } = {}): Promise<string | null> {
     this.assertAllowed(url);
-    const { status, body, error } = await this.bridge.fetch(url);
+    let status = 0, body: string | null = null, error: string | undefined;
+    try { ({ status, body, error } = await this.bridge.fetch(url)); }
+    catch (e) { error = e instanceof Error ? e.message : String(e); }
     if (body == null) { console.warn(`  ⚠ stealth falhou ${url}: ${error || `HTTP ${status}`}`); return null; }
     if (validate && !validate(body)) { console.warn(`  ⚠ stealth validação falhou ${url} (challenge/página vazia?)`); return null; }
     return body;
@@ -128,7 +139,9 @@ export class StealthHttpClient extends HttpClient {
 
   async fetchJson(url: string): Promise<unknown> {
     this.assertAllowed(url);
-    const { status, body, error } = await this.bridge.fetch(url);
+    let status = 0, body: string | null = null, error: string | undefined;
+    try { ({ status, body, error } = await this.bridge.fetch(url)); }
+    catch (e) { error = e instanceof Error ? e.message : String(e); }
     if (body == null) { console.warn(`  ⚠ stealth falhou json ${url}: ${error || `HTTP ${status}`}`); return null; }
     try { return JSON.parse(body); } catch { console.warn(`  ⚠ stealth resposta sem JSON ${url}`); return null; }
   }

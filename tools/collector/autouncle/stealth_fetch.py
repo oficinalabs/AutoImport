@@ -30,6 +30,7 @@ import json
 import time
 import base64
 import random
+import signal
 
 from scrapling.fetchers import StealthySession
 
@@ -50,9 +51,32 @@ def main():
     last_req = 0.0
     stdin = io.TextIOWrapper(sys.stdin.buffer, encoding="utf-8")
 
-    with StealthySession(headless=headless, solve_cloudflare=True, timeout=timeout_ms) as session:
+    # Ciclo de vida MANUAL (não `with`): precisamos de fechar a sessão também em SIGTERM/SIGINT — o
+    # Node mata o daemon com kill() ao fim de um run, e sem isto o browser Camoufox ficaria órfão.
+    session = StealthySession(headless=headless, solve_cloudflare=True, timeout=timeout_ms)
+    session.start()
+    closed = False
+
+    def close_once(*_):
+        nonlocal closed
+        if closed:
+            return
+        closed = True
+        try:
+            session.close()
+        except Exception:  # noqa: BLE001 — no shutdown, engolir qualquer erro do browser
+            pass
+
+    def on_signal(*_):
+        close_once()
+        os._exit(0)
+
+    signal.signal(signal.SIGTERM, on_signal)
+    signal.signal(signal.SIGINT, on_signal)
+
+    try:
         respond(RESP_FD, {"ready": True})
-        for line in stdin:
+        for line in stdin:          # EOF (o Node fecha o stdin) → sai do loop → fecha limpo no finally
             line = line.strip()
             if not line:
                 continue
@@ -90,6 +114,8 @@ def main():
                 respond(RESP_FD, {"status": status, "error": err or "sem corpo"})
             else:
                 respond(RESP_FD, {"status": status, "b64": base64.b64encode(body.encode("utf-8")).decode("ascii")})
+    finally:
+        close_once()
 
 
 if __name__ == "__main__":
