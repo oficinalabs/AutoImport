@@ -305,6 +305,16 @@ export const listings = pgTable(
     vin: text("vin"),
     /** registo completo do coletor — nada se perde */
     raw: jsonb("raw"),
+    // ── matching de versão (lib/engine/match-version.ts, Fase 3) ──
+    /** versão canónica do catálogo ultimatespecs resolvida pelo matching estrito;
+     * null = sem match. onDelete set null: perder a versão não apaga o anúncio. */
+    usVersionId: text("us_version_id").references(() => usVersions.versionId, {
+      onDelete: "set null",
+    }),
+    /** tier do match de versão: "confirmado" (≥2 sinais duros) | "provavel" (1 sinal) */
+    matchConfidence: text("match_confidence"),
+    /** evidência compacta do match (MatchEvidence) — auditoria do porquê */
+    matchEvidence: jsonb("match_evidence"),
     firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
@@ -314,6 +324,7 @@ export const listings = pgTable(
     uniqueIndex("listings_source_external_uidx").on(table.sourceSite, table.externalId),
     index("listings_model_country_price_idx").on(table.modelId, table.country, table.price),
     index("listings_last_seen_idx").on(table.lastSeenAt),
+    index("listings_us_version_idx").on(table.usVersionId),
   ],
 );
 

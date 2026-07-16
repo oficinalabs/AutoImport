@@ -10,7 +10,7 @@ import { estimateTransport } from "./transport";
 import type { CostInput, IsvBreakdown, TaxTables } from "./types";
 
 export type { CostInput, IsvBreakdown, TaxTables } from "./types";
-export { calculateIsv, vehicleAgeYears } from "./isv";
+export { calculateIsv, co2Norm, vehicleAgeYears } from "./isv";
 export { calculateIuc } from "./iuc";
 export { estimateTransport, TRANSPORT_COST_EUR } from "./transport";
 export { estimateLegalization, LEGALIZATION_COSTS_EUR } from "./legalization";

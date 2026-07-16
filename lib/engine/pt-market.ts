@@ -17,6 +17,18 @@ export interface PtEstimate {
   confidence: PtConfidence;
 }
 
+/**
+ * Janela de geração do carro estrangeiro (derivada da versão confirmada do
+ * catálogo). Quando presente, as observações PT ficam confinadas à interseção
+ * de `year±spread` com [start, end] — impede que a mediana de um anúncio da
+ * geração nova seja contaminada por carros PT da geração velha de anos vizinhos
+ * (fronteira de geração). `end` null = geração aberta (sem limite superior).
+ */
+export interface GenWindow {
+  start: number;
+  end: number | null;
+}
+
 const MIN_SAMPLE_NORMAL = 5;
 const MIN_SAMPLE_WIDE = 3;
 const WINDOW_DAYS = 60;
@@ -33,7 +45,13 @@ async function sample(
   kmBand: number,
   spread: number,
   powerHp?: number | null,
+  genWindow?: GenWindow,
 ): Promise<{ median: number; n: number; distinctPrices: number; distinctSellers: number } | null> {
+  // Interseção da janela year±spread com a janela de geração (quando presente):
+  // o guard NUNCA relaxa (só aperta) — o fallback alargado (spread=2) continua
+  // confinado à geração. Interseção vazia (lo>hi) → o `between` não devolve nada.
+  const yearLo = genWindow ? Math.max(year - spread, genWindow.start) : year - spread;
+  const yearHi = genWindow?.end != null ? Math.min(year + spread, genWindow.end) : year + spread;
   // Matching ESTRITO por designação (regra do produto: um veículo só compara
   // com o mesmo modelo): a potência é a assinatura objetiva da designação
   // (840i 333cv ≠ M850i 530cv; xDrive40 326 ≠ xDrive45 408; Golf 1.5 150 ≠
@@ -62,7 +80,7 @@ async function sample(
         from pt_price_observations o
         join listings l on l.id = o.listing_id
         where o.model_id = ${modelId}
-          and o.year between ${year - spread} and ${year + spread}
+          and o.year between ${yearLo} and ${yearHi}
           and o.km_band between ${kmBand - spread} and ${kmBand + spread}
           and o.observed_at > now() - make_interval(days => ${WINDOW_DAYS})
           ${powerFilter}
@@ -92,8 +110,9 @@ export async function estimatePtPrice(
   year: number,
   kmBand: number,
   powerHp?: number | null,
+  genWindow?: GenWindow,
 ): Promise<PtEstimate | null> {
-  const primary = await sample(db, modelId, year, kmBand, 1, powerHp);
+  const primary = await sample(db, modelId, year, kmBand, 1, powerHp, genWindow);
   if (
     primary &&
     primary.n >= MIN_SAMPLE_NORMAL &&
@@ -102,7 +121,7 @@ export async function estimatePtPrice(
   ) {
     return { estimatedPrice: primary.median, sampleSize: primary.n, confidence: "normal" };
   }
-  const wide = await sample(db, modelId, year, kmBand, 2, powerHp);
+  const wide = await sample(db, modelId, year, kmBand, 2, powerHp, genWindow);
   if (wide && wide.n >= MIN_SAMPLE_WIDE) {
     return { estimatedPrice: wide.median, sampleSize: wide.n, confidence: "alargada" };
   }
