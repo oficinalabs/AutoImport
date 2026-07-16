@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
+  litersFromVariant,
   type ResolveInput,
   resolveVersion,
 } from "../../lib/engine/match-version";
@@ -336,6 +337,37 @@ test("iX ≠ iX3 (famílias distintas): modelo iX3 não resolve na família ix",
   // O catálogo sintético não tem iX3 → um anúncio iX3 dá null (não cai no iX)
   const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "iX3", variant: "Impressive", fuelRaw: "Elektro", year: 2022, powerHp: 286 }), CAT);
   assert.equal(r, null);
+});
+
+// ── Refinamentos Fase 3 ──────────────────────────────────────────
+
+test("refinamento (a): badge igual ao slug da família não conta como sinal duro", () => {
+  // "M3" gera badge "m3" == família "m3" (nome do modelo repetido), não uma
+  // designação de trim/motor. Com potência + cc há 2 sinais REAIS → confirmado,
+  // mas o badge não pode inflar a contagem.
+  const full = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "M3", variant: "Competition", fuelRaw: "Gasolina", year: 2021, powerHp: 510, displacementCc: 2993 }), CAT);
+  assert.equal(full?.evidence.family, "bmw|m3");
+  assert.equal(full?.confidence, "confirmado");
+  assert.equal(full?.evidence.signals.badges, undefined); // "m3" não entra como badge
+  assert.equal(full?.evidence.hardSignals, 2); // potência + cc (badge NÃO soma)
+  // Só com potência (sem cc), o badge "m3" já não salva o 2.º sinal → provavel.
+  const powerOnly = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "M3", variant: "Competition", fuelRaw: "Gasolina", year: 2021, powerHp: 510 }), CAT);
+  assert.equal(powerOnly?.confidence, "provavel");
+  assert.equal(powerOnly?.evidence.hardSignals, 1);
+});
+
+test("refinamento (b): litragem apanha letra colada (1.6d/2.0T) sem falsos", () => {
+  assert.equal(litersFromVariant("1.6d"), 1.6);
+  assert.equal(litersFromVariant("2.0T"), 2.0);
+  assert.equal(litersFromVariant("2.0 TSI"), 2.0); // espaço continua a funcionar
+  assert.equal(litersFromVariant("versão 1.6"), 1.6);
+  assert.equal(litersFromVariant("R1250 GS"), null); // sem separador → não é 1.2
+  assert.equal(litersFromVariant("1500"), null); // sem separador
+  assert.equal(litersFromVariant("1.55"), null); // dígito extra veta (não é litragem)
+  // Ponta-a-ponta: "1.5T" (T colado) dá o 2.º sinal e confirma o Golf 1.5 150.
+  const golf = resolveVersion(inp({ makeRaw: "Volkswagen", modelRaw: "Golf", variant: "1.5T", fuelRaw: "Benzin", year: 2021, powerHp: 150 }), CAT);
+  assert.equal(golf?.confidence, "confirmado");
+  assert.equal(golf?.evidence.signals.displacementL, 1.5);
 });
 
 test("viaFallback: Grand Santa Fe legítimo confirma (tokens contidos no slug)", () => {

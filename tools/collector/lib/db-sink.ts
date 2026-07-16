@@ -52,14 +52,17 @@ function iso2(country: unknown): string | null {
 }
 
 // Cilindrada a partir do campo engine, em dois formatos:
-//   "1.995 cm³" / 1995      → 1995 (o ponto é separador de milhares)
-//   "3.0 Gasoline" / "2,0 l" → 3000 / 2000 (litros com UMA casa decimal —
-//     conversão determinística ×1000, erro ≤ ~2% ≈ ±100 € de ISV)
-// Rejeita o resto (ex.: "TDI") com guarda de sanidade 400–8500 cm³.
-function displacementCc(engine: unknown): number | null {
+//   "3.0 Gasoline" / "2,0 l" / "V8 4.4 Gasoline" → 3000 / 2000 / 4400 (litros com
+//     UMA casa decimal em qualquer posição — conversão ×1000, erro ≤ ~2%)
+//   "1.995 cm³" / 1995 → 1995 (o ponto é separador de milhares)
+// O token de litros `\b[1-9][.,]\d\b(?!\d)` tem prioridade sobre o strip de
+// dígitos (senão "V8 4.4 Gasoline" daria 844 — int apanha 8,4,4). Não dispara
+// dentro de um cm³ com milhares ("1.995": não há fronteira antes do 3.º dígito),
+// aí cai-se no int → 1995. Rejeita o resto (ex.: "TDI") — guarda 400–8500 cm³.
+export function displacementCc(engine: unknown): number | null {
   if (engine == null) return null;
   const s = String(engine);
-  const liters = /^\s*(\d)[.,](\d)(?!\d)/.exec(s);
+  const liters = /\b([1-9])[.,](\d)\b(?!\d)/.exec(s);
   const n = liters ? Number(liters[1]) * 1000 + Number(liters[2]) * 100 : int(s);
   return n != null && n >= 400 && n <= 8500 ? n : null;
 }

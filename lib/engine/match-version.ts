@@ -106,10 +106,16 @@ function strongBadges(modelRaw: string, variant: string | null): string[] {
   return [...badges];
 }
 
-/** Litragem da variante: "2.0"/"1,6" → litros (1 casa). Ignora números soltos. */
-function litersFromVariant(variant: string | null): number | null {
+/**
+ * Litragem da variante: "2.0"/"1,6" → litros (1 casa). Apanha a letra colada
+ * ("1.6d", "2.0T") via lookahead `(?![\d.,])` em vez de `\b` (que falharia entre
+ * dígito e letra). Não apanha falsos: "R1250" (sem separador → null), "1.5"
+ * dentro de números maiores ("1.55"/"1500" → o dígito seguinte veta). Ignora
+ * números soltos sem separador.
+ */
+export function litersFromVariant(variant: string | null): number | null {
   if (!variant) return null;
-  const m = /\b([1-9])[.,](\d)\b/.exec(variant);
+  const m = /\b([1-9])[.,](\d)(?![\d.,])/.exec(variant);
   return m ? Number(m[1]) + Number(m[2]) / 10 : null;
 }
 
@@ -239,7 +245,11 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   // ── Sinais duros e filtragem ──
   const powerAd = effectivePower(input);
   const litersAd = litersFromVariant(input.variant);
-  const badges = strongBadges(input.modelRaw, input.variant);
+  // Refinamento Fase 3: um badge igual ao slug da família é o NOME DO MODELO
+  // repetido (Volvo "V50" → badge "v50" == família "v50"), não uma designação de
+  // trim/motor — removê-lo para não contar como sinal duro nem filtrar.
+  const familySlug = familyKey.slice(makeSlug.length + 1);
+  const badges = strongBadges(input.modelRaw, input.variant).filter((b) => b !== familySlug);
 
   const signals: MatchEvidence["signals"] = {};
   let hardSignals = 0;
