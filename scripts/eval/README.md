@@ -24,6 +24,22 @@ Depois do (opcional) ingest, corre sempre `match-models → pt-market →
 compute-costs → flag-opportunities` e escreve o snapshot. Os passos são
 idempotentes: re-correr sobre a mesma BD dá um ficheiro byte-a-byte igual.
 
+## Outras ferramentas (leitores, não mutam a BD)
+
+```bash
+# audit do mapeamento de famílias/gerações do catálogo → tests/fixtures/us-families.tsv
+# (o diff deste ficheiro É a review do mapeamento; re-correr ao mexer no catálogo)
+pnpm exec tsx scripts/eval/audit-families.ts
+
+# famílias de anúncios (normalizeVehicle) sem correspondência no catálogo us_*
+# (≥5 anúncios), com sugestão da família mais próxima da mesma marca (dist. de edição)
+pnpm exec tsx scripts/eval/alias-gap.ts [--min 5]
+```
+
+`alias-gap` aponta os buracos que impedem o matching de versão (o modelo normaliza,
+mas o catálogo não tem essa família → nunca há `confirmado`): serve para priorizar
+recolha no ultimatespecs ou uma regra em `MODEL_RULES`.
+
 ## O que significa cada métrica
 
 `porFonte[<source_site>]` — por fonte, sobre anúncios **ativos**:

@@ -1112,6 +1112,12 @@ versões de modelo** (designação, ano, potência hp/kW, cilindrada, combustív
 alimentar o matching do pipeline (designação + potência obrigatória). ~6 300 páginas de
 modelo no sitemap; cada uma lista as versões numa tabela agrupada por combustível.
 
+> É a **referência de versões** do matching estrito (resolução `us_version_id`,
+> specs efetivas e janela de geração). Como o catálogo é mantido e sincronizado
+> (refresh mensal `--refresh --deep --fast`; audit-families + property test ao mexer):
+> [`../../docs/08-PIPELINE-DADOS.md`](../../docs/08-PIPELINE-DADOS.md) › "Resolução de
+> versão" e "Manutenção do catálogo".
+
 **Destino**: com `DATABASE_URL` (env ou `.env.local` da raiz) o upsert é **direto na BD**
 (`us_models`/`us_versions`, ver `ultimatespecs/db-sink.ts`) e não fica nada em disco — o
 resume é implícito (deriva da BD: relançar continua onde ficou, sem duplicar). Sem
