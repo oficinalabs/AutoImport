@@ -122,7 +122,7 @@ export const FAMILY_EXCEPTIONS: Record<string, string | null> = {
 };
 
 /** Tokens de corpo/porta a remover ao formar a chave de geração (genKey). */
-const BODY_TOKENS = new Set([
+export const BODY_TOKENS = new Set([
   "sedan", "saloon", "limousine", "berline", "coupe", "coup", "cabrio", "cabriolet",
   "convertible", "roadster", "spider", "spyder", "targa", "touring", "estate", "wagon",
   "sw", "cw", "station", "variant", "avant", "kombi", "hatchback", "hatch", "fastback",
@@ -288,8 +288,13 @@ export function genKeyOf(rawSlug: string): string {
  * o arranque anterior é ≥2 anos (funde variantes de carroçaria multi-chassis da
  * mesma geração — ex. BMW E90/E91 2005 + E92 2006 + E93 2007 — e separa
  * gerações/faceliftes reais, ≥2 anos de intervalo, ex. Golf-2017→Golf-8). Janela
- * = [arranque−1, arranque_seguinte−1]; última aberta. genKeys sem ano vão para o
- * fim numa geração de janela aberta [null, null].
+ * = [início, arranque_seguinte−1]; última aberta. O −1 de graça no `yearStart`
+ * (apanha a matrícula no ano anterior ao model-year) só se aplica à PRIMEIRA
+ * geração: nas seguintes, a geração anterior já cobre o ano N−1 (o seu `yearEnd`
+ * é arranque−1), pelo que reaplicar o −1 criava uma sobreposição de 1 ano que
+ * deixava um anúncio de fronteira (ex. Ateca 2019, X3 2023, T-Roc 2021) vazar
+ * para a geração/facelift SEGUINTE. Sem o −1 interno as janelas ficam contíguas
+ * e disjuntas. genKeys sem ano vão para o fim numa geração aberta [null, null].
  */
 export function clusterGenerations(
   familyKey: string,
@@ -321,7 +326,7 @@ export function clusterGenerations(
       id: `${familyKey}#${i}`,
       mids: c.mids,
       startYear: c.startYear,
-      yearStart: c.startYear - 1,
+      yearStart: i === 0 ? c.startYear - 1 : c.startYear,
       yearEnd: next ? next.startYear - 1 : null,
     };
   });

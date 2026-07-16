@@ -5520,5 +5520,190 @@
       "mustConfirm": true
     },
     "note": "BMW M850i 530cv ≠ 840i/M8"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "e5a1ee20-1554-4931-a31c-c2234a02e747",
+    "input": {
+      "makeRaw": "Toyota",
+      "modelRaw": "Corolla",
+      "variant": "1.8 Hybrid",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2025,
+      "powerHp": 140,
+      "displacementCc": 1798,
+      "co2": 106
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|corolla",
+      "fuel": "híbrido",
+      "powerHp": 140,
+      "cc": 1798,
+      "mustConfirm": true,
+      "midEsperado": "M13295"
+    },
+    "note": "auditoria (1): Corolla sem corpo no texto → hatch base (M13295), NUNCA o Cross (M13071); o Cross é modelo derivado e a guarda recolhe a base"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "7e4dfe96-beda-4036-992b-db80e17f5a20",
+    "input": {
+      "makeRaw": "Ford",
+      "modelRaw": "C-Max",
+      "variant": "1.6",
+      "fuelRaw": "Benzin",
+      "year": 2011,
+      "powerHp": 125,
+      "displacementCc": 1596,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ford|c",
+      "fuel": "gasolina",
+      "powerHp": 125,
+      "cc": 1596,
+      "mustConfirm": true
+    },
+    "note": "auditoria (2): o \"Grand\" só está no URL/category (model_raw=C-Max) — para o input parseável C-MAX-II regular é o match correto; recuperar \"Grand\" é do coletor, não do resolver"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "52f5c717-7593-4a25-be66-3af9f44a0e4a",
+    "input": {
+      "makeRaw": "Seat",
+      "modelRaw": "Ateca",
+      "variant": "1.5 TSI ACT Xcellence",
+      "fuelRaw": "Benzin",
+      "year": 2019,
+      "powerHp": 150,
+      "displacementCc": 1498,
+      "co2": 161
+    },
+    "label": {
+      "kind": "signature",
+      "family": "seat|ateca",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1498,
+      "mustConfirm": true,
+      "midEsperado": "M8696"
+    },
+    "note": "auditoria (3): 2019 é pré-facelift (M8696), não o facelift Ateca-2020 (M10960) — janela disjunta"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "c5927125-c6b7-4e25-9e04-002399941624",
+    "input": {
+      "makeRaw": "Land Rover",
+      "modelRaw": "Defender",
+      "variant": "D200",
+      "fuelRaw": "Diesel",
+      "year": 2025,
+      "powerHp": 200,
+      "displacementCc": 2993,
+      "co2": 220
+    },
+    "label": {
+      "kind": "null",
+      "reason": "derivado ambíguo: Defender 90 vs 110 sem token no anúncio → provavel derivadoAmbiguo, nunca confirmado a um dos dois"
+    },
+    "note": "auditoria (4): Defender sem 90/110 no texto — guarda de derivados demove a provavel"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "587e7f87-444b-44ea-82a4-e39597db743d",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X3",
+      "variant": "20d",
+      "fuelRaw": "Diesel",
+      "year": 2023,
+      "powerHp": 190,
+      "displacementCc": 1995,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x3",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 1995,
+      "mustConfirm": true,
+      "midEsperado": "M9515"
+    },
+    "note": "auditoria (5): X3 2023 190cv é G01 (M9515), não o G45 2024+ 197cv (M14269) — janela disjunta"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "c368b540-619d-4738-9e1e-abdb2d75f623",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "1.5 TSI ACT Sport",
+      "fuelRaw": "Benzin",
+      "year": 2021,
+      "powerHp": 150,
+      "displacementCc": 1498,
+      "co2": 156
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1498,
+      "mustConfirm": true,
+      "midEsperado": "M9804"
+    },
+    "note": "auditoria (6): T-Roc sem \"cabrio\" no texto → SUV base (M9804), não o Cabriolet (M13159) — guarda de derivados recolhe a base"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "08e86351-ad1c-479c-a5b1-c8c7ac51fe15",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "1.4",
+      "fuelRaw": "Benzin",
+      "year": 2008,
+      "powerHp": 80,
+      "displacementCc": 1396,
+      "co2": 164
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 80,
+      "cc": 1390,
+      "mustConfirm": true,
+      "midEsperado": "M1352"
+    },
+    "note": "auditoria (7): 2008 cai só na janela do Golf-6 (Golf-5 termina 2007) e a spec 1.4 16v 80cv 1390cc existe em ambas mas só o Golf-6 está na janela → confirmado sem geracaoAmbigua (justificado)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "cafaa455-3857-4f6a-aa5e-488cf6be0d64",
+    "input": {
+      "makeRaw": "Porsche",
+      "modelRaw": "928",
+      "variant": "4S",
+      "fuelRaw": "Benzin",
+      "year": 1987,
+      "powerHp": 320,
+      "displacementCc": 4957,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "porsche|928",
+      "fuel": "gasolina",
+      "powerHp": 320,
+      "cc": 4957,
+      "mustConfirm": true
+    },
+    "note": "auditoria (8): 928 S4 320cv (v3612), não o GT 330cv (v3611) — preferência de degrau exato (ver unit test dedicado)"
   }
 ]

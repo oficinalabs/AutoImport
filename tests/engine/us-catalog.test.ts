@@ -131,8 +131,10 @@ test("gerações Carens: 3 mids, mesma família, janelas distintas e encadeadas"
   const f = idx.byFamily.get("kia|carens");
   assert.ok(f, "família kia|carens existe");
   assert.equal(f!.generations.length, 3);
+  // Janelas contíguas e DISJUNTAS: o −1 de graça no yearStart só na 1.ª geração
+  // (as seguintes começam no arranque — a anterior já cobre o ano N−1).
   const wins = f!.generations.map((g) => [g.yearStart, g.yearEnd]);
-  assert.deepEqual(wins, [[1999, 2001], [2001, 2005], [2005, null]]);
+  assert.deepEqual(wins, [[1999, 2001], [2002, 2005], [2006, null]]);
 });
 
 test("gerações Golf: 7/2017/8 mesma família, janelas encadeadas", () => {
@@ -146,9 +148,11 @@ test("gerações Golf: 7/2017/8 mesma família, janelas encadeadas", () => {
   );
   const f = idx.byFamily.get("volkswagen|golf")!;
   assert.equal(f.generations.length, 3);
+  // Janelas disjuntas (fronteira 2016/2017 e 2019/2020 sem sobreposição): um
+  // anúncio 2019 fica no facelift 2017 (não vaza para o Golf-8 de 2020).
   assert.deepEqual(
     f.generations.map((g) => [g.yearStart, g.yearEnd]),
-    [[2011, 2016], [2016, 2019], [2019, null]],
+    [[2011, 2016], [2017, 2019], [2020, null]],
   );
 });
 

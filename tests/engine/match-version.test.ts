@@ -112,6 +112,59 @@ model("GRAND", "Hyundai", "Grand-Santa-Fe", 2014, [
   { name: "Grand Santa Fe 2.2 CRDi", fuelSection: "diesel", fuel: "Diesel", year: 2014, hp: 197, cc: 2199, co2n: 178 },
 ]);
 
+// ── Derivados de modelo/carroçaria (guarda pós-auditoria) ─────────
+// Toyota Corolla: Cross (SUV) + Hatchback + Touring Sports na MESMA geração e SEM
+// base "corolla" nu → sem token no anúncio é derivadoAmbiguo (nunca confirma).
+model("CORX", "Toyota", "Corolla-Cross", 2022, [
+  { name: "Corolla Cross 1.8 Hybrid", fuelSection: "petrol", fuel: "Hybrid / Petrol", year: 2022, hp: 140, cc: 1798, co2w: 112 },
+]);
+model("CORH", "Toyota", "Corolla-E210-Hatchback-2023", 2023, [
+  { name: "Corolla Hatchback 1.8 Hybrid", fuelSection: "petrol", fuel: "Hybrid / Petrol", year: 2023, hp: 140, cc: 1798, co2w: 108 },
+]);
+model("CORT", "Toyota", "Corolla-E210-Touring-Sports-2023", 2023, [
+  { name: "Corolla Touring Sports 1.8 Hybrid", fuelSection: "petrol", fuel: "Hybrid / Petrol", year: 2023, hp: 140, cc: 1798, co2w: 110 },
+]);
+// Land Rover Defender 90 vs 110 (números, não carroçaria) sem base → ambíguo.
+model("DEF90", "Land Rover", "Defender-90-2026", 2025, [
+  { name: "Defender 90 D200", fuelSection: "diesel", fuel: "Diesel", year: 2025, hp: 200, cc: 2997, co2w: 222 },
+]);
+model("DEF110", "Land Rover", "Defender-110-2026", 2025, [
+  { name: "Defender 110 D200", fuelSection: "diesel", fuel: "Diesel", year: 2025, hp: 200, cc: 2997, co2w: 222 },
+]);
+// VW T-Roc: SUV base + Cabrio (mesma geração) → sem "cabrio" no texto fica a base.
+model("TROC", "Volkswagen", "T-Roc", 2017, [
+  { name: "T-Roc 1.5 TSI 150HP", fuelSection: "petrol", fuel: "Petrol", year: 2017, hp: 150, cc: 1498, co2w: 137 },
+]);
+model("TROCCAB", "Volkswagen", "T-Roc-Cabrio", null, [
+  { name: "T-Roc Cabrio 1.5 TSI 150HP", fuelSection: "petrol", fuel: "Petrol", year: 2018, hp: 150, cc: 1498, co2w: 141 },
+]);
+// Audi TT Coupe/Roadster: carroçarias da MESMA designação sem base → NÃO demove.
+model("TTC", "Audi", "TT-Coupe", 2016, [
+  { name: "TT 2.0 TFSI Coupe", fuelSection: "petrol", fuel: "Petrol", year: 2016, hp: 230, cc: 1984, co2w: 145 },
+]);
+model("TTR", "Audi", "TT-Roadster", 2016, [
+  { name: "TT 2.0 TFSI Roadster", fuelSection: "petrol", fuel: "Petrol", year: 2016, hp: 230, cc: 1984, co2w: 149 },
+]);
+// BMW X3: G01 (2017, 190cv) e G45 (2024, 197cv) — janelas disjuntas.
+model("X3G01", "BMW", "G01-X3", 2017, [
+  { name: "X3 xDrive20d", fuelSection: "diesel", fuel: "Diesel", year: 2018, hp: 190, cc: 1995, co2w: 150 },
+]);
+model("X3G45", "BMW", "G45-X3", 2024, [
+  { name: "X3 20d xDrive Steptronic", fuelSection: "diesel", fuel: "Diesel", year: 2024, hp: 197, cc: 1995, co2w: 153 },
+]);
+// Seat Ateca pré-facelift (2016) vs facelift Ateca-2020 — janelas disjuntas.
+model("ATC", "Seat", "Ateca", 2016, [
+  { name: "Ateca 1.5 EcoTSI", fuelSection: "petrol", fuel: "Petrol", year: 2016, hp: 150, cc: 1498, co2w: 151 },
+]);
+model("ATC20", "Seat", "Ateca-2020", 2020, [
+  { name: "Ateca 1.5 TSI 150HP ACT DSG", fuelSection: "petrol", fuel: "Petrol", year: 2020, hp: 150, cc: 1498, co2w: 144 },
+]);
+// Porsche 928: S4 (320) e GT (330) na mesma geração/mid — degrau exato.
+model("P928", "Porsche", "928", null, [
+  { name: "928 S4", fuelSection: "petrol", fuel: "Petrol", year: 1987, hp: 320, cc: 4957 },
+  { name: "928 GT", fuelSection: "petrol", fuel: "Petrol", year: 1989, hp: 330, cc: 4957 },
+]);
+
 const CAT: UsCatalogIndex = buildIndex(models, versions);
 
 // ── helper de input ──
@@ -374,6 +427,82 @@ test("viaFallback: Grand Santa Fe legítimo confirma (tokens contidos no slug)",
   const r = resolveVersion(inp({ makeRaw: "Hyundai", modelRaw: "Grand Santa Fe", variant: "2.2 CRDi", fuelRaw: "Diesel", year: 2015, powerHp: 197, displacementCc: 2199 }), CAT);
   assert.equal(r?.confidence, "confirmado");
   assert.equal(r?.evidence.viaFallback, true);
+});
+
+// ── Guarda de derivados de modelo/carroçaria (pós-auditoria) ──────
+
+test("derivados: Corolla sem corpo no texto → hatch BASE (não o Cross, modelo derivado)", () => {
+  // hatchback é carroçaria neutra → o mid do hatch é a base; o Cross (SUV) é um
+  // derivado de modelo que só sobrevive se o anúncio o nomear.
+  const r = resolveVersion(inp({ makeRaw: "Toyota", modelRaw: "Corolla", variant: "1.8 Hybrid", fuelRaw: "Elektro/Benzin", year: 2025, powerHp: 140, displacementCc: 1798, co2: 106 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.derivadoAmbiguo, false);
+  assert.equal(vspec(r)?.tokens.includes("cross"), false);
+});
+
+test("derivados: anúncio que nomeia 'Cross' → confirma o Cross (sem ambiguidade)", () => {
+  const r = resolveVersion(inp({ makeRaw: "Toyota", modelRaw: "Corolla Cross", variant: "1.8 Hybrid", fuelRaw: "Elektro/Benzin", year: 2025, powerHp: 140, displacementCc: 1798, co2: 106 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.derivadoAmbiguo, false);
+  assert.equal(vspec(r)?.tokens.includes("cross"), true);
+});
+
+test("derivados: Defender 90 vs 110 sem token (números ≠ carroçaria) → provavel derivadoAmbiguo", () => {
+  const r = resolveVersion(inp({ makeRaw: "Land Rover", modelRaw: "Defender", variant: "D200", fuelRaw: "Diesel", year: 2025, powerHp: 200, displacementCc: 2993, co2: 220 }), CAT);
+  assert.equal(r?.confidence, "provavel");
+  assert.equal(r?.evidence.derivadoAmbiguo, true);
+});
+
+test("derivados: Defender com '90' no texto → confirma o 90", () => {
+  const r = resolveVersion(inp({ makeRaw: "Land Rover", modelRaw: "Defender 90", variant: "D200", fuelRaw: "Diesel", year: 2025, powerHp: 200, displacementCc: 2993, co2: 220 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(vspec(r)?.tokens.includes("90"), true);
+});
+
+test("derivados: T-Roc sem 'cabrio' no texto → SUV base (não o Cabriolet)", () => {
+  const r = resolveVersion(inp({ makeRaw: "Volkswagen", modelRaw: "T-Roc", variant: "1.5 TSI Sport", fuelRaw: "Benzin", year: 2018, powerHp: 150, displacementCc: 1498 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.derivadoAmbiguo, false);
+  assert.equal(vspec(r)?.tokens.includes("cabrio"), false);
+});
+
+test("derivados: T-Roc 'Cabrio' no texto → confirma o Cabriolet", () => {
+  const r = resolveVersion(inp({ makeRaw: "Volkswagen", modelRaw: "T-Roc Cabrio", variant: "1.5 TSI", fuelRaw: "Benzin", year: 2018, powerHp: 150, displacementCc: 1498 }), CAT);
+  assert.equal(vspec(r)?.tokens.includes("cabrio"), true);
+});
+
+test("derivados: carroçarias sem base (TT Coupe/Roadster) → confirmado, NÃO demove", () => {
+  // coupe/roadster são a mesma designação em corpos distintos (motor/cc iguais) →
+  // trimAmbiguo, não derivadoAmbiguo.
+  const r = resolveVersion(inp({ makeRaw: "Audi", modelRaw: "TT", variant: "2.0 TFSI", fuelRaw: "Benzin", year: 2016, powerHp: 230, displacementCc: 1984 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.derivadoAmbiguo, false);
+});
+
+// ── Janelas de geração disjuntas (fronteira sem sobreposição) ─────
+
+test("janela disjunta: X3 20d 2023 190cv → G01 (não vaza para o G45 2024 197cv)", () => {
+  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "X3", variant: "20d", fuelRaw: "Diesel", year: 2023, powerHp: 190, displacementCc: 1995 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(vspec(r)?.powerHp, 190);
+  assert.equal(r?.evidence.geracaoAmbigua, false);
+});
+
+test("janela disjunta: Ateca 2019 → pré-facelift EcoTSI (não o facelift Ateca-2020)", () => {
+  const r = resolveVersion(inp({ makeRaw: "Seat", modelRaw: "Ateca", variant: "1.5 TSI ACT", fuelRaw: "Benzin", year: 2019, powerHp: 150, displacementCc: 1498 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.family, "seat|ateca");
+  assert.equal(vspec(r)?.tokens.includes("ecotsi"), true);
+});
+
+// ── Preferência de degrau exato (potência mais próxima) ───────────
+
+test("degrau exato: 928 '4S' (token não bate 's4') → S4 320, não GT 330", () => {
+  // "4s" ≠ "s4" → o desempate de trim não separa; a potência mais próxima do
+  // anúncio (320) escolhe o S4 em vez do GT (330), sem relaxar a tolerância.
+  const r = resolveVersion(inp({ makeRaw: "Porsche", modelRaw: "928", variant: "4S", fuelRaw: "Benzin", year: 1987, powerHp: 320, displacementCc: 4957 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(vspec(r)?.powerHp, 320);
 });
 
 // ════════════════════════════════════════════════════════════════

@@ -15,7 +15,7 @@
 import { parsePowerFromText } from "../../tools/collector/lib/db-sink";
 import type { FuelType } from "../types";
 import { normFuel, normMake, normModel, normModelViaRule, slugify } from "./normalize-vehicle";
-import type { CatalogVersion, Generation, UsCatalogIndex } from "./us-catalog";
+import { BODY_TOKENS, type CatalogVersion, type Generation, type UsCatalogIndex } from "./us-catalog";
 
 export interface ResolveInput {
   makeRaw: string;
@@ -49,6 +49,9 @@ export interface MatchEvidence {
   trimAmbiguo: boolean;
   /** sobreviventes em gerações distintas mas com specs concordantes */
   geracaoAmbigua: boolean;
+  /** sobreviventes em derivados de modelo/carroçaria distintos sem base clara e
+   * sem token desambiguador no anúncio (Corolla Cross/TS, Defender 90/110…) */
+  derivadoAmbiguo: boolean;
   /** a família veio do fallback primeiro-token do normModel (ex. "Grand …") */
   viaFallback: boolean;
 }
@@ -200,6 +203,109 @@ function concordant(vs: CatalogVersion[], year: number | null): boolean {
 const byVersionId = (a: CatalogVersion, b: CatalogVersion) =>
   a.versionId.localeCompare(b.versionId, undefined, { numeric: true });
 
+// ── Guarda de derivados de modelo/carroçaria ─────────────────────
+
+const ROMAN = new Set(["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]);
+
+/**
+ * Carroçarias NEUTRAS (o corpo por omissão): não distinguem um derivado — o mid
+ * que só difere por elas É o modelo base (o sedan/hatch é o Corolla/Série-3 base,
+ * não um derivado). São tratadas como ruído ao calcular os tokens distintivos.
+ */
+const NEUTRAL_BODY = new Set([
+  "sedan", "saloon", "berline", "berlina", "limousine", "notchback", "hatchback",
+  "hatch", "liftback", "fastback", "door", "doors",
+]);
+
+/**
+ * Carroçarias ESPECIAIS + GT: distinguem um corpo real (cabrio/coupé/break/GT…).
+ * Ficam como distintivos, mas quando não há base inequívoca partilham motor/cc e
+ * o preço PT é por modelo (não por corpo), por isso NÃO demovem — só trimAmbiguo
+ * (ex. Série 8 coupé/cabrio/gran-coupé, TT coupé/roadster).
+ */
+const SPECIAL_BODY = new Set(
+  [...BODY_TOKENS, "gt", "gtc", "sports", "sportstourer"].filter((t) => !NEUTRAL_BODY.has(t)),
+);
+
+/**
+ * Ruído ao comparar slugs de mids da MESMA família (não designa um derivado):
+ * anos, romanos, códigos de chassis (e210/g20/l663), marcadores de facelift,
+ * marcas de geração (mk5/mk6), carroçaria neutra e tokens de UMA letra (letras de
+ * chassis/geração isoladas: Corsa D/E, Astra J/K — nunca um modelo por si só).
+ */
+function isNoiseToken(t: string): boolean {
+  if (/^(?:19|20)\d{2}$/.test(t)) return true; // ano
+  if (ROMAN.has(t)) return true; // romano
+  if (/^[a-z]{1,2}\d{1,3}[a-z]?$/.test(t)) return true; // chassis/plataforma (e210, g20, c8, mk5…)
+  if (/^(?:lci|facelift|restyling|mopf|phase)$/.test(t)) return true; // facelift/fase
+  if (/^(?:class|klasse|classe|clase)$/.test(t)) return true; // filler do nome (Classe C)
+  if (t.length === 1) return true; // letra/algarismo isolado (chassis/porta)
+  if (NEUTRAL_BODY.has(t)) return true; // corpo por omissão → é a base
+  return false;
+}
+
+/**
+ * Guarda de derivados: quando os candidatos sobreviventes abrangem mids cujos
+ * slugs diferem em TOKENS DISTINTIVOS de modelo/carroçaria (cross, cabrio,
+ * 90/110 do Defender, cargo/life das carrinhas…), desambigua pelo texto:
+ *  (i)   o texto nomeia um derivado → só esse grupo sobrevive;
+ *  (ii)  não nomeia nenhum mas há mid(s) BASE (só carroçaria neutra) → o base
+ *        (Corolla hatch, Série-3 sedan, T-Roc SUV);
+ *  (iii) sem base: se os distintivos forem SÓ carroçaria especial (coupé/cabrio)
+ *        fica trimAmbiguo (partilham motor/cc); senão é `derivadoAmbiguo`
+ *        (Defender 90/110, Combo cargo/life) → o consumidor demove a provável.
+ * Os tokens distintivos vêm da diferença dos slugs (menos ruído) — determinístico.
+ */
+function derivativeGuard(
+  cands: CatalogVersion[],
+  adTokens: Set<string>,
+  midInfo: UsCatalogIndex["midInfo"],
+): { cands: CatalogVersion[]; derivadoAmbiguo: boolean } {
+  const mids = [...new Set(cands.map((v) => v.mid))];
+  if (mids.length < 2) return { cands, derivadoAmbiguo: false };
+
+  const modelTokens = new Map<string, Set<string>>();
+  for (const mid of mids) {
+    modelTokens.set(mid, new Set((midInfo.get(mid)?.slugTokens ?? []).filter((t) => !isNoiseToken(t))));
+  }
+  // núcleo comum a TODOS os mids (a família); os distintivos são o resto.
+  let core: Set<string> | null = null;
+  for (const s of modelTokens.values()) {
+    if (core == null) {
+      core = new Set(s);
+    } else {
+      const inter = new Set<string>();
+      for (const t of core) if (s.has(t)) inter.add(t);
+      core = inter;
+    }
+  }
+  core ??= new Set<string>();
+  const distinctive = new Map<string, Set<string>>();
+  const universe = new Set<string>();
+  for (const mid of mids) {
+    const d = new Set([...modelTokens.get(mid)!].filter((t) => !core!.has(t)));
+    distinctive.set(mid, d);
+    for (const t of d) universe.add(t);
+  }
+  if (universe.size === 0) return { cands, derivadoAmbiguo: false }; // sem derivados reais
+
+  // (i) o anúncio nomeia algum derivado → fica só quem o anúncio nomeia.
+  const named = [...universe].some((t) => adTokens.has(t));
+  if (named) {
+    const keep = new Set(mids.filter((mid) => [...distinctive.get(mid)!].some((t) => adTokens.has(t))));
+    const filtered = cands.filter((v) => keep.has(v.mid));
+    return { cands: filtered.length ? filtered : cands, derivadoAmbiguo: false };
+  }
+  // (ii) sem token no anúncio mas há base (só carroçaria neutra) → o(s) base.
+  const baseMids = new Set(mids.filter((mid) => distinctive.get(mid)!.size === 0));
+  if (baseMids.size) {
+    return { cands: cands.filter((v) => baseMids.has(v.mid)), derivadoAmbiguo: false };
+  }
+  // (iii) sem base: só carroçaria especial → trimAmbiguo; senão derivadoAmbiguo.
+  if ([...universe].every((t) => SPECIAL_BODY.has(t))) return { cands, derivadoAmbiguo: false };
+  return { cands, derivadoAmbiguo: true };
+}
+
 // ════════════════════════════════════════════════════════════════
 // Resolver
 // ════════════════════════════════════════════════════════════════
@@ -296,15 +402,36 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     }
   }
 
+  const trimTokens = slugify(`${input.modelRaw} ${input.variant ?? ""}`).split("-").filter(Boolean);
+  const adTokens = new Set(trimTokens);
+
+  // Guarda de derivados de modelo/carroçaria: separa derivados distintos (Cross,
+  // Cabrio, Defender 90/110) pelo texto do anúncio ou, na ausência de token,
+  // recolhe o modelo base; sem base inequívoca marca `derivadoAmbiguo`.
+  const guard = derivativeGuard(cands, adTokens, catalog.midInfo);
+  cands = guard.cands;
+  const derivadoAmbiguo = guard.derivadoAmbiguo;
+
   // Desempate de trim: estreita por qualquer token do modelo+variante que PARTA
   // os candidatos (uns têm-no, outros não). NÃO conta como sinal duro — a
   // potência e a cilindrada já garantem a designação; isto só separa trims
   // gémeos de igual potência/cc (Golf R vs GTI Clubsport, M8 vs M8 Competition).
   // É seguro para a precisão: todo o sobrevivente já bateu potência/cc do anúncio.
-  const trimTokens = slugify(`${input.modelRaw} ${input.variant ?? ""}`).split("-").filter(Boolean);
   for (const t of trimTokens) {
     const withT = cands.filter((v) => v.tokens.includes(t));
     if (withT.length && withT.length < cands.length) cands = withT;
+  }
+
+  // Preferência de degrau exato: entre os sobreviventes fica o(s) de potência
+  // mais próxima da do anúncio. Separa o degrau/geração certa quando duas
+  // designações coexistem dentro da tolerância (X3 190 vs 197; 928 S4 320 vs GT
+  // 330) SEM relaxar a tolerância — só desempata pelo que bate exato.
+  if (powerAd != null) {
+    const withP = cands.filter((v) => v.powerHp != null);
+    if (withP.length) {
+      const best = Math.min(...withP.map((v) => Math.abs(v.powerHp! - powerAd)));
+      cands = cands.filter((v) => v.powerHp != null && Math.abs(v.powerHp - powerAd) === best);
+    }
   }
 
   if (!cands.length) return null;
@@ -339,6 +466,7 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     candidates: cands.length,
     trimAmbiguo: distinctVersions > 1,
     geracaoAmbigua,
+    derivadoAmbiguo,
     viaFallback: fam.viaFallback,
   };
 
@@ -354,9 +482,11 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
 
   // ── Decisão ──
   // confirmado: ≥2 sinais duros, candidatos concordantes e ANO presente (sem ano
-  // não há prova de geração). Downgrade a provavel se faltar o ano.
+  // não há prova de geração). Downgrade a provavel se faltar o ano OU se os
+  // derivados de modelo ficaram ambíguos (não sabemos QUAL carroçaria/derivado).
   if (hardSignals >= 2 && concordant(cands, input.year)) {
-    return { versionId: chosen.versionId, mid, confidence: input.year != null ? "confirmado" : "provavel", evidence };
+    const confirmable = input.year != null && !derivadoAmbiguo;
+    return { versionId: chosen.versionId, mid, confidence: confirmable ? "confirmado" : "provavel", evidence };
   }
   // provavel: ≥1 sinal duro e candidato único.
   if (hardSignals >= 1 && distinctVersions === 1) {

@@ -130,17 +130,19 @@ test(
     await cleanup();
 
     // Catálogo sintético: família `testgen|genmodel` com DUAS gerações datadas —
-    // velha (arranque 2019) → janela [2018,2022]; nova (arranque 2023) → [2022,null].
+    // velha (arranque 2019) → janela [2018,2021]; nova (arranque 2022) → [2022,null].
+    // Janelas DISJUNTAS (sem o −1 de graça interno): o ano de fronteira 2021 fica
+    // na geração velha e o 2022 na nova, sem sobreposição.
     await db.execute(sql`
       insert into us_models (mid, make, model, slug, model_year, url) values
         ('TG-OLD', 'Testgen', 'GenModel', 'GenModel-Gen1', 2019, 'https://example.test/old'),
-        ('TG-NEW', 'Testgen', 'GenModel', 'GenModel-Gen2', 2023, 'https://example.test/new')
+        ('TG-NEW', 'Testgen', 'GenModel', 'GenModel-Gen2', 2022, 'https://example.test/new')
     `);
     await db.execute(sql`
       insert into us_versions
         (version_id, mid, name, url, fuel_section, fuel, year, power_hp, displacement_cc, co2_wltp) values
         ('V-OLD', 'TG-OLD', 'GenModel 1.0', 'https://example.test/vold', 'petrol', 'Petrol', 2019, 130, 1500, 140),
-        ('V-NEW', 'TG-NEW', 'GenModel 1.0', 'https://example.test/vnew', 'petrol', 'Petrol', 2023, 130, 1500, 135)
+        ('V-NEW', 'TG-NEW', 'GenModel 1.0', 'https://example.test/vnew', 'petrol', 'Petrol', 2022, 130, 1500, 135)
     `);
 
     // Modelo canónico (o matching de versão é agnóstico à geração: as observações
