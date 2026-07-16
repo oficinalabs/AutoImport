@@ -189,10 +189,25 @@ try {
   /* sem .env.local → salta */
 }
 
+// O CI tem DATABASE_URL mas catálogo us_* vazio — skip dinâmico dentro do teste
+// (tsx compila para CJS: sem top-level await).
+async function catalogoVazio(): Promise<boolean> {
+  const postgres = (await import("postgres")).default;
+  const client = postgres(process.env.DATABASE_URL as string, { prepare: false });
+  try {
+    const r = await client`select count(*)::int as n from us_models`;
+    return Number(r[0]?.n ?? 0) === 0;
+  } finally {
+    await client.end({ timeout: 5 });
+  }
+}
+const AVISO_CI = "sem catálogo us_* na BD (CI) — teste saltado";
+
 test(
   "property: 100% dos mids resolvem por regra/exceção; exceções ≤ 90",
   { skip: !process.env.DATABASE_URL && "sem DATABASE_URL (BD docker)" },
-  async () => {
+  async (t) => {
+    if (await catalogoVazio()) return t.skip(AVISO_CI);
     const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
     const { db, closeDb } = await import("../../db");
     const idx = await buildUsCatalog(db);

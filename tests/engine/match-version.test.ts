@@ -516,6 +516,21 @@ try {
 }
 const HAS_DB = !!process.env.DATABASE_URL;
 
+// O CI tem DATABASE_URL (Postgres de serviço) mas o catálogo us_* VAZIO — os
+// testes de golden/property precisam do catálogo carregado (docker local).
+// Skip dinâmico (tsx compila para CJS: sem top-level await).
+async function catalogoVazio(): Promise<boolean> {
+  const postgres = (await import("postgres")).default;
+  const client = postgres(process.env.DATABASE_URL as string, { prepare: false });
+  try {
+    const r = await client`select count(*)::int as n from us_models`;
+    return Number(r[0]?.n ?? 0) === 0;
+  } finally {
+    await client.end({ timeout: 5 });
+  }
+}
+const AVISO_CI = "sem catálogo us_* na BD (CI) — teste saltado";
+
 // Ligação dedicada por teste-BD (o singleton `db` fecha-se uma só vez; dois
 // testes a partilhá-lo davam CONNECTION_ENDED no segundo). buildUsCatalog só usa
 // db.execute(sql), por isso um drizzle sem schema chega.
@@ -538,7 +553,8 @@ interface GoldenEntry {
 test(
   "golden: precisão de confirmado = 100% e cobertura mínima",
   { skip: !HAS_DB && "sem DATABASE_URL (BD docker)" },
-  async () => {
+  async (t) => {
+    if (await catalogoVazio()) return t.skip(AVISO_CI);
     const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
     const { db, close } = await openDb();
     const cat = await buildUsCatalog(db);
@@ -594,7 +610,8 @@ test(
 test(
   "property: invariantes do resolver sobre todos os listings ativos",
   { skip: !HAS_DB && "sem DATABASE_URL (BD docker)" },
-  async () => {
+  async (t) => {
+    if (await catalogoVazio()) return t.skip(AVISO_CI);
     const { sql } = await import("drizzle-orm");
     const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
     const { db, close } = await openDb();
