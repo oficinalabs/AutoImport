@@ -35,6 +35,7 @@ __pycache__/
 *.pyc
 .venv/
 tools/collector/piscapisca/.venv/
+tools/collector/autouncle/.venv/
 
 # vercel
 .vercel
