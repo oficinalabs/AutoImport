@@ -92,6 +92,18 @@ export interface Listing {
   /** ISO date em que foi visto pela engine */
   seenAt: string;
   isFavorite: boolean;
+  /**
+   * ISO — quando o anúncio deixou de aparecer nas fontes; `undefined` se ainda
+   * está no mercado. A engine marca isto ao fim de 14 dias sem sinal
+   * (`run-daily.ts`, `--stale-days`) e desmarca sozinha se o anúncio reaparecer.
+   *
+   * ⚠️ Não quer dizer "vendido": também fica assim se o coletor daquela fonte
+   * partir. Por isso a UI diz "já não disponível", não "vendido".
+   *
+   * Só chega à UI nos **favoritos** — a pesquisa continua a mostrar apenas
+   * anúncios vivos.
+   */
+  unavailableSince?: string;
 }
 
 export interface Alert {

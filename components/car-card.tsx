@@ -4,9 +4,10 @@ import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
 import { KmTrustBadge } from "@/components/km-trust-badge";
 import { SavingsBadge } from "@/components/savings-badge";
+import { Badge } from "@/components/ui/badge";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { toggleFavorite } from "@/lib/data";
-import { formatEuro, formatKm } from "@/lib/format";
+import { formatEuro, formatKm, relativeDay } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Heart } from "lucide-react";
@@ -15,6 +16,8 @@ import { useState } from "react";
 
 export function CarCard({ listing }: { listing: Listing }) {
   const [fav, setFav] = useState(listing.isFavorite);
+  // Só chega aqui pelos favoritos: a pesquisa nunca devolve anúncios mortos.
+  const indisponivel = Boolean(listing.unavailableSince);
 
   async function onToggle(e: React.MouseEvent) {
     e.preventDefault();
@@ -25,12 +28,30 @@ export function CarCard({ listing }: { listing: Listing }) {
   return (
     <Link
       href={`/anuncio/${listing.id}`}
-      className="group flex flex-col overflow-hidden rounded-[10px] border border-line bg-surface transition-shadow hover:shadow-[0_8px_24px_-12px_rgba(14,59,74,.25)]"
+      className={cn(
+        "group flex flex-col overflow-hidden rounded-[10px] border bg-surface transition-shadow",
+        indisponivel
+          ? "border-dashed border-line-strong"
+          : "border-line hover:shadow-[0_8px_24px_-12px_rgba(14,59,74,.25)]",
+      )}
     >
       <div className="relative">
-        <CarImage label={listing.title} className="aspect-[4/3] w-full" rounded="rounded-none" />
+        <CarImage
+          label={listing.title}
+          className={cn("aspect-[4/3] w-full", indisponivel && "opacity-40 grayscale")}
+          rounded="rounded-none"
+        />
         <div className="absolute left-2 top-2">
-          <VerdictBadge verdict={listing.verdict} className="shadow-sm backdrop-blur" />
+          {/* Num anúncio que já saiu do mercado, o veredito enganaria: dizer
+              "compensa" sobre um carro que já não se pode comprar é pior do que
+              não dizer nada. */}
+          {indisponivel ? (
+            <Badge className="bg-neutral-soft text-ink-soft shadow-sm backdrop-blur">
+              Já não disponível
+            </Badge>
+          ) : (
+            <VerdictBadge verdict={listing.verdict} className="shadow-sm backdrop-blur" />
+          )}
         </div>
         <button
           type="button"
@@ -43,7 +64,7 @@ export function CarCard({ listing }: { listing: Listing }) {
         </button>
       </div>
 
-      <div className="flex flex-1 flex-col gap-3 p-3.5">
+      <div className={cn("flex flex-1 flex-col gap-3 p-3.5", indisponivel && "opacity-60")}>
         <div>
           <h3 className="font-display text-[15px] font-semibold leading-tight">{listing.title}</h3>
           <p className="mt-1 text-xs text-ink-soft">
@@ -56,22 +77,30 @@ export function CarCard({ listing }: { listing: Listing }) {
           <span>{listing.source}</span>
         </div>
 
-        <KmTrustBadge trust={listing.kmTrust} />
+        {indisponivel ? (
+          <p className="text-xs text-ink-soft">
+            Sem sinal {relativeDay(listing.seenAt)}. Pode ter sido vendido ou retirado.
+          </p>
+        ) : (
+          <KmTrustBadge trust={listing.kmTrust} />
+        )}
 
         <div className="mt-auto flex items-end justify-between border-t border-line pt-3">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-ink-soft">
-              Custo final em PT
+              {indisponivel ? "Custo final estimado" : "Custo final em PT"}
             </div>
             <div className="tnum font-display text-lg font-bold">
               {formatEuro(listing.cost.totalPt)}
             </div>
           </div>
-          <SavingsBadge
-            savings={listing.savings}
-            savingsPct={listing.savingsPct}
-            verdict={listing.verdict}
-          />
+          {!indisponivel && (
+            <SavingsBadge
+              savings={listing.savings}
+              savingsPct={listing.savingsPct}
+              verdict={listing.verdict}
+            />
+          )}
         </div>
       </div>
     </Link>

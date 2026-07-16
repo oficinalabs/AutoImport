@@ -477,6 +477,88 @@ export const favorites = pgTable(
   (table) => [uniqueIndex("favorites_stand_listing_uidx").on(table.standId, table.listingId)],
 );
 
+// ── Catálogo ultimatespecs.com — referência de versões para o matching ──
+// Alimentado pelo coletor tools/collector/ultimatespecs (NDJSON → scripts/pipeline/
+// ingest-ultimatespecs.ts). Chaves naturais do site (mid/version_id, estáveis) em vez
+// de uuid: o upsert do replay conflita nelas e re-correr não duplica.
+
+/** Página de modelo/geração (ex. "Stonic-2021"): 1 linha por `M<id>` do site. */
+export const usModels = pgTable(
+  "us_models",
+  {
+    /** "M27110" — id da página de modelo no ultimatespecs */
+    mid: text("mid").primaryKey(),
+    make: text("make").notNull(),
+    /** nome do modelo sem o ano do slug (ex. "Stonic", "Q7 3rd Generation") */
+    model: text("model").notNull(),
+    /** slug completo (ex. "Stonic-2021") — distingue gerações/facelifts */
+    slug: text("slug").notNull(),
+    /** ano no fim do slug; null quando o slug não o tem */
+    modelYear: integer("model_year"),
+    url: text("url").notNull(),
+    /** galeria da página de modelo — URLs diretos ultimatespecs (não guardamos imagens) */
+    imageUrls: jsonb("image_urls").$type<string[]>(),
+    collectedAt: timestamp("collected_at"),
+    ...domainTimestamps,
+  },
+  (table) => [index("us_models_make_model_idx").on(table.make, table.model)],
+);
+
+/**
+ * Versão/motorização (ex. "Stonic 2021 1.0 T-GDI 100"): o grão do matching.
+ * Os campos normalizados servem queries diretas; `specs` guarda TODAS as linhas
+ * cruas `label → valor` da ficha (~37+/versão, Bore x Stroke, WLTP low/medium/…)
+ * — nada do modo --deep se perde.
+ */
+export const usVersions = pgTable(
+  "us_versions",
+  {
+    /** id numérico da versão no ultimatespecs (ex. "141870") */
+    versionId: text("version_id").primaryKey(),
+    mid: text("mid")
+      .notNull()
+      .references(() => usModels.mid, { onDelete: "cascade" }),
+    /** designação como aparece no site (ex. "Stonic 2021 1.0 T-GDI 100") */
+    name: text("name").notNull(),
+    url: text("url").notNull(),
+    /** secção da tabela de versões: petrol | diesel | electric | pluginhybrid | hybrid… */
+    fuelSection: text("fuel_section"),
+    /** coluna "Year" da tabela de versões (ano-modelo da versão) */
+    year: integer("year"),
+    powerHp: integer("power_hp"),
+    powerKw: real("power_kw"),
+    displacementCc: integer("displacement_cc"),
+    // ── ficha deep normalizada (null sem --deep) ──
+    generation: text("generation"),
+    body: text("body"),
+    doors: integer("doors"),
+    seats: integer("seats"),
+    /** linha "Fuel type" da ficha ("Petrol", "Diesel", …) */
+    fuel: text("fuel"),
+    engineCode: text("engine_code"),
+    /** "Inline 3", "V6", … */
+    cylinders: text("cylinders"),
+    torqueNm: integer("torque_nm"),
+    drivetrain: text("drivetrain"),
+    gearbox: text("gearbox"),
+    co2Wltp: integer("co2_wltp"),
+    co2Nedc: integer("co2_nedc"),
+    emissionStandard: text("emission_standard"),
+    curbWeightKg: integer("curb_weight_kg"),
+    /** imagem principal (w800) — URL direto ultimatespecs */
+    imageUrl: text("image_url"),
+    /** ficha completa crua label→valor */
+    specs: jsonb("specs").$type<Record<string, string>>(),
+    collectedAt: timestamp("collected_at"),
+    ...domainTimestamps,
+  },
+  (table) => [
+    index("us_versions_mid_idx").on(table.mid),
+    index("us_versions_power_idx").on(table.powerHp),
+    index("us_versions_cc_idx").on(table.displacementCc),
+  ],
+);
+
 // ── Relations (domínio) — usadas pelas queries em lib/queries.ts ──
 
 export const listingsRelations = relations(listings, ({ one, many }) => ({
@@ -555,5 +637,16 @@ export const favoritesRelations = relations(favorites, ({ one }) => ({
   listing: one(listings, {
     fields: [favorites.listingId],
     references: [listings.id],
+  }),
+}));
+
+export const usModelsRelations = relations(usModels, ({ many }) => ({
+  versions: many(usVersions),
+}));
+
+export const usVersionsRelations = relations(usVersions, ({ one }) => ({
+  model: one(usModels, {
+    fields: [usVersions.mid],
+    references: [usModels.mid],
   }),
 }));

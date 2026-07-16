@@ -94,6 +94,7 @@ function rowToListing(
     kmTrust: l.vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" },
     seenAt: l.lastSeenAt.toISOString(),
     isFavorite,
+    unavailableSince: l.deletedAt?.toISOString(),
   };
 }
 
@@ -240,10 +241,18 @@ export async function countryInsightsQuery(): Promise<CountryInsight[]> {
 
 // ── Favoritos ────────────────────────────────────────────────────
 
+/**
+ * Favoritos do stand, **incluindo os que já saíram do mercado**.
+ *
+ * Ao contrário da pesquisa, aqui não filtramos `deleted_at`: o stand marcou
+ * aquele carro por alguma razão, e fazê-lo desaparecer sem explicação é pior do
+ * que mostrá-lo marcado como indisponível (decisão em docs/08). Os mortos vão
+ * para o fim da lista — o que ainda dá para comprar é que interessa primeiro.
+ */
 export async function favoritesQuery(standId: string): Promise<Listing[]> {
   const rows = await baseSelect(standId)
-    .where(and(isNull(listings.deletedAt), sql`${favorites.id} is not null`))
-    .orderBy(desc(favorites.createdAt));
+    .where(sql`${favorites.id} is not null`)
+    .orderBy(sql`${listings.deletedAt} is not null`, desc(favorites.createdAt));
   return rows.map((r) => toListing(r));
 }
 

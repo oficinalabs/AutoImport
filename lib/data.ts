@@ -76,7 +76,9 @@ export interface SearchFilters {
 
 export async function searchListings(filters: SearchFilters = {}): Promise<Listing[]> {
   if (hasDb()) return q.searchListingsQuery(filters, await activeStandId());
-  let out = [...LISTINGS];
+  // Espelha a query real: a pesquisa só mostra anúncios vivos. Os que saíram do
+  // mercado só aparecem nos favoritos, marcados (docs/08).
+  let out = LISTINGS.filter((l) => !l.unavailableSince);
   if (filters.query) {
     const query = filters.query.toLowerCase();
     out = out.filter((l) => l.title.toLowerCase().includes(query));
@@ -127,7 +129,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       activeAlerts: counts.activeAlerts,
     };
   }
-  const opportunities = LISTINGS.filter((l) => l.verdict === "compensa");
+  const opportunities = LISTINGS.filter((l) => l.verdict === "compensa" && !l.unavailableSince);
   return settle({
     newOpportunities: opportunities.length,
     totalPotentialSavings: DEALS.reduce((s, d) => s + d.savings, 0),
@@ -139,8 +141,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
   if (hasDb()) return q.topOpportunitiesQuery(limit, await activeStandId());
   return settle(
-    [...LISTINGS]
-      .filter((l) => l.verdict === "compensa")
+    LISTINGS.filter((l) => l.verdict === "compensa" && !l.unavailableSince)
       .sort((a, b) => b.savings - a.savings)
       .slice(0, limit),
   );
@@ -157,7 +158,13 @@ export async function getFavorites(): Promise<Listing[]> {
     const standId = await activeStandId();
     return standId ? q.favoritesQuery(standId) : [];
   }
-  return settle(LISTINGS.filter((l) => l.isFavorite));
+  // Como na query real: os favoritos que já saíram do mercado aparecem, mas no
+  // fim da lista — o que ainda dá para comprar é que interessa primeiro.
+  return settle(
+    LISTINGS.filter((l) => l.isFavorite).sort(
+      (a, b) => Number(Boolean(a.unavailableSince)) - Number(Boolean(b.unavailableSince)),
+    ),
+  );
 }
 
 export async function toggleFavorite(id: string): Promise<void> {
