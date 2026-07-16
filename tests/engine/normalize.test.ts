@@ -156,3 +156,25 @@ test("kmBand: 25.000 km por banda", () => {
   assert.equal(kmBand(25000), 1);
   assert.equal(kmBand(87000), 3);
 });
+
+test("normModel aliases do alias-gap: S/RS Audi à base, Mazda3, MG4, Cee'd, Lynk 01, e-C4", () => {
+  // S/RS/SQ vivem dentro das páginas A/Q do catálogo — família base
+  assert.equal(normModel("audi", "RS3"), "a3");
+  assert.equal(normModel("audi", "RS 6 Avant"), "a6");
+  assert.equal(normModel("audi", "RS Q3"), "q3");
+  assert.equal(normModel("audi", "S3 Sportback"), "a3");
+  assert.equal(normModel("audi", "SQ5"), "q5");
+  assert.equal(normModel("audi", "SQ8"), "sq8"); // página própria no catálogo
+  assert.equal(normModel("audi", "A3"), "a3"); // base intacta
+  // nomes comerciais colados / grafias de fonte
+  assert.equal(normModel("mazda", "Mazda3"), "3");
+  assert.equal(normModel("mg", "MG4"), "4");
+  assert.equal(normModel("mg", "ZS"), "zs"); // fallback intacto
+  assert.equal(normModel("kia", "Cee'd SW"), "ceed");
+  assert.equal(normModel("kia", "Pro_cee'd"), "proceed");
+  assert.equal(normModel("kia", "ProCeed GT"), "proceed");
+  assert.equal(normModel("lynk-co", "1"), "01");
+  assert.equal(normModel("lynk-co", "01"), "01");
+  assert.equal(normModel("citroen", "e-C4"), "c4"); // elétrico vive nas páginas C4
+  assert.equal(normModel("citroen", "C4 Cactus"), "c4-cactus"); // não regride
+});

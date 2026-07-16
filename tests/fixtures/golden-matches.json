@@ -783,12 +783,12 @@
     },
     "label": {
       "kind": "signature",
-      "family": "kia|pro",
+      "family": "kia|proceed",
       "fuel": "gasolina",
       "powerHp": 204,
       "cc": 1591
     },
-    "note": "estrato autohero.com"
+    "note": "estrato autohero.com · família corrigida pro→proceed (alias Cee'd, pós-alias-gap)"
   },
   {
     "source_site": "autohero.com",
@@ -930,10 +930,14 @@
       "co2": 205
     },
     "label": {
-      "kind": "null",
-      "reason": "família fora do catálogo"
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "gasolina",
+      "powerHp": 400,
+      "cc": 2480,
+      "mustConfirm": true
     },
-    "note": "estrato autoscout24.de"
+    "note": "estrato autoscout24.de · RS3 8Y (2.5 TFSI 400cv) — matchável desde o alias S/RS→família A (pós-alias-gap)"
   },
   {
     "source_site": "autoscout24.de",

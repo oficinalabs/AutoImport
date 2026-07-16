@@ -66,7 +66,14 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^(?:classe-|clase-)?(cla|clb|cls|gla|glb|glc|gle|gls|slk|slc|sl|amg-gt|eq[abces]s?|citan|vito|classe-v)(?:$|-)/, "$1"],
   ],
   audi: [
-    [/^(a[1-8]|q[2-8]|tt|r8|rs[3-7]|s[3-8])(?:$|-)/, "$1"],
+    // S/RS/SQ vivem DENTRO das páginas A/Q do catálogo ("A3 RS3 S tronic", "Q5 SQ5")
+    // — sem página própria (exceção: SQ8). Mapear à família base; o badge + potência
+    // pinam a versão certa no resolver.
+    [/^rs-?(q[38])(?:$|-)/, "$1"],
+    [/^rs-?([3-7])(?:$|-)/, "a$1"],
+    [/^sq-?([57])(?:$|-)/, "q$1"],
+    [/^s-?([3-8])(?:$|-)/, "a$1"],
+    [/^(a[1-8]|q[2-8]|tt|r8)(?:$|-)/, "$1"],
     [/^(e-tron|q4-e-tron|q8-e-tron)(?:$|-)/, "$1"],
   ],
   volkswagen: [
@@ -96,7 +103,13 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^kauai(?:$|-)/, "kona"], // Kauai = nome PT do Kona (catálogo usa Kona)
     [/^(i[123]0|i40|kona|tucson|santa-fe|bayon|ioniq-?[56]?|staria|h-1)(?:$|-)/, "$1"],
   ],
-  kia: [[/^(picanto|rio|ceed|xceed|stonic|niro|sportage|sorento|ev[3469]|soul|venga)(?:$|-)/, "$1"]],
+  kia: [
+    // Cee'd/Pro_cee'd slugificam com apóstrofe ("cee-d"); o catálogo usa Ceed/Pro-Ceed
+    // — sem estas regras o ProCeed caía na família "pro" (1.º token) dos dois lados
+    [/^pro-?cee-?d/, "proceed"],
+    [/^cee-?d/, "ceed"],
+    [/^(picanto|rio|xceed|stonic|niro|sportage|sorento|ev[3469]|soul|venga)(?:$|-)/, "$1"],
+  ],
   nissan: [
     [/^x-?trail(?:$|-)/, "x-trail"],
     [/^(micra|juke|qashqai|leaf|ariya|note|navara)(?:$|-)/, "$1"],
@@ -113,8 +126,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^(fabia|octavia|superb|kamiq|karoq|kodiaq|scala|enyaq|citigo|rapid|yeti)(?:$|-)/, "$1"],
   ],
   citroen: [
-    [/^(c[1-5](?:-aircross|-x)?|berlingo|spacetourer|jumpy|jumper|ds[3-7]|e-c4|ami)(?:$|-)/, "$1"],
     [/^c4-cactus(?:$|-)/, "c4-cactus"],
+    // ë-C4/e-C4 = C4 elétrico — o catálogo não tem família própria (vive nas páginas C4)
+    [/^e-(c[1-5])(?:$|-)/, "$1"],
+    [/^(c[1-5](?:-aircross|-x)?|berlingo|spacetourer|jumpy|jumper|ds[3-7]|ami)(?:$|-)/, "$1"],
   ],
   dacia: [[/^(sandero|duster|jogger|spring|logan|lodgy|dokker|bigster)(?:$|-)/, "$1"]],
   fiat: [[/^(500[clx]?|panda|tipo|punto|doblo|ducato|talento|600|topolino)(?:$|-)/, "$1"]],
@@ -130,7 +145,11 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^(v[469]0|s[469]0|ex[39]0|ec40|c40)(?:$|-)/, "$1"],
   ],
   tesla: [[/^model-([3sxy])(?:$|-)/, "model-$1"]],
-  mazda: [[/^(2|3|6|cx-[3-9]0?|cx-[3-9]|mx-5|mx-30)(?:$|-)/, "$1"]],
+  mazda: [
+    [/^mazda-?([236])(?:$|-)/, "$1"], // "Mazda3" (nome comercial) = família 3
+    [/^(2|3|6|cx-[3-9]0?|cx-[3-9]|mx-5|mx-30)(?:$|-)/, "$1"],
+  ],
+  "lynk-co": [[/^0?([1-9])(?:$|-)/, "0$1"]], // "Lynk & Co 1" = 01 (catálogo: 01)
   honda: [
     [/^hr-?v(?:$|-)/, "hr-v"],
     [/^cr-?v(?:$|-)/, "cr-v"],
@@ -148,7 +167,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^atto-?3(?:$|-)/, "atto-3"],
     [/^(dolphin|seal|han|tang|sealion)(?:$|-)/, "$1"],
   ],
-  mg: [[/^(zs|hs|mg[3-5]|marvel-r|ehs|mg4)(?:$|-)/, "$1"]],
+  mg: [
+    [/^mg-?([3-5])(?:$|-)/, "$1"], // "MG4"/"MG 4" = família 4 (catálogo: página "4-EV")
+    [/^(zs|hs|marvel-r|ehs)(?:$|-)/, "$1"],
+  ],
   porsche: [[/^(911|macan|cayenne|panamera|taycan|boxster|cayman|718)(?:$|-)/, "$1"]],
   "land-rover": [
     [/^(range-rover(?:-evoque|-sport|-velar)?|discovery(?:-sport)?|defender|freelander)(?:$|-)/, "$1"],
