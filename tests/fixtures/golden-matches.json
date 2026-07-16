@@ -1,0 +1,5524 @@
+[
+  {
+    "source_site": "aramisauto.com",
+    "listing_id": "0ac99058-0574-4f68-be50-3cf270a8560d",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "Active Suréquipée",
+      "fuelRaw": "Essence",
+      "year": 2019,
+      "powerHp": 82,
+      "displacementCc": 1200,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "gasolina",
+      "powerHp": 82,
+      "cc": 1200
+    },
+    "note": "Peugeot 208 fronteira I/II (2019/2020)"
+  },
+  {
+    "source_site": "auto.pt",
+    "listing_id": "036f149f-3aa2-4463-ad5d-763cdc9a08c7",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Sandero",
+      "variant": "Dacia Sandero 1.0 Expression Eco-G 100",
+      "fuelRaw": "GPL",
+      "year": 2025,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "00bf5534-d051-4e7c-9169-1e359190eed8",
+    "input": {
+      "makeRaw": "Toyota",
+      "modelRaw": "Yaris",
+      "variant": null,
+      "fuelRaw": "Híbrido (Gasolina)",
+      "year": 2022,
+      "powerHp": 115,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|yaris",
+      "fuel": "híbrido",
+      "powerHp": 115,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "00d6ae8b-599a-4225-8bab-f342570edc2d",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A4",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2021,
+      "powerHp": 136,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a4",
+      "fuel": "diesel",
+      "powerHp": 136,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "00fc675d-6292-4edc-aa54-84880218e84b",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "Q3",
+      "variant": "2.0 TDI Attraction",
+      "fuelRaw": "Diesel",
+      "year": 2012,
+      "powerHp": 140,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|q3",
+      "fuel": "diesel",
+      "powerHp": 140,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "01afcff6-fe1c-4433-9ef2-ba66f7a31228",
+    "input": {
+      "makeRaw": "Volvo",
+      "modelRaw": "V60",
+      "variant": null,
+      "fuelRaw": "Híbrido (Gasolina)",
+      "year": 2022,
+      "powerHp": 340,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volvo|v60",
+      "fuel": "híbrido",
+      "powerHp": 340,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "01c9b09a-320f-45ea-8866-1d0097bd4987",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "Série 3",
+      "variant": null,
+      "fuelRaw": "Híbrido (Gasolina)",
+      "year": 2024,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "híbrido",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "01cb6884-4b51-4149-8edf-c0454cf1a738",
+    "input": {
+      "makeRaw": "Toyota",
+      "modelRaw": "Yaris",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 72,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|yaris",
+      "fuel": "gasolina",
+      "powerHp": 72,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "02a05429-2408-4752-9556-526eb79ce20d",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Captur",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2018,
+      "powerHp": 90,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|captur",
+      "fuel": "diesel",
+      "powerHp": 90,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "03b0df3e-0832-488b-b9c5-9c072440b7d4",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Kauai",
+      "variant": "1.0 T - GDi N Line",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 120,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|kona",
+      "fuel": "gasolina",
+      "powerHp": 120,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "014fe9d0-29a4-4f57-970c-06d1daec9ce3",
+    "input": {
+      "makeRaw": "Seat",
+      "modelRaw": "Ibiza",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2013,
+      "powerHp": 70,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "seat|ibiza",
+      "fuel": "gasolina",
+      "powerHp": 70,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "033fa8bd-c270-456b-b983-f844d0a1100b",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Polo",
+      "variant": "1.0 TSI Life",
+      "fuelRaw": "Gasolina",
+      "year": 2022,
+      "powerHp": 95,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|polo",
+      "fuel": "gasolina",
+      "powerHp": 95,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "0099b520-547a-4cfe-a8b5-5274341155d5",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "CLE",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 449,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|cle",
+      "fuel": "gasolina",
+      "powerHp": 449,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "0193a507-4106-452d-b266-490a59efd749",
+    "input": {
+      "makeRaw": "Polestar",
+      "modelRaw": "2",
+      "variant": null,
+      "fuelRaw": "Eléctrico",
+      "year": 2022,
+      "powerHp": 408,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "polestar|2",
+      "fuel": "elétrico",
+      "powerHp": 408,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "0286d23e-2021-4901-8d81-a875569e927c",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A6",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2021,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a6",
+      "fuel": "diesel",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "01114bb8-59ba-4903-9e6d-7abf23f1e377",
+    "input": {
+      "makeRaw": "Toyota",
+      "modelRaw": "Corolla",
+      "variant": null,
+      "fuelRaw": "Híbrido (Gasolina)",
+      "year": 2021,
+      "powerHp": 122,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|corolla",
+      "fuel": "híbrido",
+      "powerHp": 122,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "auto.sapo.pt",
+    "listing_id": "03678ac9-cc64-4f84-adbc-08534f9dd439",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2018,
+      "powerHp": 95,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "diesel",
+      "powerHp": 95,
+      "cc": null
+    },
+    "note": "estrato auto.sapo.pt"
+  },
+  {
+    "source_site": "autoboerse.de",
+    "listing_id": "002b783b-4937-4880-a4eb-6738b0472dcb",
+    "input": {
+      "makeRaw": "MERCEDES-BENZ",
+      "modelRaw": "VITO",
+      "variant": "Vito 116 KASTEN AUTOMATIK NAVI STANDHZG KAMERA L",
+      "fuelRaw": "Diesel",
+      "year": 2026,
+      "powerHp": 163,
+      "displacementCc": 1950,
+      "co2": 181
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|vito",
+      "fuel": "diesel",
+      "powerHp": 163,
+      "cc": 1950
+    },
+    "note": "estrato fuel diesel"
+  },
+  {
+    "source_site": "autocasion.com",
+    "listing_id": "019f9ac7-9ed7-4d98-a5ec-e57d15dfbc2d",
+    "input": {
+      "makeRaw": "TOYOTA",
+      "modelRaw": "Corolla",
+      "variant": "TOYOTA Corolla Corolla 125H Active Tech",
+      "fuelRaw": "Híbrido",
+      "year": 2021,
+      "powerHp": 122,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|corolla",
+      "fuel": "híbrido",
+      "powerHp": 122,
+      "cc": null
+    },
+    "note": "estrato fuel híbrido"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "00b8f612-c1ce-4924-9531-70068377425e",
+    "input": {
+      "makeRaw": "Citroen",
+      "modelRaw": "Berlingo",
+      "variant": "1.2 PureTech Feel Pack M",
+      "fuelRaw": "Benzin",
+      "year": 2023,
+      "powerHp": 131,
+      "displacementCc": 1199,
+      "co2": 154
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|berlingo",
+      "fuel": "gasolina",
+      "powerHp": 131,
+      "cc": 1199
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "000f2690-c1f8-430a-9280-b08e15c48517",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Polo",
+      "variant": "1.0 Lounge BlueMotion Tech",
+      "fuelRaw": "Benzin",
+      "year": 2016,
+      "powerHp": 75,
+      "displacementCc": 999,
+      "co2": 108
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|polo",
+      "fuel": "gasolina",
+      "powerHp": 75,
+      "cc": 999
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "01f47fdf-a3fd-4a1c-9b0f-6447bb63cd00",
+    "input": {
+      "makeRaw": "Suzuki",
+      "modelRaw": "Vitara",
+      "variant": "1.6 Comfort 4x4",
+      "fuelRaw": "Benzin",
+      "year": 2016,
+      "powerHp": 120,
+      "displacementCc": 1586,
+      "co2": 130
+    },
+    "label": {
+      "kind": "signature",
+      "family": "suzuki|vitara",
+      "fuel": "gasolina",
+      "powerHp": 120,
+      "cc": 1586
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "008f3c92-d2c6-4740-9736-84834456f0de",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "A-Klasse",
+      "variant": "A 180 BlueEfficiency Urban",
+      "fuelRaw": "Benzin",
+      "year": 2015,
+      "powerHp": 122,
+      "displacementCc": 1595,
+      "co2": 130
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-a",
+      "fuel": "gasolina",
+      "powerHp": 122,
+      "cc": 1595
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "009f37a1-5f90-4dbd-a5d9-2214c14e02df",
+    "input": {
+      "makeRaw": "Honda",
+      "modelRaw": "Civic",
+      "variant": "1.6 DTEC I-DTEC Elegance",
+      "fuelRaw": "Diesel",
+      "year": 2015,
+      "powerHp": 120,
+      "displacementCc": 1597,
+      "co2": 98
+    },
+    "label": {
+      "kind": "signature",
+      "family": "honda|civic",
+      "fuel": "diesel",
+      "powerHp": 120,
+      "cc": 1597
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "010bce5b-40f6-4b8d-a714-72b828c1d90a",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Mokka X",
+      "variant": "1.2 Turbo Elegance",
+      "fuelRaw": "Benzin",
+      "year": 2022,
+      "powerHp": 131,
+      "displacementCc": 1199,
+      "co2": 134
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|mokka",
+      "fuel": "gasolina",
+      "powerHp": 131,
+      "cc": 1199
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "010f714c-a2db-4366-b031-0dff50f2f230",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "C-Klasse",
+      "variant": "C 220 d AMG Line",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 194,
+      "displacementCc": 1950,
+      "co2": 148
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-c",
+      "fuel": "diesel",
+      "powerHp": 194,
+      "cc": 1950
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "017a5720-a43a-4da1-b0fb-a46b15069d3f",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A6",
+      "variant": "50 TDI Mild-Hybrid quattro Sport",
+      "fuelRaw": "Diesel",
+      "year": 2022,
+      "powerHp": 286,
+      "displacementCc": 2967,
+      "co2": 186
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a6",
+      "fuel": "diesel",
+      "powerHp": 286,
+      "cc": 2967
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "018e2c93-9598-4175-b5da-0c92756969b6",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "2.0 TDI Sport",
+      "fuelRaw": "Diesel",
+      "year": 2020,
+      "powerHp": 150,
+      "displacementCc": 1968,
+      "co2": 146
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1968
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "020fcde3-253d-4809-892a-b4b7dd62570c",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Santa Fe",
+      "variant": "2.2 CRDi Premium blue 4WD",
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": 200,
+      "displacementCc": 2199,
+      "co2": 174
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|santa-fe",
+      "fuel": "diesel",
+      "powerHp": 200,
+      "cc": 2199
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "52c65e38-29c8-4df2-9092-659976cf4d41",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf VIII",
+      "variant": "2.0 TSI GTI",
+      "fuelRaw": "Benzin",
+      "year": 2021,
+      "powerHp": 245,
+      "displacementCc": 1984,
+      "co2": 173
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 245,
+      "cc": 1984,
+      "mustConfirm": true
+    },
+    "note": "Golf GTI 245 ≠ 1.5 150 ≠ R"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "0057b611-f9bc-48ef-af15-beffe1cb9e21",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "1.2 Selection",
+      "fuelRaw": "Benzin",
+      "year": 2017,
+      "powerHp": 69,
+      "displacementCc": 1229,
+      "co2": 126
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 69,
+      "cc": 1229
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "0187c922-e76f-424f-be24-205f55ceba51",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Staria",
+      "variant": "2.2 CRDi Signature 4WD",
+      "fuelRaw": "Diesel",
+      "year": 2024,
+      "powerHp": 177,
+      "displacementCc": 2199,
+      "co2": 232
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|staria",
+      "fuel": "diesel",
+      "powerHp": 177,
+      "cc": 2199
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "0208c9af-a4ab-4446-8ae7-cbe15b0357de",
+    "input": {
+      "makeRaw": "Seat",
+      "modelRaw": "Leon",
+      "variant": "1.4 TSI e-HYBRID Xcellence",
+      "fuelRaw": "Hybrid",
+      "year": 2022,
+      "powerHp": 204,
+      "displacementCc": 1395,
+      "co2": 26
+    },
+    "label": {
+      "kind": "signature",
+      "family": "seat|leon",
+      "fuel": "phev",
+      "powerHp": 204,
+      "cc": 1395
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "01314d18-045a-4df9-a2d8-934aa1b5ec0a",
+    "input": {
+      "makeRaw": "Skoda",
+      "modelRaw": "Fabia",
+      "variant": "1.0 MPI Ambition",
+      "fuelRaw": "Benzin",
+      "year": 2016,
+      "powerHp": 75,
+      "displacementCc": 999,
+      "co2": 108
+    },
+    "label": {
+      "kind": "signature",
+      "family": "skoda|fabia",
+      "fuel": "gasolina",
+      "powerHp": 75,
+      "cc": 999
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "3021fa9c-4063-4bea-bb1f-3fd8a31e0900",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf VII",
+      "variant": "2.0 TSI GTI Performance BlueMotion Tech",
+      "fuelRaw": "Benzin",
+      "year": 2019,
+      "powerHp": 245,
+      "displacementCc": 1984,
+      "co2": 167
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 245,
+      "cc": 1984,
+      "mustConfirm": true
+    },
+    "note": "Golf GTI 245 ≠ 1.5 150 ≠ R"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "00878906-1fc3-4a5d-b785-67a50850afad",
+    "input": {
+      "makeRaw": "Kia",
+      "modelRaw": "pro_cee'd",
+      "variant": "1.6 TGDI GT",
+      "fuelRaw": "Benzin",
+      "year": 2021,
+      "powerHp": 204,
+      "displacementCc": 1591,
+      "co2": 163
+    },
+    "label": {
+      "kind": "signature",
+      "family": "kia|pro",
+      "fuel": "gasolina",
+      "powerHp": 204,
+      "cc": 1591
+    },
+    "note": "estrato autohero.com"
+  },
+  {
+    "source_site": "autohero.com",
+    "listing_id": "52490752-29bb-4d85-aaaf-6477f6cb5c2e",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3er",
+      "variant": "320d Advantage",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 190,
+      "displacementCc": 1995,
+      "co2": 154
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 1995
+    },
+    "note": "BMW 320d fronteira F30/G20 (2018/2019)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0ce1bdb7-5133-46c1-839c-210037af3b2c",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Duster",
+      "variant": "100 TCe",
+      "fuelRaw": "Autogas (LPG)",
+      "year": 2023,
+      "powerHp": 101,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0fd4124a-8fde-4d00-85cb-17d775ce92f1",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "Dolphin",
+      "variant": "Design/Leder/Panorama/Navi/Sitzheizung/LED/Klimaau",
+      "fuelRaw": "Elektro",
+      "year": null,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "byd|dolphin",
+      "fuel": "elétrico",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "BYD Dolphin 204 ≠ Dolphin Surf"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "002d476f-2aba-4cce-88a9-f6f10f823122",
+    "input": {
+      "makeRaw": "Citroen",
+      "modelRaw": "C3",
+      "variant": "100 HDI",
+      "fuelRaw": "Diesel",
+      "year": 2020,
+      "powerHp": 99,
+      "displacementCc": 1499,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|c3",
+      "fuel": "diesel",
+      "powerHp": 99,
+      "cc": 1499
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "002fa347-0891-44a1-993d-15675eca1c20",
+    "input": {
+      "makeRaw": "Tesla",
+      "modelRaw": "Model Y",
+      "variant": "Grand Autonomie 4x4 AWD TVA récupérable Autopilot 1ère Main Dual Motor Garantie",
+      "fuelRaw": "Elektro",
+      "year": 2022,
+      "powerHp": 476,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "tesla|model-y",
+      "fuel": "elétrico",
+      "powerHp": 476,
+      "cc": null
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "4c2cf192-a675-4cb5-9127-a936aac2a07b",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Rocks-e",
+      "variant": "Tekno",
+      "fuelRaw": "Elektro",
+      "year": 2023,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "004f5d75-5996-4ab1-a0de-a0ca2938b165",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "RS3",
+      "variant": "2.0 TFSI",
+      "fuelRaw": "Benzin",
+      "year": 2023,
+      "powerHp": 400,
+      "displacementCc": 2480,
+      "co2": 205
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "05cf1a48-4d23-4331-b079-38a9ae1d6816",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Kona",
+      "variant": "EV",
+      "fuelRaw": "Elektro",
+      "year": 2022,
+      "powerHp": 136,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|kona",
+      "fuel": "elétrico",
+      "powerHp": 136,
+      "cc": null
+    },
+    "note": "Kona elétrico ≠ térmico"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "006a38c0-2742-4b4b-9d38-6fec16d720db",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Tucson",
+      "variant": "1.7 CRDI",
+      "fuelRaw": "Diesel",
+      "year": 2016,
+      "powerHp": 140,
+      "displacementCc": 1685,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|tucson",
+      "fuel": "diesel",
+      "powerHp": 140,
+      "cc": 1685
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "007ab7cb-608c-4cb3-8de5-e199646d2a46",
+    "input": {
+      "makeRaw": "Land Rover",
+      "modelRaw": "Range Rover Evoque",
+      "variant": "D165",
+      "fuelRaw": "Benzin",
+      "year": 2022,
+      "powerHp": 200,
+      "displacementCc": 1997,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "land-rover|range-rover-evoque",
+      "fuel": "gasolina",
+      "powerHp": 200,
+      "cc": 1997
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "7f23d76c-e597-4a62-94e5-df37d2ac322d",
+    "input": {
+      "makeRaw": "Jeep",
+      "modelRaw": "Wagoneer",
+      "variant": "Grand",
+      "fuelRaw": "Benzin",
+      "year": 2024,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "008b4ac2-260e-4fec-893a-9ae94668434c",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "1.0 TSI",
+      "fuelRaw": "Benzin",
+      "year": 2021,
+      "powerHp": 110,
+      "displacementCc": 999,
+      "co2": 103
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "gasolina",
+      "powerHp": 110,
+      "cc": 999
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "08ba2b6a-c16f-4805-98c8-40c3910c2646",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Kona",
+      "variant": "1.6 GDI",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2020,
+      "powerHp": 141,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|kona",
+      "fuel": "híbrido",
+      "powerHp": 141,
+      "cc": null
+    },
+    "note": "Kona elétrico ≠ térmico"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "008f8017-71f8-4d50-be84-1f8bd5944072",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "90 TCe",
+      "fuelRaw": "Benzin",
+      "year": 2024,
+      "powerHp": 91,
+      "displacementCc": 999,
+      "co2": 118
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|clio",
+      "fuel": "gasolina",
+      "powerHp": 91,
+      "cc": 999
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0026a540-fa96-45dd-bc17-1ce60e9429ff",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Astra",
+      "variant": "1.6 Turbo",
+      "fuelRaw": "Benzin",
+      "year": 2010,
+      "powerHp": 181,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|astra",
+      "fuel": "gasolina",
+      "powerHp": 181,
+      "cc": null
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "30f15e6a-a8f3-45e3-93b2-6e4aa11fcfca",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "2.0 TDI",
+      "fuelRaw": "Diesel",
+      "year": 2020,
+      "powerHp": 116,
+      "displacementCc": 1968,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "diesel",
+      "powerHp": 116,
+      "cc": 1968
+    },
+    "note": "Golf fronteira gen7/gen8 (2019/2020)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0036b82b-06b3-49d6-99f2-491cf7e1a69f",
+    "input": {
+      "makeRaw": "Omoda",
+      "modelRaw": "7",
+      "variant": "7 1.5 TGDI PHEV 279CH EXCLUSIVE 0Km",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2026,
+      "powerHp": 280,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "042bbe44-514d-410a-9076-2d7ce33e8087",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "M8",
+      "variant": "Gran Coupé Competition | 1e eigenaar | Carbon | Or",
+      "fuelRaw": "Benzin",
+      "year": 2021,
+      "powerHp": 625,
+      "displacementCc": 4395,
+      "co2": 263
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "BMW M8 ≥600cv — nunca confunde com 840i/M850i"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "73a9810a-b283-4eaa-a908-3c03ae3c1e7b",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3er",
+      "variant": "320d",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 190,
+      "displacementCc": 1995,
+      "co2": 119
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 1995
+    },
+    "note": "BMW 320d fronteira F30/G20 (2018/2019)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "084cdd68-fbb3-478b-ace6-098e9e1962dd",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "100 HDI",
+      "fuelRaw": "Diesel",
+      "year": 2020,
+      "powerHp": 102,
+      "displacementCc": 1499,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "diesel",
+      "powerHp": 102,
+      "cc": 1499
+    },
+    "note": "Peugeot 208 fronteira I/II (2019/2020)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "095eee25-8af7-4f22-8457-1d18788ec4b5",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Sandero",
+      "variant": "100 TCe",
+      "fuelRaw": "Autogas (LPG)",
+      "year": 2021,
+      "powerHp": 102,
+      "displacementCc": null,
+      "co2": 114
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0222d761-49cf-4712-8566-33fe746f1fca",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "2.0 TDI",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 150,
+      "displacementCc": 1968,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1968
+    },
+    "note": "Golf fronteira gen7/gen8 (2019/2020)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "005147b9-cb72-42c4-8db5-7bd0c7c364f2",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Kangoo",
+      "variant": "90 DCI",
+      "fuelRaw": "Diesel",
+      "year": 2013,
+      "powerHp": 91,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|kangoo",
+      "fuel": "diesel",
+      "powerHp": 91,
+      "cc": null
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "05445ee0-8a09-43c7-865b-e0d9dc845875",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Sandero",
+      "variant": "100",
+      "fuelRaw": "Autogas (LPG)",
+      "year": 2025,
+      "powerHp": 75,
+      "displacementCc": 999,
+      "co2": 114
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "006096a3-e7f9-4f12-af33-bc95f41eaea7",
+    "input": {
+      "makeRaw": "DS Automobiles",
+      "modelRaw": "DS 4",
+      "variant": "1.6 THP Business / Keyless / Camera / Trekhaak / N",
+      "fuelRaw": "Benzin",
+      "year": 2016,
+      "powerHp": 165,
+      "displacementCc": 1598,
+      "co2": 128
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ds|ds",
+      "fuel": "gasolina",
+      "powerHp": 165,
+      "cc": 1598
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "006178d0-d616-4a8e-bba3-be128a6ee5f5",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "Rifter",
+      "variant": "130",
+      "fuelRaw": "Benzin",
+      "year": 2019,
+      "powerHp": 131,
+      "displacementCc": 1199,
+      "co2": 123
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|rifter",
+      "fuel": "gasolina",
+      "powerHp": 131,
+      "cc": 1199
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "24733f41-c102-4abb-9475-3303ca203e54",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "iX",
+      "variant": "xDrive40",
+      "fuelRaw": "Elektro",
+      "year": 2022,
+      "powerHp": 326,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|ix",
+      "fuel": "elétrico",
+      "powerHp": 326,
+      "cc": null,
+      "mustConfirm": true
+    },
+    "note": "iX xDrive40 326 ≠ xDrive45 408"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "00035225-0966-44f6-8c57-9321d0cac963",
+    "input": {
+      "makeRaw": "Porsche",
+      "modelRaw": "Boxster",
+      "variant": "S",
+      "fuelRaw": "Benzin",
+      "year": 2014,
+      "powerHp": 315,
+      "displacementCc": null,
+      "co2": 188
+    },
+    "label": {
+      "kind": "signature",
+      "family": "porsche|boxster",
+      "fuel": "gasolina",
+      "powerHp": 315,
+      "cc": null
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "0059877b-28c8-4f93-8085-89c76ae5b3a9",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "GLB",
+      "variant": "GLB 200",
+      "fuelRaw": "Benzin",
+      "year": 2020,
+      "powerHp": 163,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|glb",
+      "fuel": "gasolina",
+      "powerHp": 163,
+      "cc": null
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "00259930-3096-497a-a73d-79549a753d56",
+    "input": {
+      "makeRaw": "Ferrari",
+      "modelRaw": "812",
+      "variant": "Superfast",
+      "fuelRaw": "Benzin",
+      "year": 2018,
+      "powerHp": 799,
+      "displacementCc": 6496,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ferrari|812",
+      "fuel": "gasolina",
+      "powerHp": 799,
+      "cc": 6496
+    },
+    "note": "estrato autoscout24.de"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "805043e4-9e2c-4836-b9a1-753f66651aa1",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "iX",
+      "variant": "xDrive40",
+      "fuelRaw": "Elektro",
+      "year": 2022,
+      "powerHp": 326,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|ix",
+      "fuel": "elétrico",
+      "powerHp": 326,
+      "cc": null,
+      "mustConfirm": true
+    },
+    "note": "iX xDrive40 326 ≠ xDrive45 408"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "68469436-4b39-4320-8210-63a405731cff",
+    "input": {
+      "makeRaw": "Porsche",
+      "modelRaw": "Cayenne",
+      "variant": "GTS",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2024,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "autotrader.nl",
+    "listing_id": "21cbef93-af29-4925-ae2f-9cb4a77f59e4",
+    "input": {
+      "makeRaw": "MINI",
+      "modelRaw": "Mini",
+      "variant": "Cooper S",
+      "fuelRaw": "Benzine",
+      "year": 2021,
+      "powerHp": 178,
+      "displacementCc": 1998,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mini|mini-cooper",
+      "fuel": "gasolina",
+      "powerHp": 178,
+      "cc": 1998,
+      "mustConfirm": true
+    },
+    "note": "MINI Cooper S (F56) — geração por ano"
+  },
+  {
+    "source_site": "autotrader.nl",
+    "listing_id": "00546328-777b-4f31-a283-0d86f46a5f5d",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "C-Class",
+      "variant": "C 200",
+      "fuelRaw": "Diesel",
+      "year": 2016,
+      "powerHp": 136,
+      "displacementCc": 1598,
+      "co2": 109
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-c",
+      "fuel": "diesel",
+      "powerHp": 136,
+      "cc": 1598
+    },
+    "note": "estrato fuel diesel"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "0bdfadfd-ee78-4923-918c-c9c896f98356",
+    "input": {
+      "makeRaw": "Mercedes",
+      "modelRaw": "180",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2025,
+      "powerHp": 116,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "0c6829ee-ad1a-496a-9800-4435a1ee3510",
+    "input": {
+      "makeRaw": "Mercedes",
+      "modelRaw": "E300",
+      "variant": "Avantgarde",
+      "fuelRaw": "Elétrico/Petrol",
+      "year": 2022,
+      "powerHp": 186,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-e",
+      "fuel": "híbrido",
+      "powerHp": 186,
+      "cc": 2000
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "007f1608-f6c7-4f0c-acc1-70590dca3773",
+    "input": {
+      "makeRaw": "Mercedes",
+      "modelRaw": "180",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2021,
+      "powerHp": 116,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "10bc5829-88eb-4a63-993b-4263ec63c5c7",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "Edition",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 75,
+      "displacementCc": 1200,
+      "co2": 120
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 75,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "11b5e43f-5c66-4df1-9e41-29b97d08569e",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": "Style",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 102,
+      "displacementCc": 1200,
+      "co2": 123
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 102,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "12f641c9-da8c-4f10-8c6b-f0d51ec82743",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": "Style",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 100,
+      "displacementCc": 1200,
+      "co2": 123
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "14d9c64d-4ec2-4703-85c3-2b900b0ed32e",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X1",
+      "variant": "Advantage",
+      "fuelRaw": "Diesel",
+      "year": 2024,
+      "powerHp": 150,
+      "displacementCc": 2000,
+      "co2": 129
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x1",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 2000
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "15bf21d9-1165-47d1-8491-456fe30546ac",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X1",
+      "variant": "xLine",
+      "fuelRaw": "Diesel",
+      "year": 2013,
+      "powerHp": 116,
+      "displacementCc": 2000,
+      "co2": 128
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x1",
+      "fuel": "diesel",
+      "powerHp": 116,
+      "cc": 2000
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "041e371e-1141-498c-ae4f-8e65448b7f14",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "308",
+      "variant": "Active",
+      "fuelRaw": "Gasolina",
+      "year": 2019,
+      "powerHp": 130,
+      "displacementCc": 1200,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|308",
+      "fuel": "gasolina",
+      "powerHp": 130,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "050d8ef8-5cbf-4cfe-8a2d-bccaac1f8aff",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 100,
+      "displacementCc": 1200,
+      "co2": 123
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "104faa4b-981c-4041-be26-e41636ebfc67",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X1",
+      "variant": null,
+      "fuelRaw": "Elétrico/Petrol",
+      "year": 2020,
+      "powerHp": 220,
+      "displacementCc": 1500,
+      "co2": 40
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x1",
+      "fuel": "phev",
+      "powerHp": 220,
+      "cc": 1500
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "116d9c37-3187-4f80-90a4-805f14c66bd4",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2019,
+      "powerHp": 82,
+      "displacementCc": 1200,
+      "co2": 114
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 82,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "126d54a0-8a45-4776-8441-07fa8976145c",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "Zen",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 90,
+      "displacementCc": 1500,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|clio",
+      "fuel": "diesel",
+      "powerHp": 90,
+      "cc": 1500
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "1204584f-8b76-4501-96e5-1737142c66c9",
+    "input": {
+      "makeRaw": "Mini",
+      "modelRaw": "Aceman",
+      "variant": "Essential",
+      "fuelRaw": "Eléctrico",
+      "year": 2025,
+      "powerHp": 160,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mini|aceman",
+      "fuel": "elétrico",
+      "powerHp": 160,
+      "cc": null
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "autouncle.pt",
+    "listing_id": "01846311-8113-421c-9751-92ceec1c8cb6",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Mokka",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 136,
+      "displacementCc": 1200,
+      "co2": 129
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|mokka",
+      "fuel": "gasolina",
+      "powerHp": 136,
+      "cc": 1200
+    },
+    "note": "estrato autouncle.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "00b01d71-855d-4992-a678-4da4ab1b89e3",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "GLB",
+      "variant": "GLB 200 d Auto",
+      "fuelRaw": "Diesel",
+      "year": 2026,
+      "powerHp": 150,
+      "displacementCc": 1950,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|glb",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1950
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0c66e283-8741-477b-bdde-c37f49ab4ed1",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "1.2 PureTech 100cv Active",
+      "fuelRaw": "Gasolina",
+      "year": 2020,
+      "powerHp": 100,
+      "displacementCc": 1199,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 1199
+    },
+    "note": "Peugeot 208 fronteira I/II (2019/2020)"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0c67fb86-7234-47d7-98f8-f179a0ee79cc",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "TCe 100 Bi-Fuel Techno",
+      "fuelRaw": "GPL",
+      "year": 2023,
+      "powerHp": 100,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "00edc963-734c-467c-ba82-b67a9c466bf9",
+    "input": {
+      "makeRaw": "LEXUS",
+      "modelRaw": "NX 21-",
+      "variant": "NX 450h+ Executive+",
+      "fuelRaw": "Hibrido",
+      "year": 2023,
+      "powerHp": 308,
+      "displacementCc": 2487,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "lexus|nx",
+      "fuel": "híbrido",
+      "powerHp": 308,
+      "cc": 2487
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "00efc4df-70bd-4db2-9a3f-4d37219fc6bc",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "i20",
+      "variant": "1.1 CRDi 75Cv Access+Bth+Comandos+JLL15",
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": 75,
+      "displacementCc": 1120,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|i20",
+      "fuel": "diesel",
+      "powerHp": 75,
+      "cc": 1120
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0f54cde8-4ab8-48e3-bf15-b66b3c17ad2f",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "DOLPHIN",
+      "variant": "60,4kWh Comfort",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "byd|dolphin",
+      "fuel": "elétrico",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "BYD Dolphin 204 ≠ Dolphin Surf"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "00fe57f9-8eb8-410e-92a2-5a8ca5ab2772",
+    "input": {
+      "makeRaw": "TOYOTA",
+      "modelRaw": "Corolla Touring Sports 22-",
+      "variant": "Corolla TS 1.8 Hybrid Comfort Plus",
+      "fuelRaw": "Hibrido",
+      "year": 2024,
+      "powerHp": 140,
+      "displacementCc": 1798,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|corolla",
+      "fuel": "híbrido",
+      "powerHp": 140,
+      "cc": 1798
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "01a3834e-755e-4092-98f5-a0a7d62cbdd0",
+    "input": {
+      "makeRaw": "MINI",
+      "modelRaw": "Cooper",
+      "variant": "2.0 C",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 163,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mini|mini-cooper",
+      "fuel": "gasolina",
+      "powerHp": 163,
+      "cc": 1998
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "01b6f5aa-c8d2-447c-a8b4-c3531bec10a7",
+    "input": {
+      "makeRaw": "TOYOTA",
+      "modelRaw": "Yaris 20-",
+      "variant": "Yaris 1.5 HDF Comfort Plus",
+      "fuelRaw": "Hibrido",
+      "year": 2024,
+      "powerHp": 92,
+      "displacementCc": 1490,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|yaris",
+      "fuel": "híbrido",
+      "powerHp": 92,
+      "cc": 1490
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "01d5d7b0-381a-4360-b5f5-b3f1bc31c742",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "408",
+      "variant": "Elétrico 210 cv - Bateria 58 kWh Allure",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 210,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|408",
+      "fuel": "elétrico",
+      "powerHp": 210,
+      "cc": null
+    },
+    "note": "estrato fuel elétrico"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "2d14f123-af3b-4554-941c-1b856437452c",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "iX",
+      "variant": "xDrive45",
+      "fuelRaw": "Electrico",
+      "year": 2025,
+      "powerHp": 408,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|ix",
+      "fuel": "elétrico",
+      "powerHp": 408,
+      "cc": null,
+      "mustConfirm": true
+    },
+    "note": "iX xDrive45 408 ≠ xDrive40 326"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "08b8f5b1-b2a0-4e3a-8165-ff9aa86ef579",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Captur",
+      "variant": "1.0 TCe 100 Bi-Fuel techno",
+      "fuelRaw": "GPL",
+      "year": 2024,
+      "powerHp": 100,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "008de92b-d605-4096-87a3-c5c4f6a244d6",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Captur",
+      "variant": "1.0 TCe 90 techno",
+      "fuelRaw": "Gasolina",
+      "year": 2022,
+      "powerHp": 90,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|captur",
+      "fuel": "gasolina",
+      "powerHp": 90,
+      "cc": 999
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "017aa20b-19ac-4d37-8149-31aa5c479088",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Mégane E-Tech El.",
+      "variant": "Mégane E-Tech E-Tech EV60 Techno Super Charge | 218cv",
+      "fuelRaw": "Gasolina",
+      "year": 2023,
+      "powerHp": 218,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|megane",
+      "fuel": "gasolina",
+      "powerHp": 218,
+      "cc": null
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "019cf370-7115-4a47-8f91-7cddbeea0f00",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Cross",
+      "variant": "1.0 TSI 95cv Urban",
+      "fuelRaw": "Gasolina",
+      "year": 2026,
+      "powerHp": 95,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-cross",
+      "fuel": "gasolina",
+      "powerHp": 95,
+      "cc": 999
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0031d6ad-a542-4e96-b570-8c4d3fdbd0d9",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "i20",
+      "variant": "1.2 MPi Comfort MY24",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 84,
+      "displacementCc": 1197,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|i20",
+      "fuel": "gasolina",
+      "powerHp": 84,
+      "cc": 1197
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0040a569-c599-4634-a5d7-2cba0267b31e",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "Serie 3",
+      "variant": "330e Auto",
+      "fuelRaw": "Hibrido",
+      "year": 2025,
+      "powerHp": 292,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "phev",
+      "powerHp": 292,
+      "cc": 1998
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "50cb2fc2-d472-4158-9da6-fa12146f7733",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "iX",
+      "variant": "xDrive45",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 408,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|ix",
+      "fuel": "elétrico",
+      "powerHp": 408,
+      "cc": null,
+      "mustConfirm": true
+    },
+    "note": "iX xDrive45 408 ≠ xDrive40 326"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0060a86f-d192-43b7-b6e5-78d12c0d87b3",
+    "input": {
+      "makeRaw": "Nissan",
+      "modelRaw": "JUKE",
+      "variant": "1.0 DIG-T 114cv N-Connecta",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 114,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "nissan|juke",
+      "fuel": "gasolina",
+      "powerHp": 114,
+      "cc": 999
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0085dfd1-5d2d-403e-8fab-409008c762c1",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "1.0 TSI 115LIFE",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 115,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "gasolina",
+      "powerHp": 115,
+      "cc": 999
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0144f43d-f8dd-4e02-854a-aa8fa5fd12d1",
+    "input": {
+      "makeRaw": "TOYOTA",
+      "modelRaw": "Aygo X 22-24",
+      "variant": "Aygo X 1.0 Play",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 72,
+      "displacementCc": 998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|aygo",
+      "fuel": "gasolina",
+      "powerHp": 72,
+      "cc": 998
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0528778a-e6c0-4989-ac27-ad96817f3794",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "DOLPHIN SURF",
+      "variant": "43,2kWh Boost",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 88,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "byd|dolphin-surf",
+      "fuel": "elétrico",
+      "powerHp": 88,
+      "cc": null
+    },
+    "note": "BYD Dolphin Surf ≠ Dolphin (família própria)"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "00562474-6ff5-4913-b091-e4c200b94171",
+    "input": {
+      "makeRaw": "Nissan",
+      "modelRaw": "Qashqai",
+      "variant": "1.3 140CV mHEV MT 4x2 Advance",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 140,
+      "displacementCc": 1332,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "nissan|qashqai",
+      "fuel": "gasolina",
+      "powerHp": 140,
+      "cc": 1332
+    },
+    "note": "estrato caetano.pt"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "0565024c-9629-43f5-a481-9114e1c3c519",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "TCe 100 Bi-Fuel Evolution",
+      "fuelRaw": "GPL",
+      "year": 2024,
+      "powerHp": 100,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "00a2e359-156a-45c3-a50b-0cb8f6b6dba9",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Kauai",
+      "variant": "1.0 T-GDi Premium",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 120,
+      "displacementCc": 998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|kona",
+      "fuel": "gasolina",
+      "powerHp": 120,
+      "cc": 998,
+      "mustConfirm": true
+    },
+    "note": "Kauai→Kona (nome PT)"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "00f1caee-d3d9-4696-b9af-020e992adf81",
+    "input": {
+      "makeRaw": "BMW Motorrad",
+      "modelRaw": "R",
+      "variant": "1250RT White Alpin 3",
+      "fuelRaw": "Gasolina",
+      "year": 2023,
+      "powerHp": 136,
+      "displacementCc": 1254,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "01dca279-047b-4e91-827f-5ec4d91c94a2",
+    "input": {
+      "makeRaw": "BMW Motorrad",
+      "modelRaw": "R",
+      "variant": "1300RT Racing azul met.",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 145,
+      "displacementCc": 1300,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "01e8a681-7b15-4976-97be-ae181088c149",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "3008",
+      "variant": "Active Pack 1.5 BlueHDi 130 CVM6",
+      "fuelRaw": "Diesel",
+      "year": 2022,
+      "powerHp": 130,
+      "displacementCc": 1499,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|3008",
+      "fuel": "diesel",
+      "powerHp": 130,
+      "cc": 1499
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "01e48c10-f730-4577-bae2-3bc49e55d77e",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "Classe A",
+      "variant": "1.5 180 d",
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": 109,
+      "displacementCc": 1461,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-a",
+      "fuel": "diesel",
+      "powerHp": 109,
+      "cc": 1461
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "01e55ce7-dee4-4ff8-bb18-00ad429105ec",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "Style Elétrico 136 cv (100 kW) - Bateria 50 kW",
+      "fuelRaw": "Electrico",
+      "year": 2025,
+      "powerHp": 136,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "elétrico",
+      "powerHp": 136,
+      "cc": null
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "02bea51e-0c5a-4811-9b73-d0e4a11da2ce",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "GLC Coupé",
+      "variant": "Coupé 200d",
+      "fuelRaw": "Diesel",
+      "year": 2021,
+      "powerHp": 163,
+      "displacementCc": 1950,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|glc",
+      "fuel": "diesel",
+      "powerHp": 163,
+      "cc": 1950
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "2cb5c3d5-b9f4-4d47-a854-8aab66f80318",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "DOLPHIN SURF",
+      "variant": "43,2kWh Boost",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 88,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "byd|dolphin-surf",
+      "fuel": "elétrico",
+      "powerHp": 88,
+      "cc": null
+    },
+    "note": "BYD Dolphin Surf ≠ Dolphin (família própria)"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "03bccaab-e1f2-4385-b960-3b384f68bd55",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "Hybrid 100 e-DCS6 Allure",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 100,
+      "displacementCc": 1199,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "híbrido",
+      "powerHp": 100,
+      "cc": 1199
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "03e017b8-e0f8-43e7-a2e9-4867d2639e88",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "i20",
+      "variant": "1.2 MPi Comfort MY25",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 78,
+      "displacementCc": 1197,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|i20",
+      "fuel": "gasolina",
+      "powerHp": 78,
+      "cc": 1197
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "09bbcc24-613c-447c-bebf-1b9abc03ed5a",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Duster",
+      "variant": "1.0 ECO-G 100 Bi-Fuel Expression",
+      "fuelRaw": "LPG",
+      "year": 2025,
+      "powerHp": 100,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "0037fcb5-429b-4b59-a728-b86393904f4b",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "TCe 100 Bi-Fuel Evolution",
+      "fuelRaw": "LPG",
+      "year": 2024,
+      "powerHp": 100,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "046d7dfc-ec9f-45a0-b31c-a4c11ce6ae0b",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "i20",
+      "variant": "1.2 MPi Comfort MY24",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 84,
+      "displacementCc": 1197,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|i20",
+      "fuel": "gasolina",
+      "powerHp": 84,
+      "cc": 1197
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "046e3a59-e99d-4e2c-85c3-1520321371f2",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Clio",
+      "variant": "TCe 90 RS Line",
+      "fuelRaw": "Gasolina",
+      "year": 2022,
+      "powerHp": 90,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|clio",
+      "fuel": "gasolina",
+      "powerHp": 90,
+      "cc": 999
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "55d77bb0-7bbe-414e-9952-0cf044864800",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "ATTO 2",
+      "variant": "Boost",
+      "fuelRaw": "Gas",
+      "year": 2025,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "0119ea93-66cc-421b-8d14-bf52939ee8a4",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Bayon",
+      "variant": "1.0 T-GDi DCT Premium MY21 (TT)",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 100,
+      "displacementCc": 998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|bayon",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 998
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "0173863c-8efb-4650-b104-9fb978b77ec9",
+    "input": {
+      "makeRaw": "Kia",
+      "modelRaw": "EV6",
+      "variant": "GT-LINE (77,4 kWh)",
+      "fuelRaw": "Electrico",
+      "year": 2022,
+      "powerHp": 229,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "kia|ev6",
+      "fuel": "elétrico",
+      "powerHp": 229,
+      "cc": null
+    },
+    "note": "estrato carplus.pt"
+  },
+  {
+    "source_site": "carplus.pt",
+    "listing_id": "0244326c-c744-4cea-beb9-5d6c4ef23774",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "Kauai",
+      "variant": "1.0 T-GDi N Line MY25 (TT)",
+      "fuelRaw": "Gasolina",
+      "year": 2026,
+      "powerHp": 100,
+      "displacementCc": 998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "hyundai|kona",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 998,
+      "mustConfirm": true
+    },
+    "note": "Kauai→Kona (nome PT)"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "0db376f9-ed54-4bf6-931b-0a43e7b97a0a",
+    "input": {
+      "makeRaw": "Hyundai",
+      "modelRaw": "i20",
+      "variant": "Hyundai i20 1.0 tgdi 74kw 100cv 48v essence",
+      "fuelRaw": null,
+      "year": 2021,
+      "powerHp": 100,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "0f0ff621-5d22-4ee9-aadb-8753ef5eb405",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Passat",
+      "variant": "Volkswagen passat variant business 2.0 tdi 90kw122cv dsg",
+      "fuelRaw": null,
+      "year": 2021,
+      "powerHp": 122,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "1f8e8047-dd3a-4d72-8cc4-ad9090f9704f",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A5",
+      "variant": "Audi a5 avant tdi 204 cv advanced",
+      "fuelRaw": "híbrido",
+      "year": 2025,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a5",
+      "fuel": "híbrido",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "2ac491f6-eeb8-425c-a921-dec02564683c",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Crossland",
+      "variant": "Opel Crossland 1.2 81kW (110CV) GS Line",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 110,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|crossland",
+      "fuel": "gasolina",
+      "powerHp": 110,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "2b6c7d89-beed-4710-b45d-6783ed173c6f",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Combo",
+      "variant": "OPEL Combo Cargo 1.5TD S& XL 1000 Express 100",
+      "fuelRaw": null,
+      "year": 2021,
+      "powerHp": 100,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "004f11fd-223d-42e1-8e4d-4bfd2757aa9c",
+    "input": {
+      "makeRaw": "MAXUS",
+      "modelRaw": "Deliver 9",
+      "variant": "MAXUS Deliver 9 e Deliver 9 L3H2 72kWh",
+      "fuelRaw": "eléctrico",
+      "year": 2023,
+      "powerHp": 100,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "maxus|deliver",
+      "fuel": "elétrico",
+      "powerHp": 100,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "05c1a803-38f6-4bd3-bbc7-b66fd5873980",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Crafter",
+      "variant": "Volkswagen crafter 30 furgon bm tn l3h2 2.0tdi 103kw140cv",
+      "fuelRaw": null,
+      "year": 2026,
+      "powerHp": 140,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "017f211b-615d-4ef4-8c5d-69a27b7b729c",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Sandero",
+      "variant": "Dacia sandero expression ecog 120",
+      "fuelRaw": "glp",
+      "year": 2026,
+      "powerHp": 120,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "21a26f0f-b736-4f4d-b7b8-afd27702a158",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Dokker",
+      "variant": "DACIA Dokker Comercial Van 1.6 GLP Essential 80kW",
+      "fuelRaw": "Gasolina",
+      "year": 2020,
+      "powerHp": 110,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "dacia|dokker",
+      "fuel": "gasolina",
+      "powerHp": 110,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "21e856d2-5166-4768-92dd-da148a0def53",
+    "input": {
+      "makeRaw": "Citroën",
+      "modelRaw": "C4",
+      "variant": "Citroën C4 Cactus Shine 100Cv",
+      "fuelRaw": null,
+      "year": null,
+      "powerHp": 100,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "29e03e67-91d4-445e-b34e-d98133d45630",
+    "input": {
+      "makeRaw": "Ford",
+      "modelRaw": "Mondeo",
+      "variant": "Ford Mondeo 2.0 Híbrido 138kW Trend HEV Auto SB Híbrido no enchufable en Flexicar Green Madrid",
+      "fuelRaw": "Híbrido",
+      "year": 2021,
+      "powerHp": 188,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ford|mondeo",
+      "fuel": "híbrido",
+      "powerHp": 188,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "047dd528-2692-47c5-8bff-4efc70a5125a",
+    "input": {
+      "makeRaw": "Nissan",
+      "modelRaw": "Qashqai",
+      "variant": "Nissan Qashqai DIG-T 103kW mHEV 4x2 N-GO Híbrido no enchufable en Flexicar Green Madrid",
+      "fuelRaw": "Híbrido",
+      "year": 2022,
+      "powerHp": 140,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "nissan|qashqai",
+      "fuel": "híbrido",
+      "powerHp": 140,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "051fcd69-1eb2-42a7-8c8a-a12be0910e1c",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "Volkswagen golf life 2.0 TDI 85kW 115CV",
+      "fuelRaw": null,
+      "year": 2021,
+      "powerHp": 115,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "0166b69c-6064-4b51-8ae7-4101b9d53923",
+    "input": {
+      "makeRaw": "Fiat",
+      "modelRaw": "600",
+      "variant": "Fiat 600 1.2 MHEV La prima DDCT 81 kW (110 CV) Gasolina en Villaverde",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 110,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "fiat|600",
+      "fuel": "gasolina",
+      "powerHp": 110,
+      "cc": null
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "coches.trovit.es",
+    "listing_id": "096397b9-7ab0-4819-86e3-162e4b51eaed",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "Rifter",
+      "variant": "Peugeot rifter 1.5BlueHDI S& Active Pack Business Standard 100",
+      "fuelRaw": null,
+      "year": 2022,
+      "powerHp": 100,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "estrato coches.trovit.es"
+  },
+  {
+    "source_site": "custojusto.pt",
+    "listing_id": "942b2b4c-2c9b-4d74-88d8-e5a6aa9dd76f",
+    "input": {
+      "makeRaw": "MINI",
+      "modelRaw": "One",
+      "variant": "One D",
+      "fuelRaw": "Diesel",
+      "year": 2011,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "custojusto.pt",
+    "listing_id": "83795269-2d35-4ad6-ba2d-1e4d2834fd26",
+    "input": {
+      "makeRaw": "MINI",
+      "modelRaw": "One",
+      "variant": "One D",
+      "fuelRaw": "Diesel",
+      "year": 2012,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "01b461f3-4249-4dcd-81ed-ea8aa263417a",
+    "input": {
+      "makeRaw": "Nissan",
+      "modelRaw": "Micra",
+      "variant": "Nissan Micra",
+      "fuelRaw": "Elétrico",
+      "year": 2026,
+      "powerHp": 150,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "nissan|micra",
+      "fuel": "elétrico",
+      "powerHp": 150,
+      "cc": null
+    },
+    "note": "estrato fuel elétrico"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "04df0e32-e74d-4237-a97e-fadbf2d8a245",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "C 300",
+      "variant": "Mercedes-Benz C 300 e 9G-TRONIC AMG Line",
+      "fuelRaw": "Híbrido Plug-In",
+      "year": 2022,
+      "powerHp": 313,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-c",
+      "fuel": "phev",
+      "powerHp": 313,
+      "cc": null
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "06ce2206-4d30-41a0-9fda-2c7d03a2983f",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "508 SW",
+      "variant": "508 SW Peugeot 1.6 Hybrid Allure Pack e-EAT8",
+      "fuelRaw": "Híbrido Plug-In",
+      "year": 2022,
+      "powerHp": 225,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|508",
+      "fuel": "phev",
+      "powerHp": 225,
+      "cc": null
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "0047fb26-6e00-426b-b7cb-34dc937d1ef9",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "318",
+      "variant": "BMW 318 Modern Line",
+      "fuelRaw": "Diesel",
+      "year": 2014,
+      "powerHp": 184,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "diesel",
+      "powerHp": 184,
+      "cc": null
+    },
+    "note": "estrato fuel diesel"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "00539223-147d-4c13-ba59-b18446d9e891",
+    "input": {
+      "makeRaw": "SEAT",
+      "modelRaw": "Leon ST",
+      "variant": "Seat Leon St 1.5 Tsi E-Hybrid Fr Dsg",
+      "fuelRaw": "Híbrido Plug-In (Gasolina)",
+      "year": 2025,
+      "powerHp": 150,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "seat|leon",
+      "fuel": "phev",
+      "powerHp": 150,
+      "cc": null
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "encontracarros.pt",
+    "listing_id": "03422200-c4a9-4a18-9d9a-5703aba71526",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X3",
+      "variant": "X3 BMW 30 e xDrive",
+      "fuelRaw": "Híbrido Plug-In",
+      "year": 2022,
+      "powerHp": 292,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x3",
+      "fuel": "phev",
+      "powerHp": 292,
+      "cc": null
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "0ccd49a4-c1fd-4648-94f0-60b21cc19ee6",
+    "input": {
+      "makeRaw": "Alfa Romeo",
+      "modelRaw": "Tonale",
+      "variant": "1.5 MHEV GASOLINA 130 CV SPRINT FWD",
+      "fuelRaw": "Híbrido no enchufable",
+      "year": 2023,
+      "powerHp": 130,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "alfa-romeo|tonale",
+      "fuel": "híbrido",
+      "powerHp": 130,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "0d014377-79ba-4e1c-8d3f-87d6c67401e5",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A3",
+      "variant": "Sportback 40 e-tron 150kW S tronic",
+      "fuelRaw": "Híbrido enchufable",
+      "year": 2020,
+      "powerHp": 204,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "híbrido",
+      "powerHp": 204,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "00dde159-26ee-4891-ac37-62962474e86f",
+    "input": {
+      "makeRaw": "Citroen",
+      "modelRaw": "Jumpy",
+      "variant": "1.5 102CV",
+      "fuelRaw": "Diésel",
+      "year": 2022,
+      "powerHp": 102,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|jumpy",
+      "fuel": "diesel",
+      "powerHp": 102,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "0ffc2960-898f-4eaf-ae83-3f6f5c58800f",
+    "input": {
+      "makeRaw": "Alfa Romeo",
+      "modelRaw": "Stelvio",
+      "variant": "2.2 Diesel 118kW (160cv) SPRINT RWD",
+      "fuelRaw": "Diésel",
+      "year": 2021,
+      "powerHp": 160,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "alfa-romeo|stelvio",
+      "fuel": "diesel",
+      "powerHp": 160,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1a4a8600-3300-44e4-88c5-5c795d67b9ae",
+    "input": {
+      "makeRaw": "Skoda",
+      "modelRaw": "Kamiq",
+      "variant": "1.0 TSI 85kW (115CV) SELECTION",
+      "fuelRaw": "Gasolina",
+      "year": 2024,
+      "powerHp": 115,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "skoda|kamiq",
+      "fuel": "gasolina",
+      "powerHp": 115,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1a205aaf-753b-4783-afa6-0ba2e4075781",
+    "input": {
+      "makeRaw": "Citroen",
+      "modelRaw": "C3",
+      "variant": "PureTech 81KW (110CV) S&S Feel Pack",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 110,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|c3",
+      "fuel": "gasolina",
+      "powerHp": 110,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1ab11d35-81fb-4011-93a7-5c1bf188449d",
+    "input": {
+      "makeRaw": "DS",
+      "modelRaw": "DS 5",
+      "variant": "BlueHDi 120cv Design",
+      "fuelRaw": "Diésel",
+      "year": 2016,
+      "powerHp": 120,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ds|ds",
+      "fuel": "diesel",
+      "powerHp": 120,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1dfff36c-cba6-4455-a50c-c36b20880438",
+    "input": {
+      "makeRaw": "Abarth",
+      "modelRaw": "500",
+      "variant": "595 1.4 16v T-Jet 121kW (165 CV)",
+      "fuelRaw": "Gasolina",
+      "year": 2022,
+      "powerHp": 165,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "abarth|500",
+      "fuel": "gasolina",
+      "powerHp": 165,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1ea258ad-c862-4fa4-a024-3d1a4707304b",
+    "input": {
+      "makeRaw": "Cupra",
+      "modelRaw": "Formentor",
+      "variant": "2.5 TSI 287kW (390 CV) VZ5 4Drive DSG",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 390,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "cupra|formentor",
+      "fuel": "gasolina",
+      "powerHp": 390,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "2d5a8157-5783-4250-aaf4-469531bc3769",
+    "input": {
+      "makeRaw": "DS",
+      "modelRaw": "DS 7 Crossback",
+      "variant": "BlueHDi DE 96kW (130CV) AT Bastille +",
+      "fuelRaw": "Diésel",
+      "year": 2022,
+      "powerHp": 130,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ds|ds",
+      "fuel": "diesel",
+      "powerHp": 130,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "04a4292e-9b74-4d6c-8038-b23817bb1b35",
+    "input": {
+      "makeRaw": "Byd",
+      "modelRaw": "Atto 3",
+      "variant": "Design",
+      "fuelRaw": "Eléctrico",
+      "year": 2023,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "07a45c58-5766-42c3-a563-68abf5098c80",
+    "input": {
+      "makeRaw": "DS",
+      "modelRaw": "DS 3 Crossback",
+      "variant": "PureTech 73 kW Manual GRAND CHIC",
+      "fuelRaw": "Gasolina",
+      "year": 2020,
+      "powerHp": 99,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ds|ds",
+      "fuel": "gasolina",
+      "powerHp": 99,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "17cf2c08-ce1e-408e-9849-1729bbab16ac",
+    "input": {
+      "makeRaw": "Cupra",
+      "modelRaw": "Formentor",
+      "variant": "1.5 TSI 110kW (150 CV) DSG",
+      "fuelRaw": "Gasolina",
+      "year": 2023,
+      "powerHp": 150,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "cupra|formentor",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "22b1c4b9-cd8b-40e1-923f-72157f5dd7e0",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A3",
+      "variant": "30 TFSI 85kW (116CV) S tronic Sportback",
+      "fuelRaw": "Gasolina",
+      "year": 2023,
+      "powerHp": 116,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "gasolina",
+      "powerHp": 116,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "178bc872-c7ef-4903-b24a-09b8151b49f7",
+    "input": {
+      "makeRaw": "Aiways",
+      "modelRaw": "U5",
+      "variant": "Prime",
+      "fuelRaw": "Eléctrico",
+      "year": 2021,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "318d26fa-2a60-4e96-b45b-cd9c713f858c",
+    "input": {
+      "makeRaw": "Byd",
+      "modelRaw": "Seal u",
+      "variant": "Design",
+      "fuelRaw": "Híbrido enchufable",
+      "year": 2025,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "94868af6-9636-4094-8707-4b0001c2bac3",
+    "input": {
+      "makeRaw": "Byd",
+      "modelRaw": "Seal u",
+      "variant": "Boost",
+      "fuelRaw": "Híbrido enchufable",
+      "year": 2024,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "292475f3-c704-4615-9413-d4a671339373",
+    "input": {
+      "makeRaw": "Alfa Romeo",
+      "modelRaw": "Stelvio",
+      "variant": "2.2 Diesel 118kW (160cv) SPRINT RWD",
+      "fuelRaw": "Diésel",
+      "year": 2021,
+      "powerHp": 160,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "alfa-romeo|stelvio",
+      "fuel": "diesel",
+      "powerHp": 160,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "flexicar.es",
+    "listing_id": "1104740b-493f-4dd4-8c37-2cd74a99225a",
+    "input": {
+      "makeRaw": "Alfa Romeo",
+      "modelRaw": "Tonale",
+      "variant": "1.5 MHEV GASOLINA 130 CV SPRINT FWD",
+      "fuelRaw": "Híbrido no enchufable",
+      "year": 2023,
+      "powerHp": 130,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "alfa-romeo|tonale",
+      "fuel": "híbrido",
+      "powerHp": 130,
+      "cc": null
+    },
+    "note": "estrato flexicar.es"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "00d13cc0-ffa1-455c-a90a-0f91927d99d6",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Tayron",
+      "variant": "R-Line Edition Plus",
+      "fuelRaw": "PLUGIN_HYBRID",
+      "year": 2026,
+      "powerHp": 272,
+      "displacementCc": 1498,
+      "co2": 39
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|tayron",
+      "fuel": "phev",
+      "powerHp": 272,
+      "cc": 1498
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "016d9bad-ad9a-419e-b1c2-609baacedec7",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Duster",
+      "variant": "Extreme TCe 130",
+      "fuelRaw": "PETROL",
+      "year": 2025,
+      "powerHp": 131,
+      "displacementCc": 1199,
+      "co2": 122
+    },
+    "label": {
+      "kind": "signature",
+      "family": "dacia|duster",
+      "fuel": "gasolina",
+      "powerHp": 131,
+      "cc": 1199
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "024c75d8-5e74-4efd-bc75-06f25ed44330",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Touareg",
+      "variant": "R-Line",
+      "fuelRaw": "DIESEL",
+      "year": 2024,
+      "powerHp": 286,
+      "displacementCc": 2967,
+      "co2": 228
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|touareg",
+      "fuel": "diesel",
+      "powerHp": 286,
+      "cc": 2967
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "027f13fb-dc47-446b-9b27-e6f64f78e65b",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "GS 1.2 Direct Injection Turbo 6-Gang",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 101,
+      "displacementCc": null,
+      "co2": 119
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 101,
+      "cc": null
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "035be3d9-7aac-48bf-9114-5e962d594fa0",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Sandero",
+      "variant": null,
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 101,
+      "displacementCc": 999,
+      "co2": 130
+    },
+    "label": {
+      "kind": "signature",
+      "family": "dacia|sandero",
+      "fuel": "gasolina",
+      "powerHp": 101,
+      "cc": 999
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0044badd-4624-4441-a0c8-a00b561d04b5",
+    "input": {
+      "makeRaw": "CUPRA",
+      "modelRaw": "Leon",
+      "variant": "Basis",
+      "fuelRaw": "PETROL",
+      "year": 2025,
+      "powerHp": 150,
+      "displacementCc": 1498,
+      "co2": 131
+    },
+    "label": {
+      "kind": "signature",
+      "family": "cupra|leon",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1498
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0154f0d6-1772-41fd-ab71-7160c9d209cb",
+    "input": {
+      "makeRaw": "Dacia",
+      "modelRaw": "Duster",
+      "variant": "Duster II",
+      "fuelRaw": "PETROL",
+      "year": 2022,
+      "powerHp": 150,
+      "displacementCc": 1332,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "dacia|duster",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1332
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0414ed29-d765-404d-9b4a-00341ffa6426",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "1.5 eTSI 110 kW R-Line",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 150,
+      "displacementCc": 1498,
+      "co2": 136
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1498
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0459c545-34cf-4931-b8e4-07985fec121c",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "GS 1.2 Direct Injection Turbo 6-Gang",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 101,
+      "displacementCc": null,
+      "co2": 119
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 101,
+      "cc": null
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0605b667-939d-4702-92b6-fc91629a2182",
+    "input": {
+      "makeRaw": "Skoda",
+      "modelRaw": "Kodiaq",
+      "variant": null,
+      "fuelRaw": "PLUGIN_HYBRID",
+      "year": 2026,
+      "powerHp": 204,
+      "displacementCc": 1498,
+      "co2": 39
+    },
+    "label": {
+      "kind": "signature",
+      "family": "skoda|kodiaq",
+      "fuel": "phev",
+      "powerHp": 204,
+      "cc": 1498
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "04746d60-2d1c-4587-a8c4-b75c3b7005e0",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "Edition 1.2 Direct Injection Turbo 6-Gang",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 101,
+      "displacementCc": null,
+      "co2": 119
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 101,
+      "cc": null
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "007552e5-80a6-4716-8dbe-627bfcbc63e4",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Megane E-TECH",
+      "variant": "E-Tech EV60 220 Techno",
+      "fuelRaw": "ELECTRIC",
+      "year": 2023,
+      "powerHp": 218,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|megane",
+      "fuel": "elétrico",
+      "powerHp": 218,
+      "cc": null
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "033466c2-5add-4933-8c69-e69bd2e22d50",
+    "input": {
+      "makeRaw": "Ford",
+      "modelRaw": "Transit Custom",
+      "variant": "320 L1 FWD Limited",
+      "fuelRaw": "DIESEL",
+      "year": 2026,
+      "powerHp": 170,
+      "displacementCc": 1996,
+      "co2": 210
+    },
+    "label": {
+      "kind": "signature",
+      "family": "ford|transit",
+      "fuel": "diesel",
+      "powerHp": 170,
+      "cc": 1996
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "00036348-e36f-4b92-b9e9-c49b8e6bee20",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "T-Roc",
+      "variant": "1.0 TSI Style TEMPOMAT/LED/PDC",
+      "fuelRaw": "PETROL",
+      "year": 2025,
+      "powerHp": 116,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-roc",
+      "fuel": "gasolina",
+      "powerHp": 116,
+      "cc": 999
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "041623e9-ee20-4a12-b50d-40985dfcf2d7",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Transporter",
+      "variant": "Kombi FWD",
+      "fuelRaw": "DIESEL",
+      "year": 2022,
+      "powerHp": 150,
+      "displacementCc": 1968,
+      "co2": 201
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|transporter",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1968
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "0231780e-6c0d-4e2c-a32b-3cced4750072",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Taigo",
+      "variant": "R-Line 1.5 TSI 7-Gang-DSG",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 150,
+      "displacementCc": null,
+      "co2": 136
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|taigo",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": null
+    },
+    "note": "estrato meinauto.de"
+  },
+  {
+    "source_site": "meinauto.de",
+    "listing_id": "60071124-d39d-4a3b-bc14-aa7f00801f63",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "R",
+      "fuelRaw": "PETROL",
+      "year": 2026,
+      "powerHp": 333,
+      "displacementCc": 1984,
+      "co2": 186
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 333,
+      "cc": 1984,
+      "mustConfirm": true
+    },
+    "note": "Golf R ≥300 ≠ GTI 245"
+  },
+  {
+    "source_site": "ocasionplus.com",
+    "listing_id": "01b30979-3c00-4235-8513-0136d45682d8",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A3",
+      "variant": "Audi A3 Sportback Advanced 30 TFSI (110 CV) S tronic",
+      "fuelRaw": "Híbrido",
+      "year": 2022,
+      "powerHp": 110,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "híbrido",
+      "powerHp": 110,
+      "cc": null
+    },
+    "note": "estrato fuel híbrido"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "00e4d5cc-b6fe-460a-842f-08164605c8b3",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": "1.2 PureTech Style",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 102,
+      "displacementCc": 1199,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 102,
+      "cc": 1199
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "00e80f31-ce83-47d2-b744-db98bc2a17e5",
+    "input": {
+      "makeRaw": "Land Rover",
+      "modelRaw": "Freelander",
+      "variant": "Jipe land rover freelander 2.0 di",
+      "fuelRaw": "Diesel",
+      "year": 1998,
+      "powerHp": 100,
+      "displacementCc": 2000,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "land-rover|freelander",
+      "fuel": "diesel",
+      "powerHp": 100,
+      "cc": 2000
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "01bbc360-d085-4e9b-9b7e-6e4100f813a7",
+    "input": {
+      "makeRaw": "Tesla",
+      "modelRaw": "Model 3",
+      "variant": "Sr Plus LFP Ryzen",
+      "fuelRaw": "Eléctrico",
+      "year": 2023,
+      "powerHp": 283,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "tesla|model-3",
+      "fuel": "elétrico",
+      "powerHp": 283,
+      "cc": null
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "02afd10b-7936-4550-8a1b-ff5cb35da4cd",
+    "input": {
+      "makeRaw": "MG",
+      "modelRaw": "MG4",
+      "variant": "4 51 kWh Standard",
+      "fuelRaw": "Eléctrico",
+      "year": 2023,
+      "powerHp": 170,
+      "displacementCc": 400,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "2e8d1da9-3403-49a1-af94-25bd51260c91",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Astra Sports Tourer",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2015,
+      "powerHp": null,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "sem potência/cc e variante pobre — não confirmável"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "03c35677-40b3-48ac-a824-f22945953654",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "430 Gran Coupé",
+      "variant": "i xDrive P.M Auto",
+      "fuelRaw": "Gasolina",
+      "year": 2016,
+      "powerHp": 252,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-4",
+      "fuel": "gasolina",
+      "powerHp": 252,
+      "cc": 1998
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "03cb6a8a-a0c8-4a0d-962d-454833be98e9",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A4 Avant",
+      "variant": "1.9TDi 130cv",
+      "fuelRaw": "Diesel",
+      "year": 2002,
+      "powerHp": 130,
+      "displacementCc": 1900,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a4",
+      "fuel": "diesel",
+      "powerHp": 130,
+      "cc": 1900
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "03e5dcd5-cb38-4c9a-b57c-d6701fa1ab7a",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "VW Golf GTI Clubsport DSG",
+      "fuelRaw": "Gasolina",
+      "year": 2017,
+      "powerHp": 265,
+      "displacementCc": 1984,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 265,
+      "cc": 1984
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "03e73ab0-e1e3-4d5e-9228-10fd65800662",
+    "input": {
+      "makeRaw": "Citroën",
+      "modelRaw": "AX",
+      "variant": "14 GT",
+      "fuelRaw": "Gasolina",
+      "year": 1991,
+      "powerHp": 75,
+      "displacementCc": 1360,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|ax",
+      "fuel": "gasolina",
+      "powerHp": 75,
+      "cc": 1360
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "04a88dd8-a99a-4632-83d5-4a598d1b7712",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "3008",
+      "variant": "BlueHDi 130 Stop & Start EAT8 Allure",
+      "fuelRaw": "Diesel",
+      "year": 2020,
+      "powerHp": 131,
+      "displacementCc": 1499,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|3008",
+      "fuel": "diesel",
+      "powerHp": 131,
+      "cc": 1499
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "5b8d18e1-ff19-49a0-ae65-975ab9bf8abc",
+    "input": {
+      "makeRaw": "Mini",
+      "modelRaw": "3 Portas",
+      "variant": "Cooper S | N18 | LCI | 77.117KMS | 2013",
+      "fuelRaw": "Gasolina",
+      "year": 2013,
+      "powerHp": 184,
+      "displacementCc": 1598,
+      "co2": 136
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "MINI Cooper S (F56) — geração por ano"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "044e86bd-42b8-4c9d-a3f4-e7f7f79a9db4",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "VW Golf 2.0 TSi GTi DSG",
+      "fuelRaw": "Gasolina",
+      "year": 2015,
+      "powerHp": 220,
+      "displacementCc": 1984,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 220,
+      "cc": 1984
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "177d0baa-dc59-4e18-93a9-a913b8ac31bd",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "VW Golf 2.0 TSI GTI DSG Performance",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 245,
+      "displacementCc": 1984,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 245,
+      "cc": 1984,
+      "mustConfirm": true
+    },
+    "note": "Golf GTI 245 ≠ 1.5 150 ≠ R"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "0186afa1-18b2-4ca9-a7c7-e3c5cc03cd0c",
+    "input": {
+      "makeRaw": null,
+      "modelRaw": "Urus",
+      "variant": "Lamborghini Urus 4.0 V8",
+      "fuelRaw": "Gasolina",
+      "year": 2022,
+      "powerHp": 650,
+      "displacementCc": 3996,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "marca irresolúvel"
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "0244ea01-acbf-44ca-9f17-e52dc7593941",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "208",
+      "variant": "1.2 100cv",
+      "fuelRaw": "Gasolina",
+      "year": 2025,
+      "powerHp": 100,
+      "displacementCc": 1199,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|208",
+      "fuel": "gasolina",
+      "powerHp": 100,
+      "cc": 1199
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "0355c131-3e96-43ac-8042-c1732c7991c9",
+    "input": {
+      "makeRaw": "Citroën",
+      "modelRaw": "C5 Tourer",
+      "variant": "Citroen C5 Tourer 1.6Hdi 115cv",
+      "fuelRaw": "Diesel",
+      "year": 2014,
+      "powerHp": 115,
+      "displacementCc": 1600,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|c5",
+      "fuel": "diesel",
+      "powerHp": 115,
+      "cc": 1600
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "49485f48-b5e4-4d5d-a2c5-3f213b9d75ec",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "M850i",
+      "variant": "xDrive",
+      "fuelRaw": "Gasolina",
+      "year": 2019,
+      "powerHp": 530,
+      "displacementCc": 4395,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 530,
+      "cc": 4395,
+      "mustConfirm": true
+    },
+    "note": "BMW M850i 530cv ≠ 840i/M8"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "57832edc-060e-4ca7-957c-b522c120bfb7",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Golf",
+      "variant": "VII 2.0TSI R 300Cv",
+      "fuelRaw": "Gasolina",
+      "year": 2013,
+      "powerHp": 300,
+      "displacementCc": 1986,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|golf",
+      "fuel": "gasolina",
+      "powerHp": 300,
+      "cc": 1986,
+      "mustConfirm": true
+    },
+    "note": "Golf R ≥300 ≠ GTI 245"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "0255088e-c879-458b-81ab-b186d0960d96",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "E 220",
+      "variant": "CDI DPF BlueEFFICIENCY 7G-TRONIC Avantgarde",
+      "fuelRaw": "Diesel",
+      "year": 2014,
+      "powerHp": 170,
+      "displacementCc": 2143,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-e",
+      "fuel": "diesel",
+      "powerHp": 170,
+      "cc": 2143
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "olx.pt",
+    "listing_id": "03791662-3609-439a-8fb5-817284f4d422",
+    "input": {
+      "makeRaw": "Mazda",
+      "modelRaw": "CX-3",
+      "variant": "1.5 Sky.Special Edition Navi",
+      "fuelRaw": "Diesel",
+      "year": 2015,
+      "powerHp": 105,
+      "displacementCc": 1499,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mazda|cx-3",
+      "fuel": "diesel",
+      "powerHp": 105,
+      "cc": 1499
+    },
+    "note": "estrato olx.pt"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "0ae626af-f27c-4e15-835e-3b8bb4c99c01",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Touran",
+      "variant": "VW Touran Comfortline|1.4 TSI150 PS|06 2017|111.000km|SHZ|ACC|Navi|Tüv Insp neu|scheckheftgepflegt",
+      "fuelRaw": "benzin",
+      "year": 2017,
+      "powerHp": 150,
+      "displacementCc": 1400,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|touran",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1400
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "0de18347-b885-4aba-b5c9-90dfc4e33f6b",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "Vito",
+      "variant": "Mercedes-Benz Vito 116 CDI Tourer 4x4 Allrad Automatik Klima Standheizung 163 PS Navi Camper",
+      "fuelRaw": "diesel",
+      "year": 2019,
+      "powerHp": 163,
+      "displacementCc": 1950,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|vito",
+      "fuel": "diesel",
+      "powerHp": 163,
+      "cc": 1950
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "2f2b9e3e-eecd-48b7-a5a4-f1c3ec3af1b9",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "a1",
+      "variant": "Audi a1 2017 1.4 .125 ps neue Tüv 2 hand gute ausstatung euro 6 Tauschen möglich gegen SUV",
+      "fuelRaw": "benzin",
+      "year": 2017,
+      "powerHp": 125,
+      "displacementCc": 1395,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a1",
+      "fuel": "gasolina",
+      "powerHp": 125,
+      "cc": 1395
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "6a2f0307-e431-4cfd-97f2-d026447afeb2",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Passat",
+      "variant": "VW Passat Kombii Benzin 102 PS Bj 2001 TÜV 4 26 Schalter AHK",
+      "fuelRaw": "benzin",
+      "year": 2001,
+      "powerHp": 102,
+      "displacementCc": 1595,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|passat",
+      "fuel": "gasolina",
+      "powerHp": 102,
+      "cc": 1595
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "8c0e5d22-3b9d-408a-8d34-24d0ffb3d3b3",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Mokka",
+      "variant": "Opel Mokka 1,6 136 ps diesel",
+      "fuelRaw": "diesel",
+      "year": 2016,
+      "powerHp": 136,
+      "displacementCc": 1598,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|mokka",
+      "fuel": "diesel",
+      "powerHp": 136,
+      "cc": 1598
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "8f73f9f3-9b81-483e-aa77-0169d479d232",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A3",
+      "variant": "Audi A3 Youngtimer, 5V Turbo Motor, 2,0 ltr. 150 Ps",
+      "fuelRaw": "benzin",
+      "year": 1997,
+      "powerHp": 150,
+      "displacementCc": 1781,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "gasolina",
+      "powerHp": 150,
+      "cc": 1781
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "58edbd49-8c41-49b2-ad8d-e408f07e6a8f",
+    "input": {
+      "makeRaw": "Volkswagen",
+      "modelRaw": "Touran",
+      "variant": "VW Touran 2.0 tdi Bj 2004 6 Gang 140 PS TÜV 2027",
+      "fuelRaw": "diesel",
+      "year": 2004,
+      "powerHp": 140,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|touran",
+      "fuel": "diesel",
+      "powerHp": 140,
+      "cc": 1998
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "7305ac8b-8cee-49b0-960b-596c08a0d39a",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X4",
+      "variant": "BMW X4 xDrive30i Advantage | 252 PS | Automatik | Garantie",
+      "fuelRaw": "benzin",
+      "year": 2021,
+      "powerHp": 252,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x4",
+      "fuel": "gasolina",
+      "powerHp": 252,
+      "cc": 1998
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "c7b49d7f-a671-4488-93e8-de7338852664",
+    "input": {
+      "makeRaw": "Opel",
+      "modelRaw": "Corsa",
+      "variant": "Opel Corsa D Automatik 80PS 1,2Motor",
+      "fuelRaw": "benzin",
+      "year": 2008,
+      "powerHp": 80,
+      "displacementCc": 1200,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "opel|corsa",
+      "fuel": "gasolina",
+      "powerHp": 80,
+      "cc": 1200
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "c22191e1-5b7f-4f23-a47a-f5d86c63170b",
+    "input": {
+      "makeRaw": "Citroen",
+      "modelRaw": "H",
+      "variant": "Citroen, H (C3 PLURIEL 1.6) Erstzulassung 10 2006, 80 kW",
+      "fuelRaw": "benzin",
+      "year": 2006,
+      "powerHp": 109,
+      "displacementCc": 1600,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "c6482832-2648-408e-8fd8-c84c3e0edc12",
+    "input": {
+      "makeRaw": "Mitsubishi",
+      "modelRaw": "Space",
+      "variant": "Verkaufe Mitsubishi Space Star 1.2 Spirit, 71 PS, 76.000 km, guter Zustand, fahrbereit",
+      "fuelRaw": "benzin",
+      "year": 2022,
+      "powerHp": 71,
+      "displacementCc": 1198,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mitsubishi|space",
+      "fuel": "gasolina",
+      "powerHp": 71,
+      "cc": 1198
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "quoka.de",
+    "listing_id": "ee9afbae-1de0-48a5-86f2-188908a9f93a",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "x1",
+      "variant": "bmw x1 20d 2.2 177ps neue Tüv Tauschen möglich",
+      "fuelRaw": "diesel",
+      "year": 2012,
+      "powerHp": 177,
+      "displacementCc": 1995,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x1",
+      "fuel": "diesel",
+      "powerHp": 177,
+      "cc": 1995
+    },
+    "note": "estrato quoka.de"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "00b10d07-cee9-44f8-819b-b66adad6c0ab",
+    "input": {
+      "makeRaw": "Jaguar",
+      "modelRaw": "XF",
+      "variant": "20d Aut. R-Sport",
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": 180,
+      "displacementCc": 1999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "jaguar|xf",
+      "fuel": "diesel",
+      "powerHp": 180,
+      "cc": 1999
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "00c18f4d-8342-47bb-bbd6-c215c0265e6a",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Grand Scénic",
+      "variant": "1.5 dCi Bose Edition SS",
+      "fuelRaw": "Diesel",
+      "year": 2015,
+      "powerHp": 110,
+      "displacementCc": 1461,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|grand",
+      "fuel": "diesel",
+      "powerHp": 110,
+      "cc": 1461
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "00e2ddfa-c8aa-4379-bc01-e79fcc0f6338",
+    "input": {
+      "makeRaw": "Mitsubishi",
+      "modelRaw": "Colt",
+      "variant": "1.1 Inform RCD/AC",
+      "fuelRaw": "Gasolina",
+      "year": 2007,
+      "powerHp": 75,
+      "displacementCc": 1124,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mitsubishi|colt",
+      "fuel": "gasolina",
+      "powerHp": 75,
+      "cc": 1124
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "01d794d2-97fe-4351-a319-76a8ae56b7d4",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "420 Gran Coupé",
+      "variant": "d Auto",
+      "fuelRaw": "Diesel",
+      "year": 2015,
+      "powerHp": 190,
+      "displacementCc": 1995,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-4",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 1995
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "002b05b3-05b4-4cfc-9a73-ebe37141c095",
+    "input": {
+      "makeRaw": "VW",
+      "modelRaw": "Sharan",
+      "variant": "2.0 TDI DSG BlueMotion Comfortline",
+      "fuelRaw": "Diesel",
+      "year": 2011,
+      "powerHp": 177,
+      "displacementCc": 1968,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|sharan",
+      "fuel": "diesel",
+      "powerHp": 177,
+      "cc": 1968
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "02c27891-f69a-4bcf-a081-565646ac3c1c",
+    "input": {
+      "makeRaw": "VW",
+      "modelRaw": "T-Cross",
+      "variant": "1.0 TSI Urban",
+      "fuelRaw": "Gasolina",
+      "year": 2026,
+      "powerHp": 95,
+      "displacementCc": 999,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "volkswagen|t-cross",
+      "fuel": "gasolina",
+      "powerHp": 95,
+      "cc": 999
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "02e16394-97ff-40d7-a09e-e77c7aa662c4",
+    "input": {
+      "makeRaw": "Citroën",
+      "modelRaw": "C4",
+      "variant": "1.6 HDi Business",
+      "fuelRaw": "Diesel",
+      "year": 2010,
+      "powerHp": 92,
+      "displacementCc": 1560,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "citroen|c4",
+      "fuel": "diesel",
+      "powerHp": 92,
+      "cc": 1560
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "03a3b80e-9d4d-4646-b5e9-51549c8b4066",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X3",
+      "variant": "2.0 d",
+      "fuelRaw": "Diesel",
+      "year": 2005,
+      "powerHp": 150,
+      "displacementCc": 1995,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x3",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1995
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "04de642e-ecfb-4610-bebc-c7680ebbae68",
+    "input": {
+      "makeRaw": "Nissan",
+      "modelRaw": "Juke",
+      "variant": "1.5 dCi Tekna",
+      "fuelRaw": "Diesel",
+      "year": 2014,
+      "powerHp": 110,
+      "displacementCc": 1461,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "nissan|juke",
+      "fuel": "diesel",
+      "powerHp": 110,
+      "cc": 1461
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "07c4deb8-fd52-43f6-942c-dd3266afbbb5",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "X3",
+      "variant": "30 e xDrive Pack M",
+      "fuelRaw": "Híbrido Plug-In",
+      "year": 2022,
+      "powerHp": 292,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|x3",
+      "fuel": "phev",
+      "powerHp": 292,
+      "cc": 1998
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "057d2e56-da4b-493a-8bd8-bb63b2653604",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "C 200",
+      "variant": "d",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 160,
+      "displacementCc": 1598,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|classe-c",
+      "fuel": "diesel",
+      "powerHp": 160,
+      "cc": 1598
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "0330cca8-6bb6-4b46-839b-edee6208545e",
+    "input": {
+      "makeRaw": "Citroën",
+      "modelRaw": "e-C4",
+      "variant": "50 kWh Plus",
+      "fuelRaw": "Elétrico",
+      "year": 2025,
+      "powerHp": 136,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "0428b012-7821-4d0a-8b3b-ef0f87332105",
+    "input": {
+      "makeRaw": "Jeep",
+      "modelRaw": "Wrangler",
+      "variant": null,
+      "fuelRaw": "Gasolina",
+      "year": 1987,
+      "powerHp": 184,
+      "displacementCc": 4182,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "jeep|wrangler",
+      "fuel": "gasolina",
+      "powerHp": 184,
+      "cc": 4182
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "01117bf4-ea76-47c1-8534-a93c725473e9",
+    "input": {
+      "makeRaw": "Mercedes-Benz",
+      "modelRaw": "GLC 220",
+      "variant": "d 4Matic",
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": 194,
+      "displacementCc": 1950,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mercedes|glc",
+      "fuel": "diesel",
+      "powerHp": 194,
+      "cc": 1950
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "087154c7-f1b1-4bad-a804-068d6d951e2c",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "320",
+      "variant": null,
+      "fuelRaw": "Híbrido Plug-In",
+      "year": 2022,
+      "powerHp": 204,
+      "displacementCc": 1998,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "phev",
+      "powerHp": 204,
+      "cc": 1998
+    },
+    "note": "estrato fuel phev"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "0575528f-06e5-4a12-9d8b-ecf2db3d7a05",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "Mégane E-Tech",
+      "variant": "EV60 Evolution Optimum Charge",
+      "fuelRaw": "Elétrico",
+      "year": 2023,
+      "powerHp": 130,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|megane",
+      "fuel": "elétrico",
+      "powerHp": 130,
+      "cc": null
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "01578559-396e-486c-aa82-abd85612ea3e",
+    "input": {
+      "makeRaw": "Audi",
+      "modelRaw": "A3 Limousine",
+      "variant": "2.0 TDI Attraction",
+      "fuelRaw": "Diesel",
+      "year": 2013,
+      "powerHp": 150,
+      "displacementCc": 1968,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "audi|a3",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1968
+    },
+    "note": "estrato standvirtual.com"
+  },
+  {
+    "source_site": "standvirtual.com",
+    "listing_id": "23977082-d393-4bec-8fee-4264f0247f1e",
+    "input": {
+      "makeRaw": "Aixam",
+      "modelRaw": "Crossline",
+      "variant": null,
+      "fuelRaw": "Diesel",
+      "year": 2017,
+      "powerHp": null,
+      "displacementCc": 479,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "família fora do catálogo"
+    },
+    "note": "sem potência + variante pobre → não confirmável"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "0dd4d5d8-d681-48fd-8c33-d37f6b27ccba",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "8 SERIES",
+      "variant": "BMW 8 SERIES 840D 3.0 320 XDRIVE",
+      "fuelRaw": "Diesel",
+      "year": 2018,
+      "powerHp": 320,
+      "displacementCc": 3000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "diesel",
+      "powerHp": 320,
+      "cc": 3000,
+      "mustConfirm": true
+    },
+    "note": "BMW 840 — potência separa de M850i/M8"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "00f3b6d1-bc58-44e8-8aaf-7ce27682bd83",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3 SERIES TOURING",
+      "variant": "BMW 3 SERIES TOURING 320I 2.0 184 EXECUTIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2013,
+      "powerHp": 184,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "gasolina",
+      "powerHp": 184,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "00fc990e-da18-412d-b0e3-132d5f5d1181",
+    "input": {
+      "makeRaw": "SAAB",
+      "modelRaw": "9-3",
+      "variant": "SAAB 9-3 1.9 130 LINEAR 2WD",
+      "fuelRaw": "Diesel",
+      "year": 2012,
+      "powerHp": 130,
+      "displacementCc": 1900,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "saab|9",
+      "fuel": "diesel",
+      "powerHp": 130,
+      "cc": 1900
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "1b5ea645-2db3-40d9-b9b8-8d8986eebe45",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3 SERIES",
+      "variant": "BMW 3 SERIES 320D 2.0 190 XDRIVE",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 190,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 2000
+    },
+    "note": "BMW 320d fronteira F30/G20 (2018/2019)"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "01f293c9-8390-4d01-a171-a1c7f21f84a7",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "SERIE 2 GRAN COUPE",
+      "variant": "BMW SERIE 2 GRAN COUPE 220D 2.0 163 SDRIVE",
+      "fuelRaw": "Diesel",
+      "year": 2026,
+      "powerHp": 163,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-2",
+      "fuel": "diesel",
+      "powerHp": 163,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "02bde5b0-1e84-44d8-9dcc-a2802f7c771e",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "5 SERIES",
+      "variant": "BMW 5 SERIES 520D 2.0 190 BUSINESS",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 190,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-5",
+      "fuel": "diesel",
+      "powerHp": 190,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "03ee8ff0-3ae2-46df-8b72-1122ca5f6052",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3 SERIES TOURING",
+      "variant": "BMW 3 SERIES TOURING 318D 2.0 143",
+      "fuelRaw": "Diesel",
+      "year": 2021,
+      "powerHp": 143,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "diesel",
+      "powerHp": 143,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "024e7676-6648-4b02-9255-30f791ae5ea5",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "5 SERIES",
+      "variant": "BMW 5 SERIES 523I 2.5 177 EXECUTIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2005,
+      "powerHp": 177,
+      "displacementCc": 2500,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-5",
+      "fuel": "gasolina",
+      "powerHp": 177,
+      "cc": 2500
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "032a36cf-40e6-439f-a92c-8167181bbdd6",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "8 SERIES",
+      "variant": "BMW 8 SERIES 840I 3.0 333 XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2023,
+      "powerHp": 333,
+      "displacementCc": 3000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 333,
+      "cc": 3000,
+      "mustConfirm": true
+    },
+    "note": "BMW 840 — potência separa de M850i/M8"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "046bfbed-6d77-4cb4-9a93-4322409e0489",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "8 SERIES",
+      "variant": "BMW 8 SERIES M850I V8 4.4 530 M PERFORMANCE XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2025,
+      "powerHp": 530,
+      "displacementCc": 844,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 530,
+      "cc": 844
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "054cbb19-1168-40e4-980a-4f56842ce019",
+    "input": {
+      "makeRaw": "PORSCHE",
+      "modelRaw": "PANAMERA",
+      "variant": "PORSCHE PANAMERA 4 V6 2.9 470 4WD",
+      "fuelRaw": "Hybrid",
+      "year": 2026,
+      "powerHp": 470,
+      "displacementCc": 629,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "porsche|panamera",
+      "fuel": "híbrido",
+      "powerHp": 470,
+      "cc": 629
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "056fe251-b2c5-4e1d-bcaf-7f687bb0f1c0",
+    "input": {
+      "makeRaw": "PORSCHE",
+      "modelRaw": "PANAMERA",
+      "variant": "PORSCHE PANAMERA 4 V6 2.9 330 4WD",
+      "fuelRaw": "Hybrid",
+      "year": 2018,
+      "powerHp": 330,
+      "displacementCc": 629,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "porsche|panamera",
+      "fuel": "híbrido",
+      "powerHp": 330,
+      "cc": 629
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "067a291d-ff36-4736-9b3f-82a7e6340d07",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3 SERIES",
+      "variant": "BMW 3 SERIES 320E 2.0 204",
+      "fuelRaw": "Hybrid",
+      "year": 2022,
+      "powerHp": 204,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "phev",
+      "powerHp": 204,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "0109c451-2a49-431f-9aa7-0f175cd185a6",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "7 SERIES",
+      "variant": "BMW 7 SERIES 740D 3.0 320 M SPORT XDRIVE",
+      "fuelRaw": "Diesel",
+      "year": 2025,
+      "powerHp": 320,
+      "displacementCc": 3000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-7",
+      "fuel": "diesel",
+      "powerHp": 320,
+      "cc": 3000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "0588b759-1204-4589-ab70-3c850383b56b",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "3 SERIES",
+      "variant": "BMW 3 SERIES 318I 2.0 156 EDITION AVANTAGE",
+      "fuelRaw": "Gasoline",
+      "year": 2020,
+      "powerHp": 156,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "gasolina",
+      "powerHp": 156,
+      "cc": 2000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "02648f4d-7b6d-431a-a1d3-a7b9c1ffcb3c",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "SERIE 8 CABRIOLET",
+      "variant": "BMW SERIE 8 CABRIOLET M8 COMPETITION 4.4 625 XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2021,
+      "powerHp": 625,
+      "displacementCc": 4400,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 625,
+      "cc": 4400
+    },
+    "note": "BMW M8 ≥600cv — nunca confunde com 840i/M850i"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "05415d35-ed35-4a43-bd63-65db4e7ee9ce",
+    "input": {
+      "makeRaw": "SAAB",
+      "modelRaw": "9-3",
+      "variant": "SAAB 9-3 2.0 T 210 AERO 4WD",
+      "fuelRaw": "LPG",
+      "year": 2010,
+      "powerHp": null,
+      "displacementCc": 2000,
+      "co2": null
+    },
+    "label": {
+      "kind": "null",
+      "reason": "fuel fora do âmbito (GPL/GN/desconhecido)"
+    },
+    "note": "GPL/LPG — fuel null, sempre null"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "018890f9-5846-495b-963b-bbdef4b0190b",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "SERIE 8 GRAN COUPE",
+      "variant": "BMW SERIE 8 GRAN COUPE 840I 3.0 340 M SPORT XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2021,
+      "powerHp": 340,
+      "displacementCc": 3000,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 340,
+      "cc": 3000
+    },
+    "note": "estrato theparking.eu"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "253260ad-d8d0-45c2-82f3-7cfff840b3e5",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "SERIE 8 CABRIOLET",
+      "variant": "BMW SERIE 8 CABRIOLET M850I 4.4 530 XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2020,
+      "powerHp": 530,
+      "displacementCc": 4400,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 530,
+      "cc": 4400,
+      "mustConfirm": true
+    },
+    "note": "BMW M850i 530cv ≠ 840i/M8"
+  }
+]

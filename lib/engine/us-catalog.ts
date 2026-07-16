@@ -66,8 +66,11 @@ export interface CatalogFamily {
 export interface UsCatalogIndex {
   /** chave `${makeSlug}|${family}` → família com gerações e versões */
   byFamily: Map<string, CatalogFamily>;
-  /** mid → resolução (família + regra aplicada + geração) */
-  midInfo: Map<string, { makeSlug: string; family: string; rule: string; generationId: string }>;
+  /** mid → resolução (família + regra aplicada + geração + tokens do slug) */
+  midInfo: Map<
+    string,
+    { makeSlug: string; family: string; rule: string; generationId: string; slugTokens: string[] }
+  >;
   stats: {
     mids: number;
     porRegra: number;
@@ -397,9 +400,10 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
     familias: 0, geracoes: 0, versoes: 0, versoesExcluidasOther: 0,
   };
 
-  // mid → { makeSlug, family, rule, startYear, genKey }
+  // mid → { makeSlug, family, rule, startYear, genKey, slugTokens }
   const midResolved = new Map<string, {
     makeSlug: string; family: string; rule: string; startYear: number | null; genKey: string;
+    slugTokens: string[];
   }>();
 
   for (const m of models) {
@@ -414,7 +418,12 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
     const startYear =
       m.modelYear != null && minVer != null ? Math.min(m.modelYear, minVer)
       : (m.modelYear ?? minVer ?? null);
-    midResolved.set(m.mid, { makeSlug, family, rule, startYear, genKey: genKeyOf(m.slug) });
+    midResolved.set(m.mid, {
+      makeSlug, family, rule, startYear, genKey: genKeyOf(m.slug),
+      // Tokens do slug do modelo — usados pela guarda anti-fallback do resolver
+      // (Fase 2): "Grand i10"≠"Grand Santa Fe" apesar da mesma família `grand`.
+      slugTokens: slugify(m.slug).split("-").filter(Boolean),
+    });
   }
 
   // Agrupa mids por família e, dentro dela, por genKey.
@@ -425,7 +434,7 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
   }
 
   const byFamily = new Map<string, CatalogFamily>();
-  const midInfo = new Map<string, { makeSlug: string; family: string; rule: string; generationId: string }>();
+  const midInfo: UsCatalogIndex["midInfo"] = new Map();
 
   for (const [fk, mids] of familyMids) {
     // genKey → mids + arranque (min dos arranques dos mids)
@@ -451,7 +460,7 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
     for (const mid of mids) {
       const generationId = genOfMid.get(mid)!;
       const r = midResolved.get(mid)!;
-      midInfo.set(mid, { makeSlug, family, rule: r.rule, generationId });
+      midInfo.set(mid, { makeSlug, family, rule: r.rule, generationId, slugTokens: r.slugTokens });
       for (const v of versionsByMid.get(mid) ?? []) {
         const fuel = resolveVersionFuel(v.fuelSection, v.fuel);
         if (fuel === null) { stats.versoesExcluidasOther++; continue; }

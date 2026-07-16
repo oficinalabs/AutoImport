@@ -180,6 +180,26 @@ export function normModel(
   return slug.split("-")[0] || null;
 }
 
+/**
+ * Proveniência do `normModel`: `true` se uma regra de marca casou, `false` se o
+ * resultado veio do fallback primeiro-token. O resolver da Fase 2 usa isto para
+ * decidir quando aplicar a guarda anti-fallback (uma família só-fallback como
+ * "grand" exige compatibilidade de tokens do modelo). Não altera o `normModel`.
+ */
+export function normModelViaRule(
+  makeSlug: string | null,
+  raw: string | null | undefined,
+  variantRaw?: string | null,
+): boolean {
+  if (!raw) return false;
+  const slug = slugify(raw);
+  if (!slug) return false;
+  const matchSlug = variantRaw ? `${slug}-${slugify(variantRaw)}` : slug;
+  const rules = makeSlug ? MODEL_RULES[makeSlug] : undefined;
+  if (rules) for (const [re] of rules) if (re.exec(matchSlug)) return true;
+  return false;
+}
+
 // ── Combustível ──────────────────────────────────────────────────
 // Multi-língua (PT/DE/FR/NL/ES/EN). GPL/GN/hidrogénio → null (fora do
 // âmbito de comparação; FuelType não os cobre). "Gas" sozinho é ambíguo → null.
