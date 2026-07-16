@@ -1,4 +1,4 @@
-// autouncle/schema.ts — schema-alvo comum + mapeamento de um carro do autouncle.pt.
+// autouncle/schema.ts — schema-alvo comum + mapeamento de um carro do AutoUncle (multi-país).
 //
 // PORQUÊ: todos os coletores da AutoImport produzem o MESMO registo normalizado (ver
 // lib/normalize.ts), para comparar preços PT vs. UE de forma uniforme. Aqui juntamos os dois lados
@@ -10,12 +10,12 @@
 //     (`auRating`, o "AutoScore" 1–5), a imagem real, a variante e os dias em stock.
 //
 // AGREGADOR: `source` = site/stand de origem (ex. "PRCar", "Feiracar.pt", "Ar-automoveis.com"),
-// `source_site` = 'autouncle.pt'. `country` = 'PORTUGAL'. `region`/`postalCode` = null (o JSON-LD só
-// expõe `addressCountry: PT` por anúncio; a localização fina não vem nesta projeção). Ver
-// research/autouncle-investigacao.md.
+// `source_site` = 'autouncle.{tld}' e `country`/`currency` vêm do MERCADO (ver MARKETS em http.ts).
+// `region`/`postalCode` = null (o JSON-LD só expõe `addressCountry` por anúncio; a localização fina
+// não vem nesta projeção). Ver research/autouncle-investigacao.md.
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
-import { MARKET } from './http.ts';
+import { marketSourceSite, type Market } from './http.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do autouncle = os campos-base comuns + extras próprios do agregador.
@@ -50,14 +50,14 @@ export interface JsonLdItem {
   vehicleTransmission?: unknown;
   vehicleEngine?: {
     engineDisplacement?: { value?: number; unitText?: unknown };
-    enginePower?: { value?: number; additionalProperty?: { value?: number } };
+    enginePower?: { value?: number; unitText?: unknown; unitCode?: unknown; additionalProperty?: { value?: number } };
   };
   color?: unknown;
   numberOfDoors?: unknown;
   bodyType?: unknown;
   image?: { url?: string };
   emissionsCO2?: number;
-  fuelConsumption?: { value?: number };
+  fuelConsumption?: { value?: number; unitText?: unknown };
   name?: unknown;
 }
 
@@ -76,9 +76,10 @@ export interface SourceExtra {
   estimatedPrice?: string | null;
 }
 
-// carId numérico a partir do @id / URL de detalhe: `…/pt/d/6551782-usado-…`.
+// carId numérico a partir do @id / URL de detalhe: `…/{locale}/d/6551782-usado-…` (o prefixo de
+// locale varia por mercado: /pt/, /da/, /de-at/, …).
 export function idFromUrl(url: string | null | undefined): string | null {
-  const m = /\/pt\/d\/(\d+)-/.exec(url || '');
+  const m = /\/[a-z-]+\/d\/(\d+)-/.exec(url || '');
   return m ? m[1] : null;
 }
 
@@ -120,9 +121,9 @@ const IMG_PLACEHOLDER = /placeholder\.png/i;
 //   item.numberOfDoors                           -> doors
 //   item.bodyType                                -> category (SUV/Hatchback/…)
 //   item.offers.price                            -> price
-//   item.offers.priceCurrency                    -> currency (EUR)
-//   'PORTUGAL'                                    -> country
-//   (só addressCountry PT no JSON-LD)            -> region/postalCode = null
+//   item.offers.priceCurrency                    -> currency (fallback market.currency)
+//   market.countryLabel                          -> country
+//   (só addressCountry no JSON-LD)               -> region/postalCode = null
 //   rsc.sourceName                               -> source   (site/stand de origem — AGREGADOR)
 //   item.@id (sem #fragment)                      -> detail_url
 //   rsc.imageUrls[0] (fallback item.image)       -> image
@@ -130,14 +131,19 @@ const IMG_PLACEHOLDER = /placeholder\.png/i;
 // (avaliação de preço-justo da AutoUncle), you_save, days_on_market (laytime), seller_type
 // (particular/stand), source_slug + source_external_id (do link de saída), power_hp/power_kw, co2,
 // fuel_consumption, model_generation, name.
-export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collectedAt = null }: { collectedAt?: string | null } = {}): AutouncleRecord {
+export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collectedAt = null, market }: { collectedAt?: string | null; market: Market }): AutouncleRecord {
   const detailUrl = cleanUrl(item['@id'] || item.offers?.url);
   const id = idFromUrl(detailUrl);
   const eng = item.vehicleEngine || {};
   const displ = eng.engineDisplacement;       // { value: 1.5, unitText: "L" }
-  const power = eng.enginePower;               // { value: 115, unitText: "HP", additionalProperty: { value: 84 kW } }
-  const powerHp = power && power.value != null ? Math.round(power.value) : null;
-  const powerKw = power?.additionalProperty?.value != null ? Math.round(power.additionalProperty.value) : null;
+  // potência: a unidade do valor PRINCIPAL varia por mercado — PT dá `value` em HP (+kW no
+  // additionalProperty), DK dá `value` em kW (+HK no additionalProperty). Lemos unitText/unitCode.
+  const power = eng.enginePower;
+  const mainIsKw = power ? (String(power.unitCode ?? '') === 'KWT' || /kw/i.test(String(power.unitText ?? ''))) : false;
+  const powerMain = power && power.value != null ? Math.round(power.value) : null;
+  const powerExtra = power?.additionalProperty?.value != null ? Math.round(power.additionalProperty.value) : null;
+  const powerHp = mainIsKw ? powerExtra : powerMain;
+  const powerKw = mainIsKw ? powerMain : powerExtra;
   // cilindrada: JSON-LD dá litros → guardamos cm³ (uniforme com autoboerse/autohero).
   const engineCc = displ && displ.value != null
     ? (String(displ.unitText).toUpperCase() === 'L' ? Math.round(displ.value * 1000) : Math.round(displ.value))
@@ -159,9 +165,9 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     doors: item.numberOfDoors != null ? toInt(item.numberOfDoors) : null,
     category: cleanStr(item.bodyType),
     price: item.offers?.price != null ? toInt(item.offers.price) : null,
-    currency: cleanStr(item.offers?.priceCurrency) || MARKET.currency,
-    country: MARKET.countryLabel,
-    region: null,                                  // JSON-LD só expõe addressCountry PT por anúncio
+    currency: cleanStr(item.offers?.priceCurrency) || market.currency,
+    country: market.countryLabel,
+    region: null,                                  // JSON-LD só expõe addressCountry por anúncio
     postalCode: null,
     source: cleanStr(extra.sourceName),            // site/stand de origem (AGREGADOR)
     detail_url: detailUrl,
@@ -169,7 +175,7 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     collected_at: collectedAt,
 
     // --- extras próprios do autouncle ---
-    source_site: 'autouncle.pt',
+    source_site: marketSourceSite(market),         // 'autouncle.pt' / 'autouncle.dk' / …
     id: id != null ? String(id) : null,            // carId numérico (chave natural / dedupe)
     price_rating: extra.auRating != null ? extra.auRating : null,     // AutoScore 1–5 (5 = ótimo preço)
     estimated_price: precoFormatado(extra.estimatedPrice),            // avaliação de preço-justo AutoUncle
@@ -181,7 +187,10 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     power_hp: powerHp,
     power_kw: powerKw,
     co2: item.emissionsCO2 != null ? `${Math.round(item.emissionsCO2)} g/km` : null,
-    fuel_consumption: item.fuelConsumption?.value != null ? `${item.fuelConsumption.value} L/100km` : null,
+    // unidade varia por mercado/motor ("L/100km", "Km/l" no DK, "kWh/100 km" nos elétricos).
+    fuel_consumption: item.fuelConsumption?.value != null
+      ? `${item.fuelConsumption.value} ${cleanStr(item.fuelConsumption.unitText) || 'L/100km'}`
+      : null,
     model_generation: cleanStr(extra.modelGeneration),
     name: cleanStr(item.name),                     // título completo (inclui variante/potência)
   };

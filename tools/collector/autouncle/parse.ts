@@ -1,4 +1,7 @@
-// autouncle/parse.ts — extração dos dados de uma página de listagem SSR do autouncle.pt.
+// autouncle/parse.ts — extração dos dados de uma página de listagem SSR do AutoUncle (multi-país).
+//
+// Os 14 domínios nacionais servem o MESMO HTML SSR; só os prefixos de locale nos paths variam
+// (`/pt/d/…` vs `/da/d/…` vs `/de-at/d/…`) — os regexes abaixo aceitam qualquer locale.
 //
 // MOLDE AGREGADOR (como o theparking): a página traz os carros em DOIS sítios que juntamos pelo carId:
 //   (1) JSON-LD  — 1 bloco `application/ld+json` com `@graph` → `ItemList.itemListElement[25].item`
@@ -12,7 +15,7 @@
 // Ver research/autouncle-investigacao.md para o porquê de cada fonte.
 
 import { normalizeCar, idFromUrl, type AutouncleRecord, type JsonLdItem, type SourceExtra } from './schema.ts';
-import { BASE, MARKET } from './http.ts';
+import { marketBase, type Market } from './http.ts';
 
 // Substitui caracteres de controlo (U+0000–U+001F) por espaço. Construído sem chars de controlo no
 // código-fonte. Defensivo: JSON com quebras/tabs literais dentro de strings rebenta o JSON.parse.
@@ -58,7 +61,7 @@ export function extractSourceMap(html: string): Map<string, SourceExtra> {
   const blob = extractRscBlob(html);
   const map = new Map<string, SourceExtra>();
   const anchors: { id: string; idx: number }[] = [];
-  const re = /"vdpPath":"\/pt\/d\/(\d+)-[^"]*"/g;
+  const re = /"vdpPath":"\/[a-z-]+\/d\/(\d+)-[^"]*"/g;
   let m;
   while ((m = re.exec(blob)) !== null) anchors.push({ id: m[1], idx: m.index });
   const pick = <T = string>(win: string, k: string, cast?: (s: string) => T): T | null => { const r = new RegExp(k).exec(win); return r ? (cast ? cast(r[1]) : (r[1] as unknown as T)) : null; };
@@ -71,7 +74,9 @@ export function extractSourceMap(html: string): Map<string, SourceExtra> {
     let image = null;
     const im = /"imageUrls":\[("(?:[^"\\]|\\.)*")/.exec(fwd);
     if (im) { try { image = JSON.parse(im[1]); } catch { /* ignora */ } }
-    const out = /"outgoingPath":"\/pt\/link-externo\/([^/"]+)\/\d+\/(\d+)"/.exec(fwd);
+    // saída p/ origem: `/{locale}/{slug-localizado}/{site}/{carId}/{extId}` (ex. /pt/link-externo/…,
+    // /da/paa_gensyn/…) — o segmento do meio varia por país, a forma não.
+    const out = /"outgoingPath":"\/[a-z-]+\/[^/"]+\/([^/"]+)\/\d+\/(\d+)"/.exec(fwd);
     map.set(id, {
       sourceName: pick(fwd, '"sourceName":"([^"]*)"'),
       auRating: pick(back, '"auRating":(\\d+)', Number),
@@ -92,12 +97,12 @@ export function extractSourceMap(html: string): Map<string, SourceExtra> {
 // Parse completo de uma página → { listings, total }. Junta cada item JSON-LD com os extras RSC do
 // mesmo carId (molde theparking). `forcedMake`: quando percorremos uma faceta de marca, carimba a
 // marca autoritativamente (o JSON-LD já a traz, mas garante consistência de slug).
-export function parseListingPage(html: string, { collectedAt = null, forcedMake = null }: { collectedAt?: string | null; forcedMake?: string | null } = {}): { listings: AutouncleRecord[]; total: number | null } {
+export function parseListingPage(html: string, { collectedAt = null, forcedMake = null, market }: { collectedAt?: string | null; forcedMake?: string | null; market: Market }): { listings: AutouncleRecord[]; total: number | null } {
   const { items, total } = extractJsonLd(html);
   const sources = extractSourceMap(html);
   const listings = items.map((item) => {
     const id = idFromUrl(item['@id'] || item.offers?.url);
-    const rec = normalizeCar(item, id ? sources.get(id) ?? {} : {}, { collectedAt });
+    const rec = normalizeCar(item, id ? sources.get(id) ?? {} : {}, { collectedAt, market });
     if (forcedMake && !rec.make) rec.make = forcedMake;
     return rec;
   });
@@ -109,15 +114,15 @@ export function readTotal(html: string): number | null {
   return extractJsonLd(html).total;
 }
 
-// Constrói o URL de listagem SSR.
-// - brand: faceta via PATH SEO canónico (`/pt/carros-usados/{Marca}`). NUNCA por query `s[...]`
+// Constrói o URL de listagem SSR do mercado.
+// - brand: faceta via PATH SEO canónico (`{listPath}/{Marca}`). NUNCA por query `s[...]`
 //   (proibido pelo robots). O nome da marca vem do config (já canónico); só URL-encode.
 // - page: `?page=N` (N>1) — não contém `s[` → permitido pelo robots.
-export function listingUrl({ brand = null, page = 1 }: { brand?: string | null; page?: number } = {}): string {
-  let path = MARKET.listPath;
+export function listingUrl({ market, brand = null, page = 1 }: { market: Market; brand?: string | null; page?: number }): string {
+  let path = market.listPath;
   if (brand) path += `/${encodeURIComponent(brand)}`;
   const qs = page > 1 ? `?page=${page}` : '';
-  return `${BASE}${path}${qs}`;
+  return `${marketBase(market)}${path}${qs}`;
 }
 
 // Extrai a lista de marcas (com contagens) do JSON da config API → [{ brand, count }], só count>0,

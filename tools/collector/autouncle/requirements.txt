@@ -1,0 +1,16 @@
+# requirements.txt — dependência do transporte STEALTH do autouncle (só os 4 domínios com
+# Cloudflare ativo: de, it, es, uk). Os outros 10 domínios são HTTP puro (Node, zero-deps) e NÃO
+# precisam disto.
+#
+# ⚠️ EXCEÇÃO DELIBERADA à norma "HTTP puro, zero-deps" — a mesma do piscapisca. Estes 4 domínios
+# devolvem HTTP 403 a clientes não-browser (Cloudflare managed challenge, probe 2026-07-15). O
+# Scrapling resolve o challenge via browser stealth (Camoufox) com solve_cloudflare=True. Ver
+# autouncle/stealth_fetch.py, autouncle/stealth.ts e o README (secção autouncle).
+#
+# Instalação (num venv dedicado a este subdiretório — ver README):
+#   python3.13 -m venv .venv                 # 3.10–3.13; 3.14 é demasiado recente p/ o Camoufox
+#   .venv/bin/pip install -r requirements.txt
+#   .venv/bin/scrapling install              # descarrega o browser Camoufox (centenas de MB)
+#
+# Versão fixada (mesma do piscapisca, validada ponta-a-ponta 2026-07-15, Python 3.13.2, macOS arm64).
+scrapling[fetchers]==0.4.11
