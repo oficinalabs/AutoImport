@@ -104,8 +104,16 @@ export function parsePowerFromText(text: string): number | null {
   return null;
 }
 
-function powerHp(record: Record<string, unknown>): number | null {
-  const hp = int(record.power_hp ?? record.power_cv ?? record.power);
+// Potência estruturada em CV/cavalos, na cascata antes do fallback de texto.
+// `engine_power_cv` (standvirtual) e `power_ch` (aramisauto) traziam a potência
+// num campo que não era lido → 0/959 e 0/336 listings com power_hp; como o
+// matching estrito (lib/engine/pt-market) exclui observações sem potência,
+// as duas maiores fontes ficavam fora da amostra. tax_horsepower (aramisauto)
+// NÃO entra: são cavalos fiscais, não a potência real.
+export function powerHp(record: Record<string, unknown>): number | null {
+  const hp = int(
+    record.power_hp ?? record.power_cv ?? record.engine_power_cv ?? record.power_ch ?? record.power,
+  );
   if (hp != null && hp >= 20 && hp <= 2000) return hp;
   const kw = int(record.power_kw);
   if (kw != null && kw >= 15 && kw <= 1500) return Math.round(kw * 1.35962);
