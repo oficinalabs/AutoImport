@@ -14,6 +14,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
+  kwhFromVariant,
   litersFromVariant,
   type ResolveInput,
   resolveVersion,
@@ -163,6 +164,16 @@ model("ATC20", "Seat", "Ateca-2020", 2020, [
 model("P928", "Porsche", "928", null, [
   { name: "928 S4", fuelSection: "petrol", fuel: "Petrol", year: 1987, hp: 320, cc: 4957 },
   { name: "928 GT", fuelSection: "petrol", fuel: "Petrol", year: 1989, hp: 330, cc: 4957 },
+]);
+
+// Opel Mokka elétrico: uma versão SEM kWh no catálogo (cc null) ao lado de duas
+// com kWh — para o teste de "cc null não é eliminado por kWh-mismatch".
+model("MOKKAE", "Opel", "Mokka-Electric", 2021, [
+  // Nomes SEM o número/"kWh" de propósito: o cc vem do campo, não do nome — assim o
+  // desempate por token não interfere e o teste isola o filtro de kWh.
+  { name: "Mokka Electric", fuelSection: "electric", fuel: null, year: 2021, hp: 136, cc: 50, co2w: 0 },
+  { name: "Mokka Electric Plus", fuelSection: "electric", fuel: null, year: 2021, hp: 136, cc: null, co2w: 0 },
+  { name: "Mokka Electric GS", fuelSection: "electric", fuel: null, year: 2021, hp: 156, cc: 54, co2w: 0 },
 ]);
 
 const CAT: UsCatalogIndex = buildIndex(models, versions);
@@ -503,6 +514,66 @@ test("degrau exato: 928 '4S' (token não bate 's4') → S4 320, não GT 330", ()
   const r = resolveVersion(inp({ makeRaw: "Porsche", modelRaw: "928", variant: "4S", fuelRaw: "Benzin", year: 1987, powerHp: 320, displacementCc: 4957 }), CAT);
   assert.equal(r?.confidence, "confirmado");
   assert.equal(vspec(r)?.powerHp, 320);
+});
+
+// ── kWh da bateria como 2.º sinal (elétricos) ────────────────────
+
+test("kwhFromVariant: extrai kWh (decimais/espaço) e NÃO confunde com kW (potência)", () => {
+  assert.equal(kwhFromVariant("64 kWh"), 64);
+  assert.equal(kwhFromVariant("50kWh"), 50);
+  assert.equal(kwhFromVariant("80.8kWh"), 80.8);
+  assert.equal(kwhFromVariant("54,2 kWh Cooper SE"), 54.2);
+  assert.equal(kwhFromVariant("150 kW"), null); // potência, não bateria (kW≠kWh)
+  assert.equal(kwhFromVariant("90 kW"), null);
+  assert.equal(kwhFromVariant("Techno"), null);
+  assert.equal(kwhFromVariant(null), null);
+});
+
+test("kWh: potência + kWh → confirmado nos elétricos (Kona EV 64kWh 204cv)", () => {
+  const r = resolveVersion(inp({ makeRaw: "Hyundai", modelRaw: "Kona", variant: "Electric 64 kWh", fuelRaw: "Elektro", year: 2019, powerHp: 204 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.hardSignals, 2);
+  assert.equal(r?.evidence.signals.kwh, 64);
+  assert.equal(vspec(r)?.fuel, "elétrico");
+});
+
+test("kWh: tolerância ±2 absorve o arredondamento (54,2 kWh ↔ cc 54)", () => {
+  const r = resolveVersion(inp({ makeRaw: "MINI", modelRaw: "Mini", variant: "Cooper SE 54,2 kWh", fuelRaw: "Electrico", year: 2024, powerHp: 218 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.equal(r?.evidence.signals.kwh, 54.2);
+  assert.equal(vspec(r)?.displacementCc, 54);
+});
+
+test("kWh: candidato elétrico com cc null NÃO é eliminado por kWh-mismatch", () => {
+  // Mokka Electric 136cv: v50(cc50) + Long Range(cc null); o GS 54(156cv) sai pela
+  // potência. O kWh 50 bate a v50 mas a Long Range (cc null) sobrevive → 2 candidatos.
+  const r = resolveVersion(inp({ makeRaw: "Opel", modelRaw: "Mokka", variant: "Electric 50 kWh", fuelRaw: "Eletrico", year: 2021, powerHp: 136 }), CAT);
+  assert.equal(r?.evidence.signals.kwh, 50);
+  assert.equal(r?.evidence.candidates, 2); // a versão cc-null continua candidata
+  assert.equal(r?.evidence.hardSignals, 2);
+});
+
+test("kWh: mismatch total (nenhum candidato bate) NÃO conta como sinal nem elimina", () => {
+  // kWh 99 não bate nenhuma versão do Kona (só 64) → sinal ignorado, fica só potência.
+  const r = resolveVersion(inp({ makeRaw: "Hyundai", modelRaw: "Kona", variant: "Electric 99 kWh", fuelRaw: "Elektro", year: 2019, powerHp: 204 }), CAT);
+  assert.equal(r?.evidence.signals.kwh, undefined);
+  assert.equal(r?.evidence.hardSignals, 1);
+});
+
+// ── Badge com letra de caixa (BMW 840iA/320dA) ───────────────────
+
+test("badge letra-de-caixa: '840iA' normaliza para '840i' e casa o token", () => {
+  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "8 Series", variant: "840iA xDrive", fuelRaw: "Gasolina", year: 2020, powerHp: 333, displacementCc: 2998 }), CAT);
+  assert.equal(r?.confidence, "confirmado");
+  assert.deepEqual(r?.evidence.signals.badges, ["840i"]);
+  const d = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "3 Series", variant: "320dA", fuelRaw: "Diesel", year: 2019, powerHp: 190, displacementCc: 1995 }), CAT);
+  assert.deepEqual(d?.evidence.signals.badges, ["320d"]);
+});
+
+test("badge letra-de-caixa: 'M340i' NÃO é tocado (não termina em \\d{3}[id]a)", () => {
+  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "M340i", variant: "xDrive", fuelRaw: "Gasolina", year: 2020, powerHp: 374, displacementCc: 2998 }), CAT);
+  assert.equal(r?.evidence.family, "bmw|serie-3");
+  assert.deepEqual(r?.evidence.signals.badges, ["m340i"]);
 });
 
 // ════════════════════════════════════════════════════════════════

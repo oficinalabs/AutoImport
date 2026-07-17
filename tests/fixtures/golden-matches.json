@@ -2550,11 +2550,11 @@
     "label": {
       "kind": "signature",
       "family": "peugeot|208",
-      "fuel": "híbrido",
+      "fuel": "gasolina",
       "powerHp": 100,
       "cc": 1199
     },
-    "note": "estrato carplus.pt"
+    "note": "208 Hybrid 100 e-DCS6 = MHEV 48V PSA (caixa e-DCS) — base gasolina; o catálogo nomeia-o '208 1.2 Hybrid 100 e-DSC6' na secção petrol"
   },
   {
     "source_site": "carplus.pt",
@@ -4105,10 +4105,14 @@
       "co2": null
     },
     "label": {
-      "kind": "null",
-      "reason": "família fora do catálogo"
+      "kind": "signature",
+      "family": "mg|4",
+      "fuel": "elétrico",
+      "powerHp": 170,
+      "cc": null,
+      "mustConfirm": true
     },
-    "note": "estrato olx.pt"
+    "note": "MG4 Standard Range 51 kWh 170cv — kWh (51) da variante como 2.º sinal (fix); resolve '4 EV Standard Range'"
   },
   {
     "source_site": "olx.pt",
@@ -4973,10 +4977,14 @@
       "co2": null
     },
     "label": {
-      "kind": "null",
-      "reason": "família fora do catálogo"
+      "kind": "signature",
+      "family": "citroen|c4",
+      "fuel": "elétrico",
+      "powerHp": 136,
+      "cc": null,
+      "mustConfirm": true
     },
-    "note": "estrato standvirtual.com"
+    "note": "ë-C4 50 kWh 136cv — kWh (50) da variante como 2.º sinal (fix); e-C4 vive nas páginas C4 do catálogo"
   },
   {
     "source_site": "standvirtual.com",
@@ -5709,5 +5717,119 @@
       "mustConfirm": true
     },
     "note": "auditoria (8): 928 S4 320cv (v3612), não o GT 330cv (v3611) — preferência de degrau exato (ver unit test dedicado)"
+  },
+  {
+    "source_site": "aramisauto.com",
+    "listing_id": "384a9a43-dfda-4fc4-9a4b-300af8a941d6",
+    "input": {
+      "makeRaw": "Peugeot",
+      "modelRaw": "2008",
+      "variant": "Allure + Caméra AR",
+      "fuelRaw": "Micro-hybride essence",
+      "year": 2026,
+      "powerHp": 136,
+      "displacementCc": 1200,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "peugeot|2008",
+      "fuel": "gasolina",
+      "powerHp": 136,
+      "cc": 1200,
+      "mustConfirm": true
+    },
+    "note": "refinamento (2): fuel_raw 'Micro-hybride essence' (MHEV 48V) → base gasolina; resolve '2008 1.2 Hybrid 136 e-DSC6'"
+  },
+  {
+    "source_site": "custojusto.pt",
+    "listing_id": "35e31b42-808d-4ce5-9542-78e62bcc796f",
+    "input": {
+      "makeRaw": "MINI",
+      "modelRaw": "One",
+      "variant": "One 1.5 Gasolina 5 p 2019",
+      "fuelRaw": "Gasolina",
+      "year": 2019,
+      "powerHp": 102,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "mini|mini-cooper",
+      "fuel": "gasolina",
+      "powerHp": 102,
+      "cc": null,
+      "mustConfirm": true
+    },
+    "note": "refinamento (3b): MINI model_raw 'One' (trim do hatch) → família mini-cooper; resolve 'One 5 Door' 1.5 102cv"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "2d1b283e-a5f3-4c8f-b5c3-fcd9bb935121",
+    "input": {
+      "makeRaw": "Renault",
+      "modelRaw": "R 5",
+      "variant": "90 kW",
+      "fuelRaw": "Elektro",
+      "year": 2026,
+      "powerHp": 122,
+      "displacementCc": null,
+      "co2": 0
+    },
+    "label": {
+      "kind": "signature",
+      "family": "renault|r5",
+      "fuel": "elétrico",
+      "powerHp": 122,
+      "cc": null
+    },
+    "note": "refinamento (3a): 'R 5' (com espaço) → família renault|r5 (antes 'r'); resolve '5 E-Tech 40 kWh 122HP'"
+  },
+  {
+    "source_site": "autocasion.com",
+    "listing_id": "91a7fa8f-4d5c-4f99-a0a5-1bf33c388a07",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "Serie 8",
+      "variant": "BMW Serie 8 840iA Coupé",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 333,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 333,
+      "cc": 2998,
+      "mustConfirm": true
+    },
+    "note": "refinamento (3c): badge '840iA' (letra de caixa) normaliza para '840i' → casa o token do catálogo"
+  },
+  {
+    "source_site": "autocasion.com",
+    "listing_id": "bed46234-fe08-4774-a98e-495cf8b23dff",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "Serie 3",
+      "variant": "BMW Serie 3 320iA",
+      "fuelRaw": "Gasolina",
+      "year": 2021,
+      "powerHp": 184,
+      "displacementCc": null,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-3",
+      "fuel": "gasolina",
+      "powerHp": 184,
+      "cc": 1998,
+      "mustConfirm": true
+    },
+    "note": "refinamento (3c): badge '320iA' (letra de caixa) normaliza para '320i'; não confundir com 'M340i' (não tocado)"
   }
 ]

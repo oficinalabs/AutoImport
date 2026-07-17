@@ -39,6 +39,8 @@ export interface MatchEvidence {
     powerHp?: number;
     displacementCc?: number;
     displacementL?: number;
+    /** capacidade da bateria (kWh) batida no catálogo — 2.º sinal dos elétricos */
+    kwh?: number;
     badges?: string[];
   };
   /** nº de tipos de sinal duro batidos (potência/cilindrada/badge) */
@@ -69,6 +71,11 @@ export interface MatchResult {
 const powerTol = (hp: number) => Math.max(7, Math.round(hp * 0.04));
 /** cilindrada cc↔cc: ±30 cm³. */
 const CC_TOL = 30;
+/** kWh anúncio↔catálogo: ±2. O catálogo arredonda o kWh do nome (57.7→58, 44.9→45)
+ * para `displacementCc`; o anúncio pode trazer o nominal/utilizável e outra casa
+ * decimal. ±2 absorve o arredondamento e o desvio nominal/utilizável sem juntar
+ * capacidades distintas (degraus de bateria distam tipicamente ≥5 kWh). */
+const KWH_TOL = 2;
 // Concordância entre candidatos: mesmo cc (±50) e mesmo CO₂ da norma. O plano
 // pedia CO₂ ±10, mas a auditoria mostra que UMA designação (ex. 840i 333cv
 // 2998cc) varia ~17 g WLTP entre carroçarias/tração/facelift (cabrio vs coupé,
@@ -102,6 +109,11 @@ function strongBadges(modelRaw: string, variant: string | null): string[] {
     const hasLetter = /[a-z]/.test(t);
     const hasDigit = /\d/.test(t);
     if (hasLetter && hasDigit) badges.add(t);
+    // Badge BMW com letra de caixa colada ("840iA"→"840ia", "320dA"→"320da"): o
+    // catálogo nomeia sem o "a" ("840i"/"320d"). Acrescenta a forma sem sufixo (só
+    // no padrão \d{3}[id]a — não toca em "M340i", que começa por letra).
+    const noGearbox = /^(\d{3}[id])a$/.exec(t);
+    if (noGearbox) badges.add(noGearbox[1]);
     // par alfa + dígito adjacentes → concatenação ("xdrive" + "45" → "xdrive45")
     const next = tokens[i + 1];
     if (next && /^[a-z]+$/.test(t) && /^\d+$/.test(next)) badges.add(t + next);
@@ -120,6 +132,18 @@ export function litersFromVariant(variant: string | null): number | null {
   if (!variant) return null;
   const m = /\b([1-9])[.,](\d)(?![\d.,])/.exec(variant);
   return m ? Number(m[1]) + Number(m[2]) / 10 : null;
+}
+
+/**
+ * kWh da bateria na variante: "58 kWh"/"50kWh"/"80.8kWh"/"54,2 kWh" → número.
+ * Exige o "h" de kWh (o `[^-a-z]` a seguir veta a POTÊNCIA "150 kW" — kW≠kWh).
+ * Tolerante a decimais (. ou ,) e espaço. Usado como 2.º sinal duro nos elétricos
+ * (o catálogo guarda a capacidade arredondada no `displacementCc` das versões EV).
+ */
+export function kwhFromVariant(variant: string | null): number | null {
+  if (!variant) return null;
+  const m = /(\d+(?:[.,]\d+)?)\s*kwh\b/i.exec(variant);
+  return m ? Number(m[1].replace(",", ".")) : null;
 }
 
 /** Potência efetiva: a estruturada do anúncio, senão extraída do texto. */
@@ -351,6 +375,7 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   // ── Sinais duros e filtragem ──
   const powerAd = effectivePower(input);
   const litersAd = litersFromVariant(input.variant);
+  const kwhAd = fuel === "elétrico" ? kwhFromVariant(input.variant) : null;
   // Refinamento Fase 3: um badge igual ao slug da família é o NOME DO MODELO
   // repetido (Volvo "V50" → badge "v50" == família "v50"), não uma designação de
   // trim/motor — removê-lo para não contar como sinal duro nem filtrar.
@@ -368,6 +393,20 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     cands = filtered;
     signals.powerHp = powerAd;
     hardSignals++;
+  }
+
+  // kWh da bateria (elétricos): 2.º sinal duro. O `displacementCc` do catálogo é a
+  // capacidade arredondada da versão EV; casa com o kWh da variante (±2). Só conta
+  // quando ALGUM candidato COM cc bate (senão é ruído). Candidatos com cc null NÃO
+  // podem ser eliminados por mismatch (o catálogo não tem o valor) — sobrevivem.
+  if (kwhAd != null) {
+    const matches = (v: CatalogVersion) =>
+      v.displacementCc != null && Math.abs(v.displacementCc - kwhAd) <= KWH_TOL;
+    if (cands.some(matches)) {
+      cands = cands.filter((v) => v.displacementCc == null || matches(v));
+      signals.kwh = kwhAd;
+      hardSignals++;
+    }
   }
 
   // Cilindrada: cc↔cc (±30) ou litragem↔cc (igualdade a 1 casa). Ignorada em
