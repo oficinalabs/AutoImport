@@ -315,6 +315,10 @@ export const listings = pgTable(
     matchConfidence: text("match_confidence"),
     /** evidência compacta do match (MatchEvidence) — auditoria do porquê */
     matchEvidence: jsonb("match_evidence"),
+    /** factos de designação (specs concordantes + janela de geração) quando o
+     * motor está provado mas a variante do catálogo não é única;
+     * não-nulo ⟺ match_confidence='designacao' */
+    designationFacts: jsonb("designation_facts"),
     firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),

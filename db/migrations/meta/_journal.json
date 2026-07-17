@@ -36,6 +36,13 @@
       "when": 1784198997721,
       "tag": "0004_clumsy_firebird",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784284676237,
+      "tag": "0005_bored_rocket_raccoon",
+      "breakpoints": true
     }
   ]
 }
