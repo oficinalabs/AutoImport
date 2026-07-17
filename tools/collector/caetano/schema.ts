@@ -143,6 +143,12 @@ export function normalizeVehicle(v: Record<string, unknown>, { collectedAt = nul
     condition: cleanStr(v.condition),           // 'Usado' (após filtro)
     used_type: cleanStr(v.vehicleUsedType),     // 'Semi-Novo' | 'Não Definido' | …
     origin: cleanStr(v.origin),                 // 'R - Retomas VN', 'I - Compra Diret Imp', …
+    // LIMITAÇÃO (HEV Toyota): a API tem um ÚNICO campo `power`, preenchido pelo
+    // stand — inconsistente para os full-hybrid (o mesmo Yaris 1.5 HEV aparece a
+    // 92cv térmicos, 116cv de sistema ou 0). NÃO há campo separado de potência de
+    // sistema (só `power`, `engine`, `displacement`), pelo que o parser não pode
+    // preferir a do sistema de forma fiável — os ~92cv vetam o match do catálogo
+    // (que lista 116). Não se relaxa a tolerância de potência (precisão primeiro).
     power_cv: nz(num(v.power)),
     displacement_cc: nz(num(v.displacement)),
     seats: nz(num(v.seats)),
