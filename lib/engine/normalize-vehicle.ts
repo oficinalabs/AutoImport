@@ -91,7 +91,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
   ],
   renault: [
     [/^(clio|captur|megane|scenic|kadjar|austral|arkana|zoe|twingo|espace|talisman|kangoo|trafic|master|laguna)(?:$|-)/, "$1"],
-    [/^(r?5|r?4)(?:$|-)/, "r$1"],
+    // R5/R4 E-Tech: famílias fixas r5/r4 (catálogo: slugs "5"/"4"/"5-E-Tech" → r5/r4).
+    // Aceita a grafia com "R" e com espaço ("R5", "R 5", "5") sem duplicar o prefixo.
+    [/^r?-?5(?:$|-)/, "r5"],
+    [/^r?-?4(?:$|-)/, "r4"],
   ],
   toyota: [
     [/^yaris-cross(?:$|-)/, "yaris-cross"],
@@ -137,7 +140,12 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     // submodelos (SUV/carrinha) — não-ancorados: a Caetano/Santogal põem
     // "Mini" no modelo e o submodelo na variante ("Mini Countryman E …")
     [/(^|-)(countryman|clubman|paceman|aceman)(-|$)/, "$2"],
-    [/^(cooper|one|cabrio|hatch|electric)(?:$|-)/, "mini-$1"],
+    [/^cabrio(?:$|-)/, "mini-cabrio"],
+    // Hatch (3/5 portas): One é um trim do hatch; "3 Portas"/"5 Portas" (grafia PT)
+    // e Electric (J01) resolvem todos na família mini-cooper do catálogo (as versões
+    // hatch/cabrio/elétricas do US catalog caem em `mini-cooper`; ver us-catalog).
+    // "Coupé" fica no fallback → família `coupe` (que o catálogo tem à parte).
+    [/^(?:cooper|one|hatch|electric|[35]-?portas)(?:$|-)/, "mini-cooper"],
     [/^mini(?:$|-)/, "mini-cooper"],
   ],
   volvo: [
@@ -239,7 +247,13 @@ export function normModelViaRule(
 const PHEV_VARIANT = /(\b\d{3}\s?[xd]?e\b(?![-–])|\bgte\b|recharge)/i;
 /** Selos HEV na variante quando o campo diz gasolina/diesel (exclui mild/48V). */
 const HEV_VARIANT = /\b(hev|hybrid|hibrido|híbrido)\b/i;
-const MILD_VARIANT = /mild|mhev|48\s?v/i;
+// Marcadores MHEV/48V na variante — mantêm a base. A caixa PSA/Stellantis "e-DCS6"/
+// "e-DCS" é a transmissão do mild-hybrid PureTech ("Hybrid 145 e-DCS6"): sinaliza
+// 48V, não um full-HEV (por isso o "Hybrid" da variante não deve promover a híbrido).
+const MILD_VARIANT = /mild|mhev|48\s?v|e-?dcs/i;
+// Mesmos marcadores no PRÓPRIO campo combustível ("Micro-hybride essence", "Mild
+// Hibrido Gasolina/Diesel") — o "hybride/hibrido" aí é ruído do 48V, não HEV.
+const MILD_RAW = /mild|micro-?hybr|mhev|48-?v/;
 
 export function normFuel(
   raw: string | null | undefined,
@@ -253,6 +267,12 @@ export function normFuel(
 
   // plug-in primeiro (contém também "hybrid")
   if (/plug|phev/.test(s)) return "phev";
+  // mild/micro-hybrid declarado no campo combustível → mantém a base (gasolina/
+  // diesel), como já se faz para a variante. Antes do isHybrid (o "hybride" do
+  // "Micro-hybride" senão promovia-o erradamente a full-HEV).
+  if (MILD_RAW.test(s)) {
+    return /diesel|gasoleo|gazole|gasoil|gasolio|dizel/.test(s) ? "diesel" : "gasolina";
+  }
   // híbrido: hybrid/hibrido/hybride, ou padrão AS24 "elektro/benzin"
   const isHybrid =
     /hybrid|hibrid|hybride/.test(s) ||

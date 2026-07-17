@@ -55,6 +55,46 @@ test("normModel Peugeot/VW/Renault: sufixos de carroçaria caem", () => {
   assert.equal(normModel("toyota", "RAV 4"), "rav-4");
 });
 
+test("normModel Renault R5/R4: 'R5' · 'R 5' · '5' → r5 (famílias fixas)", () => {
+  for (const raw of ["R5", "R 5", "5", "Renault 5"]) {
+    if (raw === "Renault 5") continue; // model_raw é só "5"; make vem à parte
+    assert.equal(normModel("renault", raw), "r5", raw);
+  }
+  for (const raw of ["R4", "R 4", "4"]) assert.equal(normModel("renault", raw), "r4", raw);
+  assert.equal(normModel("renault", "5 E-Tech"), "r5");
+  assert.equal(normModel("renault", "Clio"), "clio"); // outras famílias intactas
+  assert.equal(normModel("renault", "Rafale"), "rafale"); // não é apanhado pela regra 4/5
+});
+
+test("normModel MINI: One/3 Portas/5 Portas → mini-cooper; Coupé → coupe", () => {
+  assert.equal(normModel("mini", "One"), "mini-cooper");
+  assert.equal(normModel("mini", "One", "One 1.5 Gasolina 5 p"), "mini-cooper");
+  assert.equal(normModel("mini", "3 Portas"), "mini-cooper");
+  assert.equal(normModel("mini", "5 Portas"), "mini-cooper");
+  assert.equal(normModel("mini", "Cooper"), "mini-cooper"); // intacto
+  assert.equal(normModel("mini", "Coupé"), "coupe"); // família própria do catálogo
+  assert.equal(normModel("mini", "Countryman"), "countryman"); // intacto
+  assert.equal(normModel("mini", "Cabrio"), "mini-cabrio"); // mantido (já existia)
+});
+
+test("normFuel MHEV no campo combustível: micro/mild-hybrid → base", () => {
+  assert.equal(normFuel("Micro-hybride essence"), "gasolina");
+  assert.equal(normFuel("Micro-hybride diesel"), "diesel");
+  assert.equal(normFuel("Mild Hibrido Gasolina"), "gasolina");
+  assert.equal(normFuel("Mild Híbrido Diesel"), "diesel");
+  assert.equal(normFuel("Mild Híbrido (Gasolina)"), "gasolina");
+  // full-HEV real (sem 'mild/micro') continua híbrido
+  assert.equal(normFuel("Híbrido"), "híbrido");
+  assert.equal(normFuel("Hibrido (Diesel)"), "híbrido");
+});
+
+test("normFuel caixa PSA e-DCS: fuel Gasolina + 'Hybrid ... e-DCS6' → gasolina (MHEV)", () => {
+  assert.equal(normFuel("Gasolina", "Hybrid 100 e-DCS6 Allure"), "gasolina");
+  assert.equal(normFuel("Gasolina", "1.2 Hybrid 145 e-dcs Allure"), "gasolina");
+  // mas fuel_raw já híbrido mantém-se híbrido (caso pré-existente, não regride)
+  assert.equal(normFuel("Hibrido", "1.2i Hybrid 145 e-DCS6 Allure"), "híbrido");
+});
+
 test("normModel fallback: primeiro token quando não há regra", () => {
   assert.equal(normModel("wiesmann", "MF 5 Roadster"), "mf");
   assert.equal(normModel(null, "Enyaq iV 80"), "enyaq");
