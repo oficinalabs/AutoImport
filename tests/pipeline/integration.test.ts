@@ -185,8 +185,7 @@ test(
       `);
     }
 
-    // Estrangeiro da geração NOVA (2022): seed com o tier LEGADO 'confirmado' à
-    // versão V-NEW (de propósito — prova o dual-read até ao cleanup do PR5); sem
+    // Estrangeiro da geração NOVA (2022): tier 'exato' à versão V-NEW; sem
     // CO₂ próprio (vem do catálogo). Preço baixo → a comparação assenta na
     // mediana PT.
     await db.execute(sql`
@@ -197,7 +196,7 @@ test(
       values
         ('autoscout24.de', 'fixture-gen-de-1', ${modelId}, 'Testgen', 'GenModel', 'Gasolina', 'gasolina',
          'GenModel 1.0', 2022, 30000, 130, 1500, null, 18000, 'DE', 'https://example.test/gen-de-1',
-         '2022-06-01', 'V-NEW', 'confirmado', ${JSON.stringify({ geracaoAmbigua: false })}::jsonb)
+         '2022-06-01', 'V-NEW', 'exato', ${JSON.stringify({ geracaoAmbigua: false })}::jsonb)
     `);
 
     // Segundo estrangeiro da geração NOVA: tier 'designacao' (motor provado,
@@ -235,15 +234,15 @@ test(
         genWindow?: { start: number; end: number | null } | null;
       };
     }[];
-    assert.ok(est, "o estrangeiro confirmado recebeu estimativa");
+    assert.ok(est, "o estrangeiro exato recebeu estimativa");
     assert.ok(
       est.pt_estimated_price >= 30000,
       `mediana limpa da geração nova (obtido ${est.pt_estimated_price})`,
     );
     assert.equal(est.pt_sample_size, 5, "amostra só dos 5 carros da geração nova");
-    // proveniência auditável: dual-read legado grava matchKind 'exato' + version_id
+    // proveniência auditável: o tier exato grava matchKind 'exato' + version_id
     // + CO₂ do catálogo + janela derivada
-    assert.equal(est.inputs.matchKind, "exato", "legado confirmado grava matchKind 'exato'");
+    assert.equal(est.inputs.matchKind, "exato", "tier exato grava matchKind 'exato'");
     assert.equal(est.inputs.versionId, "V-NEW");
     assert.ok(est.inputs.fromCatalog?.includes("co2"), "CO₂ efetivo veio do catálogo");
     assert.equal(est.inputs.genWindow?.start, 2022);

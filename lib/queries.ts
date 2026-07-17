@@ -67,10 +67,8 @@ function rowToListing(
   };
   // Fallbacks de display: valor do anúncio → versão exata do catálogo → factos
   // da designação → mediana do vehicle_models (último recurso; pode misturar
-  // trims). Dual-read: o legado `confirmado` lê-se como `exato` até ao rematch.
-  // O CO₂ (versão ou factos) segue a norma do ano de matrícula (WLTP/NEDC).
-  const ver =
-    usv && (l.matchConfidence === "exato" || l.matchConfidence === "confirmado") ? usv : null;
+  // trims). O CO₂ (versão ou factos) segue a norma do ano de matrícula (WLTP/NEDC).
+  const ver = usv && l.matchConfidence === "exato" ? usv : null;
   const facts = l.matchConfidence === "designacao" ? l.designationFacts : null;
   const norm = co2Norm(l.year ?? new Date().getFullYear());
   const verCo2 = ver ? (norm === "wltp" ? ver.co2Wltp : ver.co2Nedc) : null;

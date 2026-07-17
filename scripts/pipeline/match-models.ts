@@ -263,9 +263,9 @@ async function resolveVersions(
   }
 
   // ── Relatório: por tier e por fonte (sobre TODOS os ativos) ──
-  // Tiers da BD: exato · designacao · legado (confirmado+provavel, sobrevive até
-  // ao rematch) · null. Mais o provavel desta corrida (in-memory) e o breakdown
-  // dos splitters que separaram exatos.
+  // Tiers da BD: exato · designacao · legado (confirmado+provavel — invariante:
+  // 0 desde o rematch; se reaparecer, algo está a escrever tiers antigos) · null.
+  // Mais o provavel desta corrida (in-memory) e o breakdown dos splitters.
   const dist = (await db.execute(sql`
     select source_site, match_confidence as conf, count(*)::int as n
     from listings where deleted_at is null
@@ -309,15 +309,14 @@ async function resolveVersions(
     );
   }
 
-  // ── Top-20 alvos: anúncios COM potência mas sem cobertura de versão. Coberto =
-  // exato, designacao OU o legado confirmado (dual-read até ao rematch). ──
+  // ── Top-20 alvos: anúncios COM potência mas sem cobertura de versão.
+  // Coberto = exato ou designacao. ──
   const alvos = (await db.execute(sql`
     select make_raw as make, model_raw as model, fuel_raw as fuel, count(*)::int as n
     from listings
     where deleted_at is null and power_hp is not null
       and match_confidence is distinct from 'exato'
       and match_confidence is distinct from 'designacao'
-      and match_confidence is distinct from 'confirmado'
     group by make_raw, model_raw, fuel_raw
     order by n desc, make_raw, model_raw, fuel_raw
     limit 20
