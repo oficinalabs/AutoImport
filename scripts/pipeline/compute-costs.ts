@@ -103,14 +103,22 @@ export async function computeCosts() {
       and l.km is not null
       and l.fuel is not null
       -- recompute: novo/atualizado, OU o tier efetivo (exato/designacao) do
-      -- anúncio diverge do gravado na estimativa. Apanha o pós-rematch e o
-      -- backfill sem updated_at, e estabiliza à 1.ª recomputação.
+      -- anúncio diverge do gravado na estimativa, OU o DERIVADO que confina a
+      -- amostra PT mudou (o rematch reescreve facts/versão sem tocar no
+      -- updated_at — sem isto, uma estimativa calculada com a amostra antiga
+      -- contaminada por outro corpo ficava presa). Tudo estabiliza à 1.ª
+      -- recomputação: designacao compara facts↔inputs; exato só recomputa
+      -- enquanto a estimativa ainda não gravou derivative (as novas gravam sempre).
       and (
         e.id is null
         or l.updated_at > e.computed_at
         or (case when l.match_confidence in ('exato','confirmado') and l.us_version_id is not null then 'exato'
                  when l.match_confidence = 'designacao' and l.designation_facts is not null then 'designacao' end)
            is distinct from e.inputs->>'matchKind'
+        or (l.match_confidence = 'designacao'
+            and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
+        or (l.match_confidence in ('exato','confirmado') and l.us_version_id is not null
+            and e.inputs->>'derivative' is null)
       )
   `)) as unknown as {
     id: string;
