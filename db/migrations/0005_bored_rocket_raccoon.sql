@@ -1,0 +1,1 @@
+ALTER TABLE "listings" ADD COLUMN "designation_facts" jsonb;

@@ -3,19 +3,23 @@
  * (cost engine) + preço PT estimado (pt-market) → poupança e veredito →
  * upsert em import_cost_estimates.
  *   pnpm exec tsx scripts/pipeline/compute-costs.ts
- * Recomputa quando: sem estimativa, anúncio atualizado depois do cálculo, ou
- * anúncio confirmado cuja estimativa ainda não tem proveniência do catálogo
- * (backfill da Fase 3 não tocou no updated_at — sem esta condição ficariam
- * presos com a estimativa pré-catálogo).
+ * Recomputa quando: sem estimativa, anúncio atualizado depois do cálculo, ou o
+ * tier efetivo (exato/designacao) do anúncio diverge do gravado na estimativa
+ * (backfill/rematch não tocam no updated_at — sem esta condição ficariam presos
+ * com a estimativa antiga).
  * Sem CO₂/cilindrada (não-elétricos) ou sem amostra PT → sem estimativa
  * (nunca adivinhar, nunca mostrar veredito fraco).
  *
- * Fase 4 — specs efetivas do catálogo (SÓ para `match_confidence='confirmado'`):
- * cc/CO₂/potência em falta no anúncio são preenchidos pela versão canónica
- * (ultimatespecs) resolvida pelo matching estrito; a norma do CO₂ segue o ano de
- * matrícula (isv.ts). A potência efetiva vai à amostra PT e a janela de geração
- * da versão confina a mediana (evita contaminar com a geração vizinha).
+ * Specs efetivas do catálogo (fill-only-missing) por tier do match:
+ *  - `exato` (ou legado `confirmado`, dual-read até ao rematch): cc/CO₂/potência
+ *    em falta vêm da versão canónica; a janela de geração da versão confina a
+ *    mediana PT (evita contaminar com a geração vizinha);
+ *  - `designacao`: vêm dos factos gravados (specs medianas + janela direta),
+ *    sem versão canónica (o motor está provado, a variante não);
+ *  - resto: só o anúncio.
+ * A norma do CO₂ segue sempre o ano de matrícula (isv.ts), sem cross-norma.
  */
+import type { DesignationFacts } from "../../lib/engine/match-version";
 import type { GenWindow } from "../../lib/engine/pt-market";
 import type { CountryCode } from "../../lib/types";
 
@@ -53,6 +57,19 @@ export async function computeCosts() {
     return { start: gen.yearStart, end: gen.yearEnd };
   }
 
+  /** Mids da família `family` (chave `make|família` da evidência) cujo derivado
+   * DIFERE do do estrangeiro — para confinar a amostra PT ao mesmo corpo/derivado.
+   * `""` (base) é derivado válido e ≠ null: um estrangeiro base exclui os Gran
+   * Coupé/Cabrio (mais caros → margem falsa), mas nunca os outros base. */
+  function excludeMidsForDerivative(family: string, foreignDerivative: string): string[] {
+    const out: string[] = [];
+    for (const [mid, info] of catalog.midInfo) {
+      if (`${info.makeSlug}|${info.family}` === family && info.derivative !== foreignDerivative)
+        out.push(mid);
+    }
+    return out;
+  }
+
   // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
   // o ISV é €5,61/cm³ e uma mediana envenenada/entre-trims produz impostos
   // confiantemente errados (caso real: Série 8 com mediana cc=844 → ISV 1k
@@ -66,6 +83,7 @@ export async function computeCosts() {
            l.match_confidence,
            l.match_evidence,
            l.us_version_id,
+           l.designation_facts,
            v.mid as v_mid,
            v.displacement_cc as v_cc,
            v.co2_wltp as v_co2_wltp,
@@ -84,12 +102,23 @@ export async function computeCosts() {
       and l.year is not null
       and l.km is not null
       and l.fuel is not null
-      -- recompute: novo/atualizado, OU confirmado sem proveniência de catálogo
-      -- (Fase 3 fez backfill sem tocar no updated_at; recomputa 1× e estabiliza)
+      -- recompute: novo/atualizado, OU o tier efetivo (exato/designacao) do
+      -- anúncio diverge do gravado na estimativa, OU o DERIVADO que confina a
+      -- amostra PT mudou (o rematch reescreve facts/versão sem tocar no
+      -- updated_at — sem isto, uma estimativa calculada com a amostra antiga
+      -- contaminada por outro corpo ficava presa). Tudo estabiliza à 1.ª
+      -- recomputação: designacao compara facts↔inputs; exato só recomputa
+      -- enquanto a estimativa ainda não gravou derivative (as novas gravam sempre).
       and (
         e.id is null
         or l.updated_at > e.computed_at
-        or (l.match_confidence = 'confirmado' and e.inputs->>'versionId' is null)
+        or (case when l.match_confidence in ('exato','confirmado') and l.us_version_id is not null then 'exato'
+                 when l.match_confidence = 'designacao' and l.designation_facts is not null then 'designacao' end)
+           is distinct from e.inputs->>'matchKind'
+        or (l.match_confidence = 'designacao'
+            and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
+        or (l.match_confidence in ('exato','confirmado') and l.us_version_id is not null
+            and e.inputs->>'derivative' is null)
       )
   `)) as unknown as {
     id: string;
@@ -104,8 +133,9 @@ export async function computeCosts() {
     power_hp: number | null;
     model_id: string;
     match_confidence: string | null;
-    match_evidence: { geracaoAmbigua?: boolean } | null;
+    match_evidence: { geracaoAmbigua?: boolean; family?: string } | null;
     us_version_id: string | null;
+    designation_facts: DesignationFacts | null;
     v_mid: string | null;
     v_cc: number | null;
     v_co2_wltp: number | null;
@@ -135,15 +165,27 @@ export async function computeCosts() {
       : new Date(`${l.year}-07-01`);
     const regYear = firstReg.getFullYear();
 
-    // Specs efetivas: SÓ para confirmado sobrepomos a versão do catálogo aos
-    // campos em falta do anúncio (nunca substituímos um valor que o anúncio traz).
-    const confirmed = l.match_confidence === "confirmado" && l.us_version_id != null;
+    // Specs efetivas: fill-only-missing (nunca substituímos um valor que o
+    // anúncio traz). 3 ramos consoante o tier do match:
+    //  - exato (ou legado confirmado, dual-read até ao rematch): a versão do
+    //    catálogo via join; janela de geração da versão (off se geracaoAmbigua);
+    //  - designacao: os factos gravados (specs medianas + janela direta);
+    //  - resto: só o anúncio.
+    const exato =
+      (l.match_confidence === "exato" || l.match_confidence === "confirmado") &&
+      l.us_version_id != null;
+    let matchKind: "exato" | "designacao" | null = null;
     const fromCatalog: string[] = [];
     let ccEfetivo = l.cc;
     let co2Efetivo = l.co2;
     let powerEfetivo = l.power_hp;
     let genWindow: GenWindow | undefined;
-    if (confirmed) {
+    // Derivado/corpo PROVADO do estrangeiro (ramo exato → do índice pelo mid da
+    // versão; ramo designacao → dos factos). "" = base; null = desconhecido.
+    let foreignDerivative: string | null = null;
+    if (exato) {
+      matchKind = "exato";
+      foreignDerivative = l.v_mid ? (catalog.midInfo.get(l.v_mid)?.derivative ?? null) : null;
       if (ccEfetivo == null && l.v_cc != null) {
         ccEfetivo = l.v_cc;
         fromCatalog.push("cc");
@@ -163,6 +205,29 @@ export async function computeCosts() {
       }
       // Janela de geração da versão — desligada quando a geração ficou ambígua.
       if (!l.match_evidence?.geracaoAmbigua) genWindow = genWindowOfMid(l.v_mid);
+    } else if (l.match_confidence === "designacao" && l.designation_facts != null) {
+      matchKind = "designacao";
+      const f = l.designation_facts;
+      // linhas antigas de designacao não têm `derivative` gravado → null.
+      foreignDerivative = f.derivative ?? null;
+      if (ccEfetivo == null && f.displacementCc != null) {
+        ccEfetivo = f.displacementCc;
+        fromCatalog.push("cc");
+      }
+      if (co2Efetivo == null) {
+        // mesma norma pela matrícula; sem cross-norma (a designação guarda ambas).
+        const fCo2 = co2Norm(regYear) === "wltp" ? f.co2Wltp : f.co2Nedc;
+        if (fCo2 != null) {
+          co2Efetivo = fCo2;
+          fromCatalog.push("co2");
+        }
+      }
+      if (powerEfetivo == null && f.powerHp != null) {
+        powerEfetivo = f.powerHp;
+        fromCatalog.push("power");
+      }
+      // Janela de geração direta dos factos (sem lookup no catálogo).
+      genWindow = f.genWindow ?? undefined;
     }
 
     if (!isEv && (ccEfetivo == null || co2Efetivo == null)) {
@@ -178,7 +243,25 @@ export async function computeCosts() {
       continue;
     }
 
-    const pt = await estimatePtPrice(db, l.model_id, l.year, kmBand(l.km), powerEfetivo, genWindow);
+    // Confina a amostra PT ao mesmo derivado/corpo do estrangeiro: exclui os mids
+    // da família cujo derivado é OUTRO (caso real: um 216d Gran Tourer comparado
+    // com Gran Coupés, mais caros → margem falsa). Só quando o derivado é conhecido
+    // e a evidência traz a família; lista vazia → não passa (nada a excluir).
+    let excludeMids: string[] | undefined;
+    if (foreignDerivative != null && l.match_evidence?.family) {
+      const mids = excludeMidsForDerivative(l.match_evidence.family, foreignDerivative);
+      if (mids.length) excludeMids = mids;
+    }
+
+    const pt = await estimatePtPrice(
+      db,
+      l.model_id,
+      l.year,
+      kmBand(l.km),
+      powerEfetivo,
+      genWindow,
+      excludeMids,
+    );
     if (!pt) {
       semAmostra++;
       await dropStale(l.est_id);
@@ -208,10 +291,16 @@ export async function computeCosts() {
       fuel: l.fuel,
       firstRegistration: firstReg.toISOString().slice(0, 10),
       firstRegistrationAssumed: !l.first_registration,
-      // Proveniência (auditabilidade): version_id e que campos vieram do catálogo.
-      ...(confirmed
+      // Proveniência (auditabilidade): o tier efetivo + de onde vieram as specs.
+      // exato → version_id; designacao → só factos (fromCatalog + janela).
+      matchKind,
+      // derivado/corpo que confinou a amostra PT (quando conhecido): "" = base.
+      ...(foreignDerivative != null ? { derivative: foreignDerivative } : {}),
+      ...(matchKind === "exato"
         ? { versionId: l.us_version_id, fromCatalog, genWindow: genWindow ?? null }
-        : {}),
+        : matchKind === "designacao"
+          ? { fromCatalog, genWindow: genWindow ?? null }
+          : {}),
       isv: isvDetail,
     };
 

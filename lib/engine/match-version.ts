@@ -1,21 +1,38 @@
 /**
  * Resolver determinístico anúncio → versão do catálogo ultimatespecs (Fase 2).
  *
- * `resolveVersion(input, catalog)` devolve a versão canónica (ou null) SEM tocar
- * na BD: o índice (`UsCatalogIndex`) vem injetado. Puro e determinístico —
+ * `resolveVersion(input, catalog)` devolve o resultado do match (ou null) SEM
+ * tocar na BD: o índice (`UsCatalogIndex`) vem injetado. Puro e determinístico —
  * mesmo input + mesmo catálogo ⇒ mesmo output byte-a-byte.
  *
- * Filosofia (docs/08): NUNCA adivinhar. Um `confirmado` é uma afirmação forte
- * (usa-se para restringir a amostra de mercado PT), por isso exige ≥2 sinais
- * duros do anúncio (potência, cilindrada, badge) que batem no catálogo E que os
- * candidatos sobreviventes concordem entre si. `provavel` é 1 sinal + candidato
- * único. Tudo o resto → null (sem sinais duros nunca há match, mesmo com um só
- * candidato). A cascata e as tolerâncias vêm do plano "matching perfeito".
+ * Filosofia (docs/08): NUNCA adivinhar, e distinguir "sei QUAL versão" de "sei o
+ * MOTOR mas não a variante". O discriminante é `kind`:
+ *  - `exato`: ≥2 sinais duros (potência/cilindrada/badge) batidos, candidatos
+ *    concordantes, ANO presente E uma só versão sobrevivente — sabemos a versão
+ *    canónica exata. Escreve-se `us_version_id`.
+ *  - `designacao`: os mesmos ≥2 sinais + concordância + ano, mas sobrevivem ≥2
+ *    versões (gémeas: cabrio/coupé, manual/auto que os sinais do anúncio não
+ *    separam). Sabemos o motor mas não a variante → gravam-se FACTOS de
+ *    designação (specs medianas + janela de geração), não uma versão.
+ *  - `provavel`: 1 sinal + candidato único, OU ≥2 sinais mas sem ano/derivado
+ *    ambíguo. NÃO se escreve na BD (só conta no relatório).
+ * Tudo o resto → null (sem sinais duros nunca há match, mesmo com candidato
+ * único). Antes da decisão, os "splitters" tentam separar gémeos por sinais
+ * SUAVES (trim curado, caixa, portas, CO₂) — estreitam sem contar como sinal
+ * duro. A cascata e as tolerâncias vêm do plano "matching perfeito".
  */
 import { parsePowerFromText } from "../../tools/collector/lib/db-sink";
 import type { FuelType } from "../types";
 import { normFuel, normMake, normModel, normModelViaRule, slugify } from "./normalize-vehicle";
-import { BODY_TOKENS, type CatalogVersion, type Generation, type UsCatalogIndex } from "./us-catalog";
+import {
+  BODY_TOKENS,
+  type CatalogVersion,
+  distinctiveTokensByMid,
+  type Generation,
+  NEUTRAL_BODY,
+  normGearbox,
+  type UsCatalogIndex,
+} from "./us-catalog";
 
 export interface ResolveInput {
   makeRaw: string;
@@ -26,9 +43,39 @@ export interface ResolveInput {
   powerHp: number | null;
   displacementCc: number | null;
   co2: number | null;
+  /** texto livre da caixa do anúncio ("6 speed Manual", "DSG", "Schaltgetriebe") */
+  gearbox?: string | null;
+  doors?: number | null;
+  /** raw->>'engine_code' (só standvirtual; SEM splitter de motor ativo — ver nota) */
+  engineCode?: string | null;
+  /** texto extra do anúncio (título + slug do detail_url) — SÓ para tokens de
+   * desambiguação (derivativeGuard, desempate de trim, trimset); NUNCA alimenta
+   * badges/potência/litragem/família (o slug do URL traz ruído — cores,
+   * equipamento — que não pode virar sinal duro). */
+  extraText?: string | null;
 }
 
-export type MatchConfidence = "confirmado" | "provavel";
+/**
+ * Factos de designação: o que sabemos quando o motor está provado mas ≥2 versões
+ * gémeas sobrevivem. Specs medianas dos candidatos (o `concordant()` garante que
+ * cabem numa designação) + a geração fixável. O compute-costs escolhe o CO₂ pela
+ * norma da matrícula, por isso guardam-se ambas.
+ */
+export interface DesignationFacts {
+  displacementCc: number | null;
+  co2Wltp: number | null;
+  co2Nedc: number | null;
+  powerHp: number | null;
+  /** mid único dos candidatos; null se abrangem vários mids */
+  mid: string | null;
+  /** derivado/corpo único dos candidatos (tokens distintivos, ex. "gran-tourer");
+   * "" = modelo base; null = candidatos abrangem derivados distintos */
+  derivative: string | null;
+  /** geração datada única, senão null */
+  genWindow: { start: number; end: number | null } | null;
+  /** nº de versões distintas (≥2 por definição) */
+  versions: number;
+}
 
 export interface MatchEvidence {
   /** chave de família usada (`make|família`) */
@@ -54,15 +101,16 @@ export interface MatchEvidence {
   derivadoAmbiguo: boolean;
   /** a família veio do fallback primeiro-token do normModel (ex. "Grand …") */
   viaFallback: boolean;
+  /** sinais SUAVES que separaram gémeos (só os que ESTREITARAM de facto).
+   * "engine" fica reservado no contrato mas NÃO é implementado (a auditoria de
+   * cobertura do engine_code ainda não correu). */
+  splitters?: ("trimset" | "gearbox" | "doors" | "co2")[];
 }
 
-export interface MatchResult {
-  versionId: string;
-  /** mid da geração; null quando `geracaoAmbigua` e o ano cabe em várias gerações */
-  mid: string | null;
-  confidence: MatchConfidence;
-  evidence: MatchEvidence;
-}
+export type MatchResult =
+  | { kind: "exato"; versionId: string; mid: string; evidence: MatchEvidence }
+  | { kind: "designacao"; facts: DesignationFacts; evidence: MatchEvidence }
+  | { kind: "provavel"; versionId: string; mid: string | null; evidence: MatchEvidence };
 
 // ── Tolerâncias (plano) ──────────────────────────────────────────
 /** |Δcv| aceite entre anúncio e versão (facelifts/afinações da mesma designação). */
@@ -204,18 +252,8 @@ const byVersionId = (a: CatalogVersion, b: CatalogVersion) =>
   a.versionId.localeCompare(b.versionId, undefined, { numeric: true });
 
 // ── Guarda de derivados de modelo/carroçaria ─────────────────────
-
-const ROMAN = new Set(["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]);
-
-/**
- * Carroçarias NEUTRAS (o corpo por omissão): não distinguem um derivado — o mid
- * que só difere por elas É o modelo base (o sedan/hatch é o Corolla/Série-3 base,
- * não um derivado). São tratadas como ruído ao calcular os tokens distintivos.
- */
-const NEUTRAL_BODY = new Set([
-  "sedan", "saloon", "berline", "berlina", "limousine", "notchback", "hatchback",
-  "hatch", "liftback", "fastback", "door", "doors",
-]);
+// `isNoiseToken`/`NEUTRAL_BODY`/`distinctiveTokensByMid` vivem em us-catalog (para
+// o build partilhar a MESMA lógica sem ciclo de import); aqui só o que é do resolver.
 
 /**
  * Carroçarias ESPECIAIS + GT: distinguem um corpo real (cabrio/coupé/break/GT…).
@@ -228,23 +266,6 @@ const SPECIAL_BODY = new Set(
 );
 
 /**
- * Ruído ao comparar slugs de mids da MESMA família (não designa um derivado):
- * anos, romanos, códigos de chassis (e210/g20/l663), marcadores de facelift,
- * marcas de geração (mk5/mk6), carroçaria neutra e tokens de UMA letra (letras de
- * chassis/geração isoladas: Corsa D/E, Astra J/K — nunca um modelo por si só).
- */
-function isNoiseToken(t: string): boolean {
-  if (/^(?:19|20)\d{2}$/.test(t)) return true; // ano
-  if (ROMAN.has(t)) return true; // romano
-  if (/^[a-z]{1,2}\d{1,3}[a-z]?$/.test(t)) return true; // chassis/plataforma (e210, g20, c8, mk5…)
-  if (/^(?:lci|facelift|restyling|mopf|phase)$/.test(t)) return true; // facelift/fase
-  if (/^(?:class|klasse|classe|clase)$/.test(t)) return true; // filler do nome (Classe C)
-  if (t.length === 1) return true; // letra/algarismo isolado (chassis/porta)
-  if (NEUTRAL_BODY.has(t)) return true; // corpo por omissão → é a base
-  return false;
-}
-
-/**
  * Guarda de derivados: quando os candidatos sobreviventes abrangem mids cujos
  * slugs diferem em TOKENS DISTINTIVOS de modelo/carroçaria (cross, cabrio,
  * 90/110 do Defender, cargo/life das carrinhas…), desambigua pelo texto:
@@ -254,7 +275,8 @@ function isNoiseToken(t: string): boolean {
  *  (iii) sem base: se os distintivos forem SÓ carroçaria especial (coupé/cabrio)
  *        fica trimAmbiguo (partilham motor/cc); senão é `derivadoAmbiguo`
  *        (Defender 90/110, Combo cargo/life) → o consumidor demove a provável.
- * Os tokens distintivos vêm da diferença dos slugs (menos ruído) — determinístico.
+ * Os tokens distintivos vêm da diferença dos slugs (menos ruído) sobre os mids DOS
+ * CANDIDATOS (universo local, distinto do núcleo-família do build) — determinístico.
  */
 function derivativeGuard(
   cands: CatalogVersion[],
@@ -264,35 +286,28 @@ function derivativeGuard(
   const mids = [...new Set(cands.map((v) => v.mid))];
   if (mids.length < 2) return { cands, derivadoAmbiguo: false };
 
-  const modelTokens = new Map<string, Set<string>>();
-  for (const mid of mids) {
-    modelTokens.set(mid, new Set((midInfo.get(mid)?.slugTokens ?? []).filter((t) => !isNoiseToken(t))));
-  }
-  // núcleo comum a TODOS os mids (a família); os distintivos são o resto.
-  let core: Set<string> | null = null;
-  for (const s of modelTokens.values()) {
-    if (core == null) {
-      core = new Set(s);
-    } else {
-      const inter = new Set<string>();
-      for (const t of core) if (s.has(t)) inter.add(t);
-      core = inter;
-    }
-  }
-  core ??= new Set<string>();
-  const distinctive = new Map<string, Set<string>>();
+  const distinctive = distinctiveTokensByMid(
+    new Map(mids.map((mid) => [mid, midInfo.get(mid)?.slugTokens ?? []])),
+  );
   const universe = new Set<string>();
-  for (const mid of mids) {
-    const d = new Set([...modelTokens.get(mid)!].filter((t) => !core!.has(t)));
-    distinctive.set(mid, d);
-    for (const t of d) universe.add(t);
-  }
+  for (const d of distinctive.values()) for (const t of d) universe.add(t);
   if (universe.size === 0) return { cands, derivadoAmbiguo: false }; // sem derivados reais
 
-  // (i) o anúncio nomeia algum derivado → fica só quem o anúncio nomeia.
+  // (i) o anúncio nomeia algum derivado → fica só quem o anúncio nomeia. Preferimos
+  // CONTENÇÃO TOTAL: se ≥1 mid tem o conjunto distintivo INTEIRO contido em adTokens,
+  // ficam só esses. Ex. real: "216d Gran Tourer" → adTokens ⊇ {gran,tourer} contém
+  // por inteiro o Gran-Tourer {gran,tourer} mas só parcialmente o Gran-Coupe
+  // {gran,coupe} (partilham "gran") → fica só o Gran-Tourer (o bug era o inverso).
+  // Sem contenção total, cai no critério largo (some): qualquer token nomeado mantém.
   const named = [...universe].some((t) => adTokens.has(t));
   if (named) {
-    const keep = new Set(mids.filter((mid) => [...distinctive.get(mid)!].some((t) => adTokens.has(t))));
+    const full = mids.filter((mid) => {
+      const d = distinctive.get(mid)!;
+      return d.size > 0 && [...d].every((t) => adTokens.has(t));
+    });
+    const keep = new Set(
+      full.length ? full : mids.filter((mid) => [...distinctive.get(mid)!].some((t) => adTokens.has(t))),
+    );
     const filtered = cands.filter((v) => keep.has(v.mid));
     return { cands: filtered.length ? filtered : cands, derivadoAmbiguo: false };
   }
@@ -304,6 +319,105 @@ function derivativeGuard(
   // (iii) sem base: só carroçaria especial → trimAmbiguo; senão derivadoAmbiguo.
   if ([...universe].every((t) => SPECIAL_BODY.has(t))) return { cands, derivadoAmbiguo: false };
   return { cands, derivadoAmbiguo: true };
+}
+
+// ── Splitters de gémeos ──────────────────────────────────────────
+
+/**
+ * Whitelist curada de badges de EQUIPAMENTO/performance que distinguem gémeos de
+ * igual potência/cilindrada (a potência/cc não os separa: GTI vs GTI Clubsport).
+ * v1 SEM letras isoladas (r/m/s/n são perigosas — "R-Line" não é "R", "S line"
+ * não é "S"); só tokens inequívocos.
+ */
+const TRIM_TOKENS = new Set([
+  "gti", "gtd", "gte", "gts", "gtx", "rs", "vrs", "cupra", "jcw", "competition",
+  "clubsport", "performance", "abarth", "nismo", "polestar", "quadrifoglio", "gsi", "opc",
+]);
+
+/**
+ * Compostos de equipamento colados por hífen: colapsam num único token opaco
+ * ANTES de tokenizar, para nunca contribuírem uma letra isolada (r-line→rline).
+ * Case-insensitive, sobre o texto cru do anúncio antes do slugify.
+ */
+const TRIM_COMPOUNDS: [RegExp, string][] = [
+  [/r-line/gi, "rline"], [/s-line/gi, "sline"], [/m-sport/gi, "msport"],
+  [/m-paket/gi, "mpaket"], [/amg-line/gi, "amgline"], [/gt-line/gi, "gtline"],
+];
+
+/** Trim-tokens do anúncio ∩ TRIM_TOKENS (compostos colapsados no texto cru). */
+function adTrimTokens(modelRaw: string, variant: string | null, extraText: string | null): Set<string> {
+  let text = `${modelRaw} ${variant ?? ""} ${extraText ?? ""}`;
+  for (const [re, to] of TRIM_COMPOUNDS) text = text.replace(re, to);
+  const tokens = slugify(text).split("-").filter(Boolean);
+  return new Set(tokens.filter((t) => TRIM_TOKENS.has(t)));
+}
+
+/** Trim-tokens do catálogo ∩ TRIM_TOKENS (colapsa hífenes: "r-line"→"rline"). */
+function candTrimTokens(tokens: string[]): Set<string> {
+  return new Set(tokens.map((t) => t.replace(/-/g, "")).filter((t) => TRIM_TOKENS.has(t)));
+}
+
+/** Igualdade de conjuntos (mesmos elementos). */
+function setEq(a: Set<string>, b: Set<string>): boolean {
+  if (a.size !== b.size) return false;
+  for (const x of a) if (!b.has(x)) return false;
+  return true;
+}
+
+/**
+ * Factos de designação a partir dos candidatos gémeos (kind `designacao`).
+ * Cada spec é a MEDIANA-BAIXA dos valores não-nulos: `xs.sort()[⌊(n−1)/2⌋]` —
+ * determinística e inteira; como o `concordant()` já limita o spread, a mediana
+ * cai sempre dentro da designação (não inventa um valor fora dos candidatos).
+ */
+function deriveFacts(
+  cands: CatalogVersion[],
+  year: number | null,
+  genById: Map<string, Generation>,
+  midInfo: UsCatalogIndex["midInfo"],
+): DesignationFacts {
+  const lowMedian = (xs: (number | null)[]): number | null => {
+    const ys = xs.filter((v): v is number => v != null).sort((a, b) => a - b);
+    return ys.length ? ys[Math.floor((ys.length - 1) / 2)] : null;
+  };
+  const mids = new Set(cands.map((v) => v.mid));
+  const versionIds = new Set(cands.map((v) => v.versionId));
+
+  // derivative: o derivado (do índice) único entre os mids dos candidatos; se
+  // abrangem derivados distintos (Gran-Tourer + Gran-Coupe) → null. Usa o
+  // derivado FAMÍLIA-WIDE do midInfo (o jusante confina a amostra PT por ele).
+  const derivs = new Set([...mids].map((mid) => midInfo.get(mid)?.derivative ?? ""));
+  const derivative = derivs.size === 1 ? [...derivs][0] : null;
+
+  // genWindow: geração fixável única. Se todos os candidatos partilham UMA
+  // geração usa-a; senão, se há exatamente uma geração DATADA que contém o ano
+  // usa essa; senão null. Geração sem yearStart → null (janela inútil).
+  const gens = new Set(cands.map((v) => v.generationId));
+  let gid: string | null = null;
+  if (gens.size === 1) {
+    gid = [...gens][0];
+  } else if (year != null) {
+    const dated = new Set(
+      cands.filter((v) => genDatedContains(genById.get(v.generationId)!, year)).map((v) => v.generationId),
+    );
+    if (dated.size === 1) gid = [...dated][0];
+  }
+  let genWindow: DesignationFacts["genWindow"] = null;
+  if (gid) {
+    const g = genById.get(gid)!;
+    if (g.yearStart != null) genWindow = { start: g.yearStart, end: g.yearEnd };
+  }
+
+  return {
+    displacementCc: lowMedian(cands.map((v) => v.displacementCc)),
+    co2Wltp: lowMedian(cands.map((v) => v.co2Wltp)),
+    co2Nedc: lowMedian(cands.map((v) => v.co2Nedc)),
+    powerHp: lowMedian(cands.map((v) => v.powerHp)),
+    mid: mids.size === 1 ? [...mids][0] : null,
+    derivative,
+    genWindow,
+    versions: versionIds.size,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -402,7 +516,11 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     }
   }
 
-  const trimTokens = slugify(`${input.modelRaw} ${input.variant ?? ""}`).split("-").filter(Boolean);
+  // Tokens de desambiguação: modelRaw + variant + extraText (título/slug do URL).
+  // SÓ para o derivativeGuard, o desempate de trim e o trimset — os sinais DUROS
+  // (badges/potência/litragem/família) já foram calculados só de modelRaw/variant.
+  const trimTokens = slugify(`${input.modelRaw} ${input.variant ?? ""} ${input.extraText ?? ""}`)
+    .split("-").filter(Boolean);
   const adTokens = new Set(trimTokens);
 
   // Guarda de derivados de modelo/carroçaria: separa derivados distintos (Cross,
@@ -436,7 +554,77 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
 
   if (!cands.length) return null;
 
-  // ── Escolha e flags ──
+  // ── Splitters de gémeos ──
+  // Só corre com >1 versão distinta, dentro de um conjunto CONCORDANTE (a mesma
+  // designação) E com um SÓ mid. A concordância impede que um sinal suave escolha
+  // entre carros materialmente diferentes; o mid único impede que escolha entre
+  // DERIVADOS/CORPOS (Gran Tourer vs Gran Coupe — o caso do bug): um sinal suave
+  // separa gémeas do MESMO modelo (Cooper S manual/auto), nunca decide o derivado.
+  // Mids mistos + specs concordantes → designacao (motor provado, variante não
+  // única). (Um subconjunto de um conjunto concordante de mid único continua
+  // concordante e de mid único — basta avaliar uma vez.) Cada sinal é um filtro
+  // SUAVE: aplica-se só se (a) o anúncio o traz, (b) ≥1 candidato bate e (c) parte
+  // o conjunto (estreita sem esvaziar). Nunca conta para hardSignals nem demove o
+  // tier. Pára quando as versões distintas chegam a 1.
+  const splitters: NonNullable<MatchEvidence["splitters"]> = [];
+  const distinctCount = () => new Set(cands.map((v) => v.versionId)).size;
+  const splittable = concordant(cands, input.year) && new Set(cands.map((v) => v.mid)).size === 1;
+
+  if (splittable && distinctCount() > 1) {
+    // 1. trimset — igualdade de conjuntos de badges de equipamento curados.
+    // Prefere os candidatos cujo conjunto de trim-tokens IGUALA o do anúncio
+    // (elimina "GTI Clubsport" quando o anúncio diz só "GTI"); se nenhum iguala
+    // exatamente, não atua (não adivinha o trim mais rico).
+    const adTrim = adTrimTokens(input.modelRaw, input.variant, input.extraText ?? null);
+    if (adTrim.size) {
+      const eq = cands.filter((v) => setEq(candTrimTokens(v.tokens), adTrim));
+      if (eq.length && eq.length < cands.length) {
+        cands = eq;
+        splitters.push("trimset");
+      }
+    }
+  }
+  if (splittable && distinctCount() > 1) {
+    // 2. gearbox — caixa classificada em manual/auto pelos dois lados (normGearbox).
+    const adGb = normGearbox(input.gearbox ?? null);
+    if (adGb) {
+      const f = cands.filter((v) => v.gearbox === adGb);
+      if (f.length && f.length < cands.length) {
+        cands = f;
+        splitters.push("gearbox");
+      }
+    }
+  }
+  if (splittable && distinctCount() > 1) {
+    // 3. doors — igualdade exata do nº de portas.
+    if (input.doors != null) {
+      const f = cands.filter((v) => v.doors === input.doors);
+      if (f.length && f.length < cands.length) {
+        cands = f;
+        splitters.push("doors");
+      }
+    }
+  }
+  if (splittable && distinctCount() > 1) {
+    // 4. co2 — só se o anúncio traz CO₂ E TODOS os candidatos têm CO₂ da norma do
+    // ano; escolhe os de |Δ| mínimo, mas só se esse Δ ≤ 10 g. Acima disso o
+    // anúncio pode estar na norma errada (NEDC vs WLTP) — não adivinhar.
+    if (input.co2 != null && cands.every((v) => normCo2(v, input.year) != null)) {
+      const co2Ad = input.co2;
+      const best = Math.min(...cands.map((v) => Math.abs(normCo2(v, input.year)! - co2Ad)));
+      if (best <= 10) {
+        const f = cands.filter((v) => Math.abs(normCo2(v, input.year)! - co2Ad) === best);
+        if (f.length && f.length < cands.length) {
+          cands = f;
+          splitters.push("co2");
+        }
+      }
+    }
+  }
+  // Splitter `engine` (engine_code) NÃO é implementado: a auditoria de cobertura
+  // do engine_code ainda não correu (o campo fica no contrato para quando existir).
+
+  // ── Escolha e flags (sobre o conjunto final, pós-splitters) ──
   const gens = new Set(cands.map((v) => v.generationId));
   const geracaoAmbigua = gens.size > 1;
   const distinctVersions = new Set(cands.map((v) => v.versionId)).size;
@@ -468,6 +656,7 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     geracaoAmbigua,
     derivadoAmbiguo,
     viaFallback: fam.viaFallback,
+    ...(splitters.length ? { splitters } : {}),
   };
 
   // Guarda anti-fallback (obrigatória): quando a família veio do fallback
@@ -481,16 +670,30 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   }
 
   // ── Decisão ──
-  // confirmado: ≥2 sinais duros, candidatos concordantes e ANO presente (sem ano
-  // não há prova de geração). Downgrade a provavel se faltar o ano OU se os
-  // derivados de modelo ficaram ambíguos (não sabemos QUAL carroçaria/derivado).
-  if (hardSignals >= 2 && concordant(cands, input.year)) {
-    const confirmable = input.year != null && !derivadoAmbiguo;
-    return { versionId: chosen.versionId, mid, confidence: confirmable ? "confirmado" : "provavel", evidence };
+  // G = base forte: ≥2 sinais duros, candidatos concordantes, ANO presente (sem
+  // ano não há prova de geração) e derivados não-ambíguos.
+  const G =
+    hardSignals >= 2 && concordant(cands, input.year) && input.year != null && !derivadoAmbiguo;
+
+  // exato: G + uma só versão sobrevivente. mid nunca null (versão única ⇒ geração
+  // única ⇒ geracaoAmbigua false).
+  if (G && distinctVersions === 1) {
+    return { kind: "exato", versionId: chosen.versionId, mid: chosen.mid, evidence };
   }
-  // provavel: ≥1 sinal duro e candidato único.
+  // designacao: G mas ≥2 versões gémeas (os splitters não as separaram) — sabemos
+  // o motor, não a variante → factos de designação.
+  if (G && distinctVersions > 1) {
+    return { kind: "designacao", facts: deriveFacts(cands, input.year, genById, catalog.midInfo), evidence };
+  }
+  // provavel: ≥2 sinais + concordantes mas sem ano OU derivado ambíguo. O Defender
+  // 90/110 NÃO vira designacao: derivado incerto é MODELO incerto, não uma variante
+  // dentro do mesmo motor.
+  if (hardSignals >= 2 && concordant(cands, input.year) && (input.year == null || derivadoAmbiguo)) {
+    return { kind: "provavel", versionId: chosen.versionId, mid, evidence };
+  }
+  // provavel: 1 sinal duro e candidato único.
   if (hardSignals >= 1 && distinctVersions === 1) {
-    return { versionId: chosen.versionId, mid, confidence: "provavel", evidence };
+    return { kind: "provavel", versionId: chosen.versionId, mid, evidence };
   }
   // Resto → null (0 sinais duros nunca casa, mesmo com candidato único).
   return null;

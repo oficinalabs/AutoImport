@@ -65,15 +65,16 @@ function rowToListing(
     legalization: e.legalization,
     totalPt: e.totalPt,
   };
-  // Fallbacks de display: valor do anúncio → versão confirmada do catálogo →
-  // mediana do vehicle_models (último recurso; pode misturar trims). O CO₂ da
-  // versão segue a norma do ano de matrícula (WLTP/NEDC).
-  const ver = usv && l.matchConfidence === "confirmado" ? usv : null;
-  const verCo2 = ver
-    ? co2Norm(l.year ?? new Date().getFullYear()) === "wltp"
-      ? ver.co2Wltp
-      : ver.co2Nedc
-    : null;
+  // Fallbacks de display: valor do anúncio → versão exata do catálogo → factos
+  // da designação → mediana do vehicle_models (último recurso; pode misturar
+  // trims). Dual-read: o legado `confirmado` lê-se como `exato` até ao rematch.
+  // O CO₂ (versão ou factos) segue a norma do ano de matrícula (WLTP/NEDC).
+  const ver =
+    usv && (l.matchConfidence === "exato" || l.matchConfidence === "confirmado") ? usv : null;
+  const facts = l.matchConfidence === "designacao" ? l.designationFacts : null;
+  const norm = co2Norm(l.year ?? new Date().getFullYear());
+  const verCo2 = ver ? (norm === "wltp" ? ver.co2Wltp : ver.co2Nedc) : null;
+  const factsCo2 = facts ? (norm === "wltp" ? facts.co2Wltp : facts.co2Nedc) : null;
   return {
     id: l.id,
     model: {
@@ -83,9 +84,14 @@ function rowToListing(
       variant: l.variant ?? undefined,
       fuel: (l.fuel ?? vm.fuel) as FuelType,
       transmission: transmissionOf(l.gearbox),
-      displacementCc: l.displacementCc ?? ver?.displacementCc ?? vm.displacementCc ?? undefined,
-      co2: l.co2 ?? verCo2 ?? vm.co2 ?? undefined,
-      powerHp: l.powerHp ?? ver?.powerHp ?? vm.powerHp ?? undefined,
+      displacementCc:
+        l.displacementCc ??
+        ver?.displacementCc ??
+        facts?.displacementCc ??
+        vm.displacementCc ??
+        undefined,
+      co2: l.co2 ?? verCo2 ?? factsCo2 ?? vm.co2 ?? undefined,
+      powerHp: l.powerHp ?? ver?.powerHp ?? facts?.powerHp ?? vm.powerHp ?? undefined,
     },
     title: [l.makeRaw, l.variant ?? l.modelRaw].filter(Boolean).join(" ") || "Anúncio",
     year: l.year ?? 0,

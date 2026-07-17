@@ -21,21 +21,34 @@ const UA =
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-export async function enrichEs() {
+export async function enrichEs(opts: { limit?: number } = {}) {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { parsePrecioContado } = await import("../../lib/engine/precio-contado");
 
+  // Elegibilidade = espelho do compute-costs (SEM exigir estimativa já calculada).
+  // Antes, o join a import_cost_estimates fazia o enrich visitar só anúncios que
+  // JÁ tinham veredito — e o preço da montra ES é o FINANCIADO, logo um anúncio
+  // novo era avaliado (e podia virar oportunidade) com o preço errado durante 1
+  // dia, até ganhar estimativa e ser visitado. Agora é visitado ANTES da 1.ª
+  // estimativa. `first_seen_at desc`: o stock novo primeiro (o --limit corta a
+  // cauda no backfill; o run-daily corre sem limite).
   const pending = (await db.execute(sql`
     select l.id, l.price, l.detail_url
     from listings l
-    join import_cost_estimates e on e.listing_id = l.id
     where l.source_site = 'autoscout24.de'
       and l.country = 'ES'
       and l.deleted_at is null
+      and l.is_damaged is not true
       and l.price is not null
+      and l.year is not null
+      and l.km is not null
+      and l.fuel is not null
+      and l.model_id is not null
       and l.detail_url is not null
       and (l.raw->>'precio_contado_checked') is null
+    order by l.first_seen_at desc
+    ${opts.limit != null ? sql`limit ${opts.limit}` : sql``}
   `)) as unknown as { id: string; price: number; detail_url: string }[];
 
   let corrigidos = 0;
@@ -86,7 +99,10 @@ export async function enrichEs() {
 }
 
 if (process.argv[1]?.endsWith("enrich-es.ts")) {
-  enrichEs()
+  // --limit N: corta a cauda (backfill do stock em fatias); ausente → sem limite.
+  const i = process.argv.indexOf("--limit");
+  const limit = i >= 0 ? Number(process.argv[i + 1]) : undefined;
+  enrichEs(Number.isFinite(limit) ? { limit } : {})
     .then(() => process.exit(0))
     .catch((err) => {
       console.error(err);

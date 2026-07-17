@@ -12,6 +12,8 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+// Type-only (sem ciclo em runtime): tipa a coluna designation_facts.
+import type { DesignationFacts } from "../lib/engine/match-version";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -311,10 +313,16 @@ export const listings = pgTable(
     usVersionId: text("us_version_id").references(() => usVersions.versionId, {
       onDelete: "set null",
     }),
-    /** tier do match de versão: "confirmado" (≥2 sinais duros) | "provavel" (1 sinal) */
+    /** tier do match de versão: "exato" (versão única provada) | "designacao"
+     * (motor provado, variante não única — factos em designation_facts) | null.
+     * Valores legados "confirmado"/"provavel" sobrevivem até ao rematch. */
     matchConfidence: text("match_confidence"),
     /** evidência compacta do match (MatchEvidence) — auditoria do porquê */
     matchEvidence: jsonb("match_evidence"),
+    /** factos de designação (specs concordantes + janela de geração) quando o
+     * motor está provado mas a variante do catálogo não é única;
+     * não-nulo ⟺ match_confidence='designacao' */
+    designationFacts: jsonb("designation_facts").$type<DesignationFacts>(),
     firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),

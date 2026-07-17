@@ -46,6 +46,7 @@ async function sample(
   spread: number,
   powerHp?: number | null,
   genWindow?: GenWindow,
+  excludeMids?: string[],
 ): Promise<{ median: number; n: number; distinctPrices: number; distinctSellers: number } | null> {
   // Interseção da janela year±spread com a janela de geração (quando presente):
   // o guard NUNCA relaxa (só aperta) — o fallback alargado (spread=2) continua
@@ -62,6 +63,16 @@ async function sample(
     powerHp != null
       ? sql`and l.power_hp is not null and abs(l.power_hp - ${powerHp}) <= ${Math.max(Math.round(powerHp * 0.1), 15)}`
       : sql``;
+  // Exclusão por derivado/corpo (auditoria): uma observação PT cujo carro está
+  // PROVADO ser de OUTRO derivado (um Gran Coupé quando o estrangeiro é Gran
+  // Tourer, mais caro → margem falsa) sai da amostra. O mid provado vem da versão
+  // exata (uv.mid) ou dos factos de designação (designation_facts->>'mid');
+  // observação SEM match (mid null) FICA — nunca adivinhar, só excluir o que está
+  // provado diferente. Como a genWindow, NUNCA relaxa (só aperta).
+  const midExclusion = excludeMids?.length
+    ? sql`and (coalesce(uv.mid, l.designation_facts->>'mid') is null
+              or not (coalesce(uv.mid, l.designation_facts->>'mid') = any(${`{${excludeMids.join(",")}}`}::text[])))`
+    : sql``;
   // Dedupe por CARRO físico, não por anúncio: grupos como Caetano/CarPlus
   // listam o mesmo stock (mesmo VIN) em vários sites — contar 2× inflaciona
   // a amostra. Identidade = VIN; sem VIN, preço+ano+km (o mesmo carro
@@ -79,11 +90,13 @@ async function sample(
                o.price, o.observed_at
         from pt_price_observations o
         join listings l on l.id = o.listing_id
+        left join us_versions uv on uv.version_id = l.us_version_id
         where o.model_id = ${modelId}
           and o.year between ${yearLo} and ${yearHi}
           and o.km_band between ${kmBand - spread} and ${kmBand + spread}
           and o.observed_at > now() - make_interval(days => ${WINDOW_DAYS})
           ${powerFilter}
+          ${midExclusion}
       ) obs
       order by identity, observed_at desc
     ) latest
@@ -111,8 +124,9 @@ export async function estimatePtPrice(
   kmBand: number,
   powerHp?: number | null,
   genWindow?: GenWindow,
+  excludeMids?: string[],
 ): Promise<PtEstimate | null> {
-  const primary = await sample(db, modelId, year, kmBand, 1, powerHp, genWindow);
+  const primary = await sample(db, modelId, year, kmBand, 1, powerHp, genWindow, excludeMids);
   if (
     primary &&
     primary.n >= MIN_SAMPLE_NORMAL &&
@@ -121,7 +135,7 @@ export async function estimatePtPrice(
   ) {
     return { estimatedPrice: primary.median, sampleSize: primary.n, confidence: "normal" };
   }
-  const wide = await sample(db, modelId, year, kmBand, 2, powerHp, genWindow);
+  const wide = await sample(db, modelId, year, kmBand, 2, powerHp, genWindow, excludeMids);
   if (wide && wide.n >= MIN_SAMPLE_WIDE) {
     return { estimatedPrice: wide.median, sampleSize: wide.n, confidence: "alargada" };
   }

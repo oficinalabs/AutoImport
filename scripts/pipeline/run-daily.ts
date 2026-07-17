@@ -95,11 +95,12 @@ async function main() {
 }
 
 /**
- * Painel de saúde do matching de versão (Fase 3/4): distribuição por tier do
- * resolver estrito — global e por fonte (top-8) — mais a proveniência de catálogo
- * das estimativas. O top-20 de anúncios com potência mas sem confirmado (os alvos
- * para alargar o catálogo/dicionário) é impresso pelo passo 3/7 (match-models) —
- * este bloco fecha o painel com os totais. Exportado para correr isolado.
+ * Painel de saúde do matching de versão: distribuição por tier — global e por
+ * fonte (top-8) — mais a proveniência das estimativas. O `legado`
+ * (confirmado+provavel) é um smoke test: deve ser 0 pós-rematch (impresso à
+ * mesma). O top-20 de anúncios com potência mas sem cobertura de versão é
+ * impresso pelo passo 3/7 (match-models); este bloco fecha o painel com os
+ * totais. Exportado para correr isolado.
  */
 export async function versionHealthPanel(
   db: typeof import("../../db").db,
@@ -107,51 +108,54 @@ export async function versionHealthPanel(
 ) {
   const verSrc = (await db.execute(sql`
     select source_site,
-      count(*) filter (where match_confidence = 'confirmado')::int as confirmado,
-      count(*) filter (where match_confidence = 'provavel')::int as provavel,
+      count(*) filter (where match_confidence = 'exato')::int as exato,
+      count(*) filter (where match_confidence = 'designacao')::int as designacao,
       count(*) filter (where match_confidence is null)::int as sem_match,
+      count(*) filter (where match_confidence in ('confirmado','provavel'))::int as legado,
       count(*)::int as ativos
     from listings where deleted_at is null
     group by source_site
     order by ativos desc
   `)) as unknown as {
     source_site: string;
-    confirmado: number;
-    provavel: number;
+    exato: number;
+    designacao: number;
     sem_match: number;
+    legado: number;
     ativos: number;
   }[];
   const g = verSrc.reduce(
     (acc, r) => {
-      acc.confirmado += r.confirmado;
-      acc.provavel += r.provavel;
+      acc.exato += r.exato;
+      acc.designacao += r.designacao;
       acc.sem_match += r.sem_match;
+      acc.legado += r.legado;
       acc.ativos += r.ativos;
       return acc;
     },
-    { confirmado: 0, provavel: 0, sem_match: 0, ativos: 0 },
+    { exato: 0, designacao: 0, sem_match: 0, legado: 0, ativos: 0 },
   );
   const p = (n: number) => (g.ativos ? Math.round((n / g.ativos) * 1000) / 10 : 0);
   const [prov] = (await db.execute(sql`
     select count(*)::int as total,
       count(*) filter (where inputs->>'versionId' is not null)::int as com_versao,
-      count(*) filter (where jsonb_array_length(coalesce(inputs->'fromCatalog', '[]'::jsonb)) > 0)::int as com_specs
+      count(*) filter (where inputs->>'matchKind' = 'designacao')::int as com_factos
     from import_cost_estimates
-  `)) as unknown as { total: number; com_versao: number; com_specs: number }[];
+  `)) as unknown as { total: number; com_versao: number; com_factos: number }[];
 
   console.log("\n── saúde do matching de versão ──");
   console.log(
-    `global: confirmado ${g.confirmado} (${p(g.confirmado)}%) · provável ${g.provavel} (${p(g.provavel)}%) · sem match ${g.sem_match} (${p(g.sem_match)}%) · de ${g.ativos} ativos`,
+    `global: exato ${g.exato} (${p(g.exato)}%) · designacao ${g.designacao} (${p(g.designacao)}%) · sem match ${g.sem_match} (${p(g.sem_match)}%) · legado ${g.legado} (deve ser 0 pós-rematch) · de ${g.ativos} ativos`,
   );
   console.log("por fonte (top-8, % sobre ativos da fonte):");
   for (const r of verSrc.slice(0, 8)) {
     const ps = (n: number) => (r.ativos ? Math.round((n / r.ativos) * 1000) / 10 : 0);
     console.log(
-      `  ${r.source_site.padEnd(20)} conf ${ps(r.confirmado)}% · prov ${ps(r.provavel)}% · null ${ps(r.sem_match)}% (${r.ativos})`,
+      `  ${r.source_site.padEnd(20)} exato ${ps(r.exato)}% · desig ${ps(r.designacao)}% · null ${ps(r.sem_match)}% · legado ${r.legado} (${r.ativos})`,
     );
   }
   console.log(
-    `estimativas: ${prov.total} · com versão do catálogo ${prov.com_versao} · com specs efetivas do catálogo ${prov.com_specs}`,
+    `estimativas: ${prov.total} · com versão do catálogo ${prov.com_versao} · com factos de designação ${prov.com_factos}`,
   );
 }
 
