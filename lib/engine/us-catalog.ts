@@ -474,16 +474,19 @@ export function nameTokens(name: string): string[] {
  * Classifica a caixa em manual/auto a partir de texto livre (o catálogo tem
  * "6 speed Manual", anúncios têm "Schaltgetriebe", "DSG", "S-tronic", …).
  * Partilhada pelos dois lados (anúncio e catálogo) para classificarem igual.
- * A ORDEM dos ramos importa: `/semi/` primeiro (semi-automática é ambígua —
- * nunca a classificamos); depois auto ANTES de manual, porque "automatic"
- * contém "man" e cairia no ramo manual se este viesse primeiro.
+ * A ORDEM dos ramos importa: semi/halbautomatik primeiro (semi-automática é
+ * ambígua — nunca a classificamos; "halbautomatik" contém "autom" e viraria
+ * auto); depois auto ANTES de manual, porque "automatic" contém "man" e cairia
+ * no ramo manual se este viesse primeiro. Calibrada com o Passo 0 na BD real:
+ * "AUTO" nu (107), "Handgeschakeld" NL (84, "schak"≠"schalt"), "Halbautomatik"
+ * (18) e "Doppelkupplung" (4) eram mal/não classificados.
  */
 export function normGearbox(text: string | null): "manual" | "auto" | null {
   const s = text?.toLowerCase().trim() ?? "";
   if (!s) return null;
-  if (/semi/.test(s)) return null;
-  if (/(autom|dsg|s[- ]?tronic|steptronic|tiptronic|multitronic|powershift|dct|edc|pdk|cvt|automaat|automatique)/.test(s)) return "auto";
-  if (/(man|schalt|m[eé]c[aá]n)/.test(s)) return "manual";
+  if (/semi|halbautom|sequen/.test(s)) return null;
+  if (/(autom|dsg|s[- ]?tronic|steptronic|tiptronic|multitronic|powershift|dct|edc|pdk|cvt|automaat|automatique|doppelkupp|\bauto\b)/.test(s)) return "auto";
+  if (/(man|schalt|schak|m[eé]c[aá]n)/.test(s)) return "manual";
   return null;
 }
 

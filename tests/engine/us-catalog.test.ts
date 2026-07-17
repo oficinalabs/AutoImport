@@ -149,6 +149,14 @@ test("normGearbox: semi-automática é ambígua → null; null/vazio/desconhecid
   assert.equal(normGearbox("5"), null);
 });
 
+test("normGearbox: formatos do Passo 0 (BD real) que falhavam ou classificavam mal", () => {
+  assert.equal(normGearbox("AUTO"), "auto"); // "auto" nu não batia /autom/
+  assert.equal(normGearbox("Handgeschakeld"), "manual"); // NL: "schak" ≠ "schalt"
+  assert.equal(normGearbox("Halbautomatik"), null); // semi DE — contém "autom", NUNCA auto
+  assert.equal(normGearbox("Doppelkupplung"), "auto"); // dupla embraiagem = DSG
+  assert.equal(normGearbox("Sequencial"), null); // sequencial é ambíguo
+});
+
 test("normEngineCode: remove não-alfanuméricos e uppercase; vazio → null", () => {
   assert.equal(normEngineCode("N47 D20"), "N47D20");
   assert.equal(normEngineCode(" ea189 "), "EA189");
