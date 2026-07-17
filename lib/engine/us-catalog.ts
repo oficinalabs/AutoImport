@@ -33,7 +33,7 @@ import { normMake, normModel, slugify } from "./normalize-vehicle";
 export interface CatalogVersion {
   versionId: string;
   mid: string;
-  /** id da geração a que pertence (`${makeSlug}|${family}#${idx}`) */
+  /** id da geração a que pertence (`${makeSlug}|${family}|${derivative||"base"}#${idx}`) */
   generationId: string;
   year: number | null;
   powerHp: number | null;
@@ -71,10 +71,14 @@ export interface CatalogFamily {
 export interface UsCatalogIndex {
   /** chave `${makeSlug}|${family}` → família com gerações e versões */
   byFamily: Map<string, CatalogFamily>;
-  /** mid → resolução (família + regra aplicada + geração + tokens do slug) */
+  /** mid → resolução (família + regra aplicada + geração + tokens do slug + derivado) */
   midInfo: Map<
     string,
-    { makeSlug: string; family: string; rule: string; generationId: string; slugTokens: string[] }
+    {
+      makeSlug: string; family: string; rule: string; generationId: string; slugTokens: string[];
+      /** tokens distintivos do mid dentro da sua família (ex. "gran-tourer"); "" = base */
+      derivative: string;
+    }
   >;
   stats: {
     mids: number;
@@ -353,6 +357,80 @@ export function clusterGenerations(
 }
 
 // ════════════════════════════════════════════════════════════════
+// 2b. Tokens distintivos por mid (derivados de modelo/carroçaria)
+// ════════════════════════════════════════════════════════════════
+// Partilhado pela guarda de derivados do resolver (match-version) e pelo build do
+// índice: a MESMA lógica de ruído/núcleo/diferença. Vive aqui (e não em
+// match-version) para evitar o ciclo — us-catalog não pode importar de match-version.
+
+const ROMAN = new Set(["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"]);
+
+/**
+ * Carroçarias NEUTRAS (o corpo por omissão): não distinguem um derivado — o mid
+ * que só difere por elas É o modelo base (o sedan/hatch é o Corolla/Série-3 base,
+ * não um derivado). São tratadas como ruído ao calcular os tokens distintivos.
+ */
+export const NEUTRAL_BODY = new Set([
+  "sedan", "saloon", "berline", "berlina", "limousine", "notchback", "hatchback",
+  "hatch", "liftback", "fastback", "door", "doors",
+]);
+
+/**
+ * Ruído ao comparar slugs de mids da MESMA família (não designa um derivado):
+ * anos, romanos, códigos de chassis (e210/g20/l663), marcadores de facelift,
+ * marcas de geração (mk5/mk6), carroçaria neutra e tokens de UMA letra (letras de
+ * chassis/geração isoladas: Corsa D/E, Astra J/K — nunca um modelo por si só).
+ */
+export function isNoiseToken(t: string): boolean {
+  if (/^(?:19|20)\d{2}$/.test(t)) return true; // ano
+  if (ROMAN.has(t)) return true; // romano
+  if (/^[a-z]{1,2}\d{1,3}[a-z]?$/.test(t)) return true; // chassis/plataforma letra-inicial (e210, g20, c8, mk5…)
+  if (/^\d{1,3}[a-z]{1,2}$/.test(t)) return true; // chassis/plataforma dígito-inicial (8v, 8y, 8p — Audi/VW)
+  if (/^(?:lci|facelift|restyling|mopf|phase)$/.test(t)) return true; // facelift/fase
+  if (/^(?:class|klasse|classe|clase)$/.test(t)) return true; // filler do nome (Classe C)
+  if (t.length === 1) return true; // letra/algarismo isolado (chassis/porta)
+  if (NEUTRAL_BODY.has(t)) return true; // corpo por omissão → é a base
+  return false;
+}
+
+/**
+ * Tokens DISTINTIVOS por mid num universo de mids: os tokens de modelo/carroçaria
+ * (slug menos ruído) que NÃO pertencem ao NÚCLEO comum a todos os mids do universo.
+ * Determinístico, e preserva a ordem do slug (os Set mantêm a ordem de inserção —
+ * daí "gran-coupe" e não "coupe-gran").
+ *
+ * O universo é do chamador — por isso os distintivos DIFEREM entre usos e está
+ * certo: a guarda passa os mids DOS CANDIDATOS (núcleo local), o build passa TODOS
+ * os mids da família (núcleo da família). Só a lógica ruído/núcleo/diferença é a
+ * mesma; o núcleo é relativo ao universo recebido.
+ */
+export function distinctiveTokensByMid(
+  slugTokensByMid: Map<string, string[]>,
+): Map<string, Set<string>> {
+  const modelTokens = new Map<string, Set<string>>();
+  for (const [mid, toks] of slugTokensByMid) {
+    modelTokens.set(mid, new Set(toks.filter((t) => !isNoiseToken(t))));
+  }
+  // núcleo comum a TODOS os mids do universo; os distintivos são o resto.
+  let core: Set<string> | null = null;
+  for (const s of modelTokens.values()) {
+    if (core == null) {
+      core = new Set(s);
+    } else {
+      const inter = new Set<string>();
+      for (const t of core) if (s.has(t)) inter.add(t);
+      core = inter;
+    }
+  }
+  core ??= new Set<string>();
+  const distinctive = new Map<string, Set<string>>();
+  for (const [mid, s] of modelTokens) {
+    distinctive.set(mid, new Set([...s].filter((t) => !core!.has(t))));
+  }
+  return distinctive;
+}
+
+// ════════════════════════════════════════════════════════════════
 // 3. Fuel map e tokens
 // ════════════════════════════════════════════════════════════════
 
@@ -473,30 +551,64 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
   const midInfo: UsCatalogIndex["midInfo"] = new Map();
 
   for (const [fk, mids] of familyMids) {
-    // genKey → mids + arranque (min dos arranques dos mids)
-    const byGenKey = new Map<string, { mids: string[]; startYear: number | null }>();
-    for (const mid of mids) {
-      const r = midResolved.get(mid)!;
-      const e = byGenKey.get(r.genKey) ?? { mids: [], startYear: null };
-      e.mids.push(mid);
-      if (r.startYear != null) e.startYear = e.startYear == null ? r.startYear : Math.min(e.startYear, r.startYear);
-      byGenKey.set(r.genKey, e);
-    }
-    const generations = clusterGenerations(
-      fk,
-      [...byGenKey.entries()].map(([genKey, v]) => ({ genKey, ...v })),
+    const [makeSlug, family] = [midResolved.get(mids[0])!.makeSlug, midResolved.get(mids[0])!.family];
+
+    // Derivado por mid: tokens distintivos sobre TODOS os mids da família (núcleo =
+    // a família inteira). Calculado ANTES das gerações porque as gerações passam a ser
+    // encadeadas POR LINHA DE DERIVADO (ver abaixo). O resolver recalcula-os por
+    // CANDIDATOS — universos diferentes de propósito (ver distinctiveTokensByMid).
+    const distinctiveByMid = distinctiveTokensByMid(
+      new Map(mids.map((mid) => [mid, midResolved.get(mid)!.slugTokens])),
     );
+    const derivativeOfMid = new Map<string, string>(
+      mids.map((mid) => [mid, [...(distinctiveByMid.get(mid) ?? [])].join("-")]),
+    );
+
+    // Encadeia as gerações SEPARADAMENTE por linha de derivado. O clusterGenerations
+    // fecha cada janela no arranque do cluster seguinte — correto DENTRO de uma linha
+    // de carroçaria (Golf-7 2013 → Golf-8 2020), mas errado ENTRE derivados: sem esta
+    // separação, a linha Gran-Tourer (F46 2015, F46-LCI 2018) era "fechada" em 2019
+    // pela chegada do Gran-Coupe (F44 2020, OUTRA carroçaria e não o sucessor), e um GT
+    // de 2022 caía fora da sua própria janela → só sobrava o Gran-Coupe e o match saía
+    // na carroçaria errada. Por linha, cada carroçaria tem a sua sucessão e janelas.
+    const midsByDerivative = new Map<string, string[]>();
+    for (const mid of mids) {
+      const d = derivativeOfMid.get(mid)!;
+      (midsByDerivative.get(d) ?? midsByDerivative.set(d, []).get(d)!).push(mid);
+    }
+
+    const generations: Generation[] = [];
+    // Ordena as linhas por chave de derivado para o id `#i` ser estável (a lista FLAT
+    // é opaca aos consumidores, que iteram/procuram por id, nunca fazem parse dele).
+    for (const derivative of [...midsByDerivative.keys()].sort()) {
+      // genKey → mids + arranque (min dos arranques) DENTRO da linha de derivado.
+      const byGenKey = new Map<string, { mids: string[]; startYear: number | null }>();
+      for (const mid of midsByDerivative.get(derivative)!) {
+        const r = midResolved.get(mid)!;
+        const e = byGenKey.get(r.genKey) ?? { mids: [], startYear: null };
+        e.mids.push(mid);
+        if (r.startYear != null) e.startYear = e.startYear == null ? r.startYear : Math.min(e.startYear, r.startYear);
+        byGenKey.set(r.genKey, e);
+      }
+      // id único na família: prefixado pela linha (`${fk}|${derivative||"base"}#i`).
+      generations.push(
+        ...clusterGenerations(
+          `${fk}|${derivative || "base"}`,
+          [...byGenKey.entries()].map(([genKey, v]) => ({ genKey, ...v })),
+        ),
+      );
+    }
 
     // mid → generationId
     const genOfMid = new Map<string, string>();
     for (const g of generations) for (const mid of g.mids) genOfMid.set(mid, g.id);
 
-    const [makeSlug, family] = [midResolved.get(mids[0])!.makeSlug, midResolved.get(mids[0])!.family];
     const famVersions: CatalogVersion[] = [];
     for (const mid of mids) {
       const generationId = genOfMid.get(mid)!;
       const r = midResolved.get(mid)!;
-      midInfo.set(mid, { makeSlug, family, rule: r.rule, generationId, slugTokens: r.slugTokens });
+      const derivative = derivativeOfMid.get(mid)!;
+      midInfo.set(mid, { makeSlug, family, rule: r.rule, generationId, slugTokens: r.slugTokens, derivative });
       for (const v of versionsByMid.get(mid) ?? []) {
         const fuel = resolveVersionFuel(v.fuelSection, v.fuel);
         if (fuel === null) { stats.versoesExcluidasOther++; continue; }

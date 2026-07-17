@@ -192,6 +192,27 @@ model("P928", "Porsche", "928", null, [
   { name: "928 S4", fuelSection: "petrol", fuel: "Petrol", year: 1987, hp: 320, cc: 4957 },
   { name: "928 GT", fuelSection: "petrol", fuel: "Petrol", year: 1989, hp: 330, cc: 4957 },
 ]);
+// BMW Série 2 — o caso REAL do bug: um 216d Gran Tourer (monovolume) casava exato no
+// 216d Gran Coupe (sedan-coupé) porque a janela da linha Gran-Tourer era FECHADA pelo
+// arranque do Gran-Coupe (F44 2020) — uma carroçaria diferente, não o sucessor. Com o
+// encadeamento POR LINHA DE DERIVADO, a linha GT (F46 2015, F46-LCI 2018) fica ABERTA e
+// um 216d 2022 continua a ter candidatos GT. Sem o texto "Gran Tourer" os mids misturam-se
+// (GT/GC/AT, todas as linhas abertas cobrem 2022) → designacao; com ele, a contenção total
+// pina o Gran-Tourer. O F46 pré-LCI tem OUTRO motor (218d 150cv) para os sinais duros do
+// 216d o descartarem → sobra só o F46-LCI (mid único), que o gearbox splitter separa → exato.
+model("F46", "BMW", "F46-2-Series-Gran-Tourer", null, [
+  { name: "F46 218d Gran Tourer", fuelSection: "diesel", fuel: "Diesel", year: 2015, hp: 150, cc: 1995, co2w: 119 },
+]);
+model("F46-LCI", "BMW", "F46-LCI-2-Series-Gran-Tourer", null, [
+  { name: "F46 LCI 216d Gran Tourer", fuelSection: "diesel", fuel: "Diesel", year: 2018, hp: 116, cc: 1499, co2w: 120, gearbox: "6 speed Manual" },
+  { name: "F46 LCI 216d Gran Tourer Auto", fuelSection: "diesel", fuel: "Diesel", year: 2018, hp: 116, cc: 1499, co2w: 128, gearbox: "7 speed Automatic" },
+]);
+model("F44", "BMW", "F44-2-Series-Gran-Coupe", null, [
+  { name: "F44 216d Gran Coupe", fuelSection: "diesel", fuel: "Diesel", year: 2020, hp: 116, cc: 1499, co2w: 125, gearbox: "7 speed Automatic" },
+]);
+model("F45-LCI", "BMW", "F45-LCI-2-Series-Active-Tourer", null, [
+  { name: "F45 LCI 216d Active Tourer", fuelSection: "diesel", fuel: "Diesel", year: 2017, hp: 116, cc: 1499, co2w: 122, gearbox: "7 speed Automatic" },
+]);
 
 const CAT: UsCatalogIndex = buildIndex(models, versions);
 
@@ -201,6 +222,7 @@ function inp(p: Partial<ResolveInput> & { makeRaw: string; modelRaw: string }): 
     makeRaw: p.makeRaw, modelRaw: p.modelRaw, variant: p.variant ?? null, fuelRaw: p.fuelRaw ?? null,
     year: p.year ?? null, powerHp: p.powerHp ?? null, displacementCc: p.displacementCc ?? null, co2: p.co2 ?? null,
     gearbox: p.gearbox ?? null, doors: p.doors ?? null, engineCode: p.engineCode ?? null,
+    extraText: p.extraText ?? null,
   };
 }
 /** versão do resultado (exato/provavel); undefined para designacao/null. */
@@ -501,11 +523,16 @@ test("evidence: família e fuel corretos na evidência", () => {
 
 // ── Janela de geração ────────────────────────────────────────────
 
-test("geração: anúncio 2020 não casa o clássico E31 (1993) da mesma família", () => {
-  // Um 840 gasolina 2020 (333cv) fica no G15; jamais no E31 (286cv, fora da janela)
-  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "8 Series", variant: "840i", fuelRaw: "Gasolina", year: 2020, powerHp: 286, displacementCc: 3982 }), CAT);
-  // 286cv só existe no E31 (janela ~1993) → 2020 fora da janela → null
-  assert.equal(r, null);
+test("geração: 840i moderno (2020, 333cv/2998cc) → G15, nunca o clássico E31 (286cv/3982cc)", () => {
+  // Um 840i gasolina 2020 (333cv/2998cc) resolve no G15; jamais no E31 (286cv/3982cc,
+  // assinatura incompatível). NOTA (janelas por linha): a linha base do 8-Series só tem o
+  // E31 — os G14/G15/G16 modernos trazem token de corpo (cabrio/coupe/gran-coupe) e são
+  // OUTRAS linhas — pelo que a janela do E31 fica ABERTA [~1992,null]. Deixou de ser o ano
+  // a separar o clássico: é a assinatura. Nenhum anúncio moderno REAL carrega 3982cc/286cv
+  // (essa combinação É o E31), por isso o risco de match trans-época é teórico.
+  const modern = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "8 Series", variant: "840i xDrive", fuelRaw: "Gasolina", year: 2020, powerHp: 333, displacementCc: 2998 }), CAT);
+  assert.equal(modern?.kind, "exato");
+  assert.equal(vspec(modern)?.powerHp, 333); // G15 840i xDrive, não o E31 (286cv)
 });
 
 test("iX ≠ iX3 (famílias distintas): modelo iX3 não resolve na família ix", () => {
@@ -604,6 +631,75 @@ test("derivados: carroçarias sem base (TT Coupe/Roadster) → designacao (motor
     assert.equal(r.facts.powerHp, 230);
     assert.equal(r.facts.displacementCc, 1984);
     assert.equal(r.evidence.family, "audi|tt");
+  }
+});
+
+// ── extraText + contenção total + splitter gated a mid único ──────
+// (regressão do bug real: 216d Gran Tourer casava exato no 216d Gran Coupe)
+
+test("D4 (bug real): 216d Gran Tourer com extraText → exato no F46-LCI (nunca Gran Coupe)", () => {
+  const r = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "2er", variant: "216d", fuelRaw: "Diesel", year: 2022,
+    powerHp: 116, displacementCc: 1499, gearbox: "Automaat",
+    extraText: "BMW 216 dA Gran Tourer Automaat Full Led Navi DAB PDC Alu",
+  }), CAT);
+  // contenção total pina o Gran-Tourer; o gearbox (mid único) separa manual/auto.
+  assert.equal(r?.kind, "exato");
+  if (r?.kind === "exato") {
+    assert.equal(r.mid, "F46-LCI");
+    assert.equal(CAT.midInfo.get(r.mid)?.derivative, "gran-tourer"); // JAMAIS gran-coupe
+  }
+  assert.ok(r?.kind === "exato" && r.evidence.splitters?.includes("gearbox"));
+});
+
+test("sem extraText: mids misturam GT/GC/AT (linhas distintas, todas abertas) → designacao, nunca exato", () => {
+  // Ano 2022 cai nas janelas ABERTAS das três linhas de derivado (GT/GC/AT), por isso os
+  // candidatos abrangem F46-LCI/F44/F45. Sem o texto do derivado, os mids são mistos → o
+  // gearbox splitter NÃO atua (gated a mid único) → designacao com derivative null
+  // (candidatos abrangem derivados distintos).
+  const r = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "2er", variant: "216d", fuelRaw: "Diesel", year: 2022,
+    powerHp: 116, displacementCc: 1499, gearbox: "Automaat",
+  }), CAT);
+  assert.equal(r?.kind, "designacao");
+  assert.notEqual(r?.kind, "exato");
+  if (r?.kind === "designacao") {
+    assert.equal(r.facts.derivative, null);
+    assert.equal(r.facts.mid, null); // mids mistos
+  }
+});
+
+test("contenção total: 'gran tourer' fica só GT; 'gran' (parcial de ambos) mantém GT+GC", () => {
+  // "gran tourer" ⊇ {gran,tourer} contém por inteiro o GT {gran,tourer} mas só
+  // parcialmente o GC {gran,coupe} → só GT (mid único F46-LCI, 2 gémeas).
+  const gt = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "2er", variant: "216d", fuelRaw: "Diesel", year: 2022,
+    powerHp: 116, displacementCc: 1499, extraText: "216d Gran Tourer",
+  }), CAT);
+  assert.equal(gt?.kind, "designacao");
+  if (gt?.kind === "designacao") {
+    assert.equal(gt.facts.mid, "F46-LCI");
+    assert.equal(gt.facts.derivative, "gran-tourer");
+  }
+  // "gran" está nos dois distintivos ({gran,tourer} e {gran,coupe}) sem conter
+  // nenhum por inteiro → cai no critério largo (some) e mantém ambos → designacao.
+  const gran = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "2er", variant: "216d", fuelRaw: "Diesel", year: 2022,
+    powerHp: 116, displacementCc: 1499, extraText: "216d Gran",
+  }), CAT);
+  assert.equal(gran?.kind, "designacao");
+  if (gran?.kind === "designacao") assert.equal(gran.facts.derivative, null); // GT + GC
+});
+
+test("facts.derivative único: designacao confinada a UM mid herda o derivado do mid", () => {
+  // Cooper S F66 manual/auto sem gearbox no input → 2 gémeas do MESMO mid F66 →
+  // designacao; derivative = o do mid (via índice), nunca null.
+  const r = resolveVersion(inp({ makeRaw: "MINI", modelRaw: "Mini", variant: "Cooper S", fuelRaw: "Benzin", year: 2023, powerHp: 178, displacementCc: 1499 }), CAT);
+  assert.equal(r?.kind, "designacao");
+  if (r?.kind === "designacao") {
+    assert.equal(r.facts.mid, "F66");
+    assert.notEqual(r.facts.derivative, null);
+    assert.equal(r.facts.derivative, CAT.midInfo.get("F66")?.derivative);
   }
 });
 

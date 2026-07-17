@@ -31,6 +31,17 @@ function chunk<T>(xs: T[], size: number): T[][] {
   return out;
 }
 
+/** Pathname do detail_url legível: separadores (/-_.+) → espaço, sem URL-encoding.
+ * O slug traz o corpo/derivado ("gran-tourer") que make/model/variant perdem. */
+function pathText(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return decodeURIComponent(new URL(url).pathname).replace(/[/\-_.+]/g, " ");
+  } catch {
+    return null;
+  }
+}
+
 export async function matchModels(opts: { rematch?: boolean } = {}) {
   const { db } = await import("../../db");
   const { inArray, sql } = await import("drizzle-orm");
@@ -161,6 +172,7 @@ async function resolveVersions(
            fuel_raw as "fuelRaw", year, power_hp as "powerHp",
            displacement_cc as "displacementCc", co2,
            gearbox, doors, raw->>'engine_code' as "engineCode",
+           detail_url as "detailUrl", raw->>'title' as "rawTitle",
            us_version_id as "curVid", match_confidence as "curConf",
            designation_facts as "curFacts"
     from listings
@@ -179,6 +191,8 @@ async function resolveVersions(
     gearbox: string | null;
     doors: number | null;
     engineCode: string | null;
+    detailUrl: string | null;
+    rawTitle: string | null;
     curVid: string | null;
     curConf: string | null;
     curFacts: unknown;
@@ -196,7 +210,11 @@ async function resolveVersions(
   let provavelRun = 0; // contado in-memory (não é escrito): só relatório
   const splitterCounts: Record<string, number> = {};
   for (const row of rows) {
-    const r = resolveVersion(row, cat);
+    // extraText = título + slug do detail_url. Traz o corpo/derivado ("gran
+    // tourer") que make/model/variant perdem; SÓ alimenta a desambiguação
+    // (derivativeGuard/trim), nunca sinais duros — o resolver garante-o.
+    const extraText = [row.rawTitle, pathText(row.detailUrl)].filter(Boolean).join(" ") || null;
+    const r = resolveVersion({ ...row, extraText }, cat);
     let vid: string | null = null;
     let conf: string | null = null;
     let evidence: unknown = null;

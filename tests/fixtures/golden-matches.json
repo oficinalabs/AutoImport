@@ -5709,5 +5709,100 @@
       "mustConfirm": true
     },
     "note": "auditoria (8): 928 S4 320cv (v3612), não o GT 330cv (v3611) — preferência de degrau exato (ver unit test dedicado)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "audit-216d-gran-tourer",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "2er",
+      "variant": "216d",
+      "fuelRaw": "Diesel",
+      "year": 2019,
+      "powerHp": 116,
+      "displacementCc": 1499,
+      "co2": null,
+      "gearbox": "Automaat",
+      "extraText": "bmw 216 da gran tourer automaat full led navi dab pdc alu diesel grau"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-2",
+      "fuel": "diesel",
+      "powerHp": 116,
+      "cc": 1499
+    },
+    "note": "auditoria jul/2026: 216d Gran Tourer — o extraText 'gran tourer' fixa o derivado gran-tourer (designacao), nunca o Active Tourer nem o Gran Coupe. Caso ainda válido no ano 2019; a entrada gémea a seguir (ano 2022 real da auditoria) já não precisa de workaround: com o encadeamento por linha de derivado a janela da linha Gran-Tourer ficou aberta e o 2022 continua a resolver no Gran-Tourer."
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "audit-216d-gran-tourer-2022",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "2er",
+      "variant": "216d",
+      "fuelRaw": "Diesel",
+      "year": 2022,
+      "powerHp": 116,
+      "displacementCc": 1499,
+      "co2": null,
+      "gearbox": "Automaat",
+      "extraText": "bmw 216 da gran tourer automaat full led navi dab pdc alu diesel grau"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-2",
+      "fuel": "diesel",
+      "powerHp": 116,
+      "cc": 1496,
+      "mustConfirm": true,
+      "midEsperado": "M9893"
+    },
+    "note": "auditoria jul/2026 (matrícula 2022 REAL, ex-workaround): pós-correção das janelas por linha de derivado, a linha Gran-Tourer (M7911 F46 2015, M9893 F46-LCI 2018) fica numa geração aberta e um 216d 2022 resolve em DESIGNACAO gran-tourer (facts.mid null: F46 e F46-LCI têm 216d 116cv/1496cc idênticos, indistinguíveis por specs) — NUNCA exato no Gran Coupe M10634, que era o bug. midEsperado M9893 (F46-LCI) só é exigido se algum dia colapsar a um único mid GT; mustConfirm garante que nunca cai a null."
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "audit-218d-active-tourer",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "2 SERIES ACTIVE TOURER",
+      "variant": "BMW 2 SERIES ACTIVE TOURER 218D 2.0 150 EDITION AVANTAGE",
+      "fuelRaw": "Diesel",
+      "year": 2016,
+      "powerHp": 150,
+      "displacementCc": 1995,
+      "co2": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-2",
+      "fuel": "diesel",
+      "powerHp": 150,
+      "cc": 1995
+    },
+    "note": "auditoria jul/2026: 218d Active Tourer — o corpo no variant fixa o derivado active-tourer (designacao), nunca Coupé/Cabrio; facts.mid null (F45/F45-LCI), por isso sem midEsperado"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "audit-corolla-hibrido-es",
+    "input": {
+      "makeRaw": "Toyota",
+      "modelRaw": "Corolla",
+      "variant": "1.8 Hybrid",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2023,
+      "powerHp": 140,
+      "displacementCc": 1798,
+      "co2": null,
+      "gearbox": "Automatik"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "toyota|corolla",
+      "fuel": "híbrido",
+      "powerHp": 140,
+      "cc": 1798
+    },
+    "note": "auditoria jul/2026: Corolla híbrido sem corpo no texto → base (sedan/hatch são ambos base), nunca Touring Sports; sem midEsperado (o mid base pode variar)"
   }
 ]

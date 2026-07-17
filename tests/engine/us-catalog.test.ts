@@ -169,9 +169,12 @@ function mkVersion(mid: string, year: number, i = 0): UsVersionRow {
   };
 }
 
-test("gerações Carens: 3 mids, mesma família, janelas distintas e encadeadas", () => {
+test("gerações Carens: 3 mids da MESMA linha (base), janelas distintas e encadeadas", () => {
+  // Os três são o Carens base (corpo neutro, sem derivado) → encadeiam na MESMA linha
+  // de derivado. O encadeamento por linha continua a produzir janelas contíguas e
+  // disjuntas dentro da linha (é o comportamento normal do clusterGenerations por chamada).
   const idx = buildIndex(
-    [mkModel("C1", "Kia", "Carens-1"), mkModel("C2", "Kia", "Carens-15"), mkModel("C3", "Kia", "Carens-2")],
+    [mkModel("C1", "Kia", "Carens-1"), mkModel("C2", "Kia", "Carens-2"), mkModel("C3", "Kia", "Carens-3")],
     [mkVersion("C1", 2000), mkVersion("C2", 2002), mkVersion("C3", 2006)],
   );
   const f = idx.byFamily.get("kia|carens");
@@ -212,7 +215,12 @@ test("gerações MINI: F56 e J01 são gerações DISTINTAS de mini-cooper", () =
   assert.notEqual(f.generations[0].id, f.generations[1].id);
 });
 
-test("gerações BMW: variantes de carroçaria/LCI do mesmo chassis fundem-se", () => {
+test("gerações BMW: LCI funde na linha base; touring/coupe são linhas de derivado próprias", () => {
+  // Encadeamento POR LINHA DE DERIVADO: o E90 sedan e o E90-LCI (mesmo corpo neutro; o
+  // LCI é removido no genKey) fundem-se numa só geração da linha base; o Touring e o
+  // Coupe são carroçarias distintas → cada um a sua linha e a sua geração. Antes, todos
+  // os corpos do mesmo chassis fundiam por proximidade de ano; separá-los por linha é o
+  // que impede que a linha de um derivado seja fechada pela chegada de OUTRO (o bug GT/GC).
   const idx = buildIndex(
     [
       mkModel("E90", "BMW", "E90-3-Series"),
@@ -223,8 +231,56 @@ test("gerações BMW: variantes de carroçaria/LCI do mesmo chassis fundem-se", 
     [mkVersion("E90", 2005), mkVersion("E91", 2005), mkVersion("E92", 2006), mkVersion("E90L", 2008)],
   );
   const f = idx.byFamily.get("bmw|serie-3")!;
-  assert.equal(f.generations.length, 1, "E90/E91/E92 + LCI = uma só geração");
-  assert.equal(f.generations[0].mids.length, 4);
+  assert.equal(f.generations.length, 3, "base (E90+LCI) + touring + coupe");
+  const base = f.generations.find((g) => g.id.includes("|base#"))!;
+  assert.deepEqual([...base.mids].sort(), ["E90", "E90L"]); // LCI funde no sedan base
+  assert.equal(idx.midInfo.get("E91")!.derivative, "touring");
+  assert.equal(idx.midInfo.get("E92")!.derivative, "coupe");
+  // ids de geração únicos na família.
+  assert.equal(new Set(f.generations.map((g) => g.id)).size, 3);
+});
+
+test("gerações Série 2 (bug real): a linha Gran-Tourer não é fechada pelo Gran-Coupe", () => {
+  // Antes, o clusterGenerations encadeava TODOS os genKeys da família por proximidade de
+  // ano e fechava a janela da linha Gran-Tourer (F46 2015, F46-LCI 2018) no arranque do
+  // Gran-Coupe (F44 2020) — OUTRA carroçaria, não o sucessor. Um GT de 2022 caía fora da
+  // janela da sua linha e só sobrava o Gran-Coupe (match na carroçaria errada). Com o
+  // encadeamento POR LINHA DE DERIVADO, cada carroçaria tem a sua sucessão: a linha GT
+  // fica ABERTA e um GT 2022 volta a ter candidatos.
+  const idx = buildIndex(
+    [
+      mkModel("F45", "BMW", "F45-2-Series-Active-Tourer", 2014),
+      mkModel("F45L", "BMW", "F45-LCI-2-Series-Active-Tourer", 2017),
+      mkModel("F46", "BMW", "F46-2-Series-Gran-Tourer", 2015),
+      mkModel("F46L", "BMW", "F46-LCI-2-Series-Gran-Tourer", 2018),
+      mkModel("F44", "BMW", "F44-2-Series-Gran-Coupe", 2020),
+    ],
+    [mkVersion("F45", 2014), mkVersion("F45L", 2017), mkVersion("F46", 2015), mkVersion("F46L", 2018), mkVersion("F44", 2020)],
+  );
+  const f = idx.byFamily.get("bmw|serie-2")!;
+  const genOf = (mid: string) => f.generations.find((g) => g.id === idx.midInfo.get(mid)!.generationId)!;
+
+  // Linha Gran-Tourer: F46 + F46-LCI numa geração ABERTA (yearEnd null; o F46-LCI funde no
+  // F46 pelo genKey que remove o LCI) → um GT 2022 continua dentro da janela.
+  const gt = genOf("F46");
+  assert.equal(gt.id, genOf("F46L").id, "F46 e F46-LCI na mesma geração da linha GT");
+  assert.equal(gt.yearEnd, null, "linha GT aberta — nunca fechada pelo Gran-Coupe");
+  assert.ok(gt.yearStart != null && gt.yearStart <= 2022, "GT 2022 dentro da janela");
+  assert.equal(idx.midInfo.get("F46")!.derivative, "gran-tourer");
+
+  // Linha Active-Tourer: própria, distinta da GT.
+  const at = genOf("F45");
+  assert.equal(at.id, genOf("F45L").id);
+  assert.notEqual(at.id, gt.id);
+  assert.equal(idx.midInfo.get("F45")!.derivative, "active-tourer");
+
+  // Linha Gran-Coupe: própria; a sua chegada (2020) NÃO fecha a linha GT.
+  const gc = genOf("F44");
+  assert.notEqual(gc.id, gt.id);
+  assert.equal(idx.midInfo.get("F44")!.derivative, "gran-coupe");
+
+  // ids de geração únicos na família (o formato do id é opaco aos consumidores).
+  assert.equal(new Set(f.generations.map((g) => g.id)).size, f.generations.length);
 });
 
 test("buildIndex propaga doors/gearbox/engineCode para CatalogVersion", () => {
@@ -243,6 +299,37 @@ test("buildIndex propaga doors/gearbox/engineCode para CatalogVersion", () => {
   assert.equal(c2.doors, null);
   assert.equal(c2.gearbox, null);
   assert.equal(c2.engineCode, null);
+});
+
+// ── derivative por mid (tokens distintivos da família) ───────────
+
+test("derivative por mid: Gran Tourer/Coupe/Active Tourer distintos; base → ''", () => {
+  const idx = buildIndex(
+    [
+      mkModel("F46", "BMW", "F46-2-Series-Gran-Tourer", 2015),
+      mkModel("F46L", "BMW", "F46-LCI-2-Series-Gran-Tourer", 2018),
+      mkModel("F44", "BMW", "F44-2-Series-Gran-Coupe", 2020),
+      mkModel("F45", "BMW", "F45-LCI-2-Series-Active-Tourer", 2016),
+    ],
+    [mkVersion("F46", 2015), mkVersion("F46L", 2018), mkVersion("F44", 2020), mkVersion("F45", 2016)],
+  );
+  const d = (mid: string) => idx.midInfo.get(mid)?.derivative;
+  // ordem do slug (Set preserva inserção) → "gran-coupe", não "coupe-gran".
+  assert.equal(d("F46"), "gran-tourer");
+  assert.equal(d("F46L"), "gran-tourer");
+  assert.equal(d("F44"), "gran-coupe");
+  assert.equal(d("F45"), "active-tourer");
+
+  // Base (só carroçaria neutra) → "" ; o derivado real fica com os seus tokens.
+  const cor = buildIndex(
+    [
+      mkModel("CX", "Toyota", "Corolla-Cross", 2022),
+      mkModel("CH", "Toyota", "Corolla-E210-Hatchback-2023", 2023),
+    ],
+    [mkVersion("CX", 2022), mkVersion("CH", 2023)],
+  );
+  assert.equal(cor.midInfo.get("CH")?.derivative, "");
+  assert.equal(cor.midInfo.get("CX")?.derivative, "cross");
 });
 
 // ── Property test sobre o catálogo real (só com BD docker) ───────

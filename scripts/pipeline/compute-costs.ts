@@ -57,6 +57,19 @@ export async function computeCosts() {
     return { start: gen.yearStart, end: gen.yearEnd };
   }
 
+  /** Mids da família `family` (chave `make|família` da evidência) cujo derivado
+   * DIFERE do do estrangeiro — para confinar a amostra PT ao mesmo corpo/derivado.
+   * `""` (base) é derivado válido e ≠ null: um estrangeiro base exclui os Gran
+   * Coupé/Cabrio (mais caros → margem falsa), mas nunca os outros base. */
+  function excludeMidsForDerivative(family: string, foreignDerivative: string): string[] {
+    const out: string[] = [];
+    for (const [mid, info] of catalog.midInfo) {
+      if (`${info.makeSlug}|${info.family}` === family && info.derivative !== foreignDerivative)
+        out.push(mid);
+    }
+    return out;
+  }
+
   // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
   // o ISV é €5,61/cm³ e uma mediana envenenada/entre-trims produz impostos
   // confiantemente errados (caso real: Série 8 com mediana cc=844 → ISV 1k
@@ -112,7 +125,7 @@ export async function computeCosts() {
     power_hp: number | null;
     model_id: string;
     match_confidence: string | null;
-    match_evidence: { geracaoAmbigua?: boolean } | null;
+    match_evidence: { geracaoAmbigua?: boolean; family?: string } | null;
     us_version_id: string | null;
     designation_facts: DesignationFacts | null;
     v_mid: string | null;
@@ -159,8 +172,12 @@ export async function computeCosts() {
     let co2Efetivo = l.co2;
     let powerEfetivo = l.power_hp;
     let genWindow: GenWindow | undefined;
+    // Derivado/corpo PROVADO do estrangeiro (ramo exato → do índice pelo mid da
+    // versão; ramo designacao → dos factos). "" = base; null = desconhecido.
+    let foreignDerivative: string | null = null;
     if (exato) {
       matchKind = "exato";
+      foreignDerivative = l.v_mid ? (catalog.midInfo.get(l.v_mid)?.derivative ?? null) : null;
       if (ccEfetivo == null && l.v_cc != null) {
         ccEfetivo = l.v_cc;
         fromCatalog.push("cc");
@@ -183,6 +200,8 @@ export async function computeCosts() {
     } else if (l.match_confidence === "designacao" && l.designation_facts != null) {
       matchKind = "designacao";
       const f = l.designation_facts;
+      // linhas antigas de designacao não têm `derivative` gravado → null.
+      foreignDerivative = f.derivative ?? null;
       if (ccEfetivo == null && f.displacementCc != null) {
         ccEfetivo = f.displacementCc;
         fromCatalog.push("cc");
@@ -216,7 +235,25 @@ export async function computeCosts() {
       continue;
     }
 
-    const pt = await estimatePtPrice(db, l.model_id, l.year, kmBand(l.km), powerEfetivo, genWindow);
+    // Confina a amostra PT ao mesmo derivado/corpo do estrangeiro: exclui os mids
+    // da família cujo derivado é OUTRO (caso real: um 216d Gran Tourer comparado
+    // com Gran Coupés, mais caros → margem falsa). Só quando o derivado é conhecido
+    // e a evidência traz a família; lista vazia → não passa (nada a excluir).
+    let excludeMids: string[] | undefined;
+    if (foreignDerivative != null && l.match_evidence?.family) {
+      const mids = excludeMidsForDerivative(l.match_evidence.family, foreignDerivative);
+      if (mids.length) excludeMids = mids;
+    }
+
+    const pt = await estimatePtPrice(
+      db,
+      l.model_id,
+      l.year,
+      kmBand(l.km),
+      powerEfetivo,
+      genWindow,
+      excludeMids,
+    );
     if (!pt) {
       semAmostra++;
       await dropStale(l.est_id);
@@ -249,6 +286,8 @@ export async function computeCosts() {
       // Proveniência (auditabilidade): o tier efetivo + de onde vieram as specs.
       // exato → version_id; designacao → só factos (fromCatalog + janela).
       matchKind,
+      // derivado/corpo que confinou a amostra PT (quando conhecido): "" = base.
+      ...(foreignDerivative != null ? { derivative: foreignDerivative } : {}),
       ...(matchKind === "exato"
         ? { versionId: l.us_version_id, fromCatalog, genWindow: genWindow ?? null }
         : matchKind === "designacao"

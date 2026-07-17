@@ -133,10 +133,13 @@ test(
     // velha (arranque 2019) → janela [2018,2021]; nova (arranque 2022) → [2022,null].
     // Janelas DISJUNTAS (sem o −1 de graça interno): o ano de fronteira 2021 fica
     // na geração velha e o 2022 na nova, sem sobreposição.
+    // Os slugs marcam a geração por NÚMERO NU (GenModel-1/-2, como Golf-7/-8) — token de
+    // uma cifra é ruído no cálculo do derivado, por isso ambas as gerações ficam na MESMA
+    // linha de derivado (base ""), que é onde o encadeamento por linha as separa por janela.
     await db.execute(sql`
       insert into us_models (mid, make, model, slug, model_year, url) values
-        ('TG-OLD', 'Testgen', 'GenModel', 'GenModel-Gen1', 2019, 'https://example.test/old'),
-        ('TG-NEW', 'Testgen', 'GenModel', 'GenModel-Gen2', 2022, 'https://example.test/new')
+        ('TG-OLD', 'Testgen', 'GenModel', 'GenModel-1', 2019, 'https://example.test/old'),
+        ('TG-NEW', 'Testgen', 'GenModel', 'GenModel-2', 2022, 'https://example.test/new')
     `);
     await db.execute(sql`
       insert into us_versions
@@ -283,6 +286,118 @@ test(
       `com guarda a mediana fica limpa (${comGuarda.estimatedPrice})`,
     );
     assert.notEqual(semGuarda.estimatedPrice, comGuarda.estimatedPrice);
+  },
+);
+
+test(
+  "guarda de derivado/corpo (excludeMids): Gran Tourer não compara com Gran Coupe",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+    const { estimatePtPrice } = await import("../../lib/engine/pt-market");
+
+    await cleanup();
+
+    // Catálogo sintético: dois mids da MESMA família/geração (arranque 2022, motor
+    // idêntico 130cv/1500cc) mas corpos distintos — TG-BASE (sedan/hatch, derivado
+    // "") e TG-CAB (cabrio, derivado "cabrio"). O genKeyOf tira "cabrio"
+    // (BODY_TOKEN) → fundem-se na mesma geração; só o DERIVADO os separa.
+    await db.execute(sql`
+      insert into us_models (mid, make, model, slug, model_year, url) values
+        ('TG-BASE', 'Testgen', 'GenTwo', 'GenTwo-Gen1', 2022, 'https://example.test/base'),
+        ('TG-CAB', 'Testgen', 'GenTwo', 'GenTwo-Gen1-Cabrio', 2022, 'https://example.test/cab')
+    `);
+    await db.execute(sql`
+      insert into us_versions
+        (version_id, mid, name, url, fuel_section, fuel, year, power_hp, displacement_cc, co2_wltp) values
+        ('V-BASE', 'TG-BASE', 'GenTwo 1.0', 'https://example.test/vbase', 'petrol', 'Petrol', 2022, 130, 1500, 135),
+        ('V-CAB', 'TG-CAB', 'GenTwo 1.0 Cabrio', 'https://example.test/vcab', 'petrol', 'Petrol', 2022, 130, 1500, 148)
+    `);
+
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'gentwo', 'gasolina', 'testgen|gentwo|gasolina')
+      returning id
+    `)) as unknown as { id: string }[];
+    const modelId = model.id;
+
+    // PT (todos 2022, MESMA banda de km/potência): 5 BASE (~30 k, sem versão → mid
+    // desconhecido, ficam na amostra) + 5 CABRIO caros (~45 k, us_version_id=V-CAB
+    // → mid TG-CAB provado). Sem excludeMids os cabrios inflam a mediana do base.
+    for (const [i, price] of [30000, 30300, 30600, 30900, 31200].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${`fixture-deriv-pt-base-${i}`}, ${modelId}, 'Testgen', 'GenTwo',
+           'Gasolina', 'gasolina', 'GenTwo 1.0', 2022, 30000, 130, ${price}, 'PT',
+           ${`Stand Base ${i}`}, ${`https://example.test/fixture-deriv-pt-base-${i}`})
+      `);
+    }
+    for (const [i, price] of [45000, 45250, 45500, 45750, 46000].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url,
+           us_version_id, match_confidence)
+        values
+          ('standvirtual.com', ${`fixture-deriv-pt-cab-${i}`}, ${modelId}, 'Testgen', 'GenTwo',
+           'Gasolina', 'gasolina', 'GenTwo 1.0 Cabrio', 2022, 30000, 130, ${price}, 'PT',
+           ${`Stand Cabrio ${i}`}, ${`https://example.test/fixture-deriv-pt-cab-${i}`},
+           'V-CAB', 'exato')
+      `);
+    }
+
+    // Estrangeiro BASE (exato V-BASE, derivado ""), com match_evidence.family para
+    // o compute-costs derivar o excludeMids. Preço baixo → assenta na mediana PT.
+    await db.execute(sql`
+      insert into listings
+        (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+         year, km, power_hp, displacement_cc, co2, price, country, detail_url, first_registration,
+         us_version_id, match_confidence, match_evidence)
+      values
+        ('autoscout24.de', 'fixture-deriv-de-1', ${modelId}, 'Testgen', 'GenTwo', 'Gasolina', 'gasolina',
+         'GenTwo 1.0', 2022, 30000, 130, 1500, null, 18000, 'DE', 'https://example.test/deriv-de-1',
+         '2022-06-01', 'V-BASE', 'exato',
+         ${JSON.stringify({ geracaoAmbigua: false, family: "testgen|gentwo" })}::jsonb)
+    `);
+
+    await collectPtObservations();
+    await computeCosts();
+
+    // Ponta-a-ponta: o compute-costs deriva o excludeMids (mids da família com
+    // derivado ≠ ""), exclui os cabrios (TG-CAB) e a amostra fica só nos 5 base.
+    const [est] = (await db.execute(sql`
+      select e.pt_estimated_price, e.pt_sample_size, e.inputs
+      from import_cost_estimates e
+      join listings l on l.id = e.listing_id
+      where l.external_id = 'fixture-deriv-de-1'
+    `)) as unknown as {
+      pt_estimated_price: number;
+      pt_sample_size: number;
+      inputs: { derivative?: string };
+    }[];
+    assert.ok(est, "o estrangeiro base recebeu estimativa");
+    assert.equal(est.pt_sample_size, 5, "amostra só dos 5 base (cabrios excluídos)");
+    assert.ok(
+      est.pt_estimated_price < 32000,
+      `mediana dos base, sem os cabrios caros (obtido ${est.pt_estimated_price})`,
+    );
+    assert.equal(est.inputs.derivative, "", "inputs regista o derivado base ''");
+
+    // Prova direta: excluir o mid do outro derivado baixa a mediana — só APERTA.
+    const comExcl = await estimatePtPrice(db, modelId, 2022, 1, 130, undefined, ["TG-CAB"]);
+    const semExcl = await estimatePtPrice(db, modelId, 2022, 1, 130);
+    assert.ok(comExcl && semExcl, "ambas as amostras existem");
+    assert.equal(comExcl.sampleSize, 5, "excluir os cabrios deixa só os 5 base");
+    assert.ok(
+      comExcl.estimatedPrice < semExcl.estimatedPrice,
+      `excluir o derivado cabrio baixa a mediana (com=${comExcl.estimatedPrice} sem=${semExcl.estimatedPrice})`,
+    );
   },
 );
 
