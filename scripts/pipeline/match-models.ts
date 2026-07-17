@@ -8,12 +8,16 @@
  *   3. enriquece o modelo com medianas (cc/CO₂/potência) dos anúncios ligados
  *   4. relatório: taxa de match + top-20 não-mapeados (alimenta o dicionário)
  *
- * B) VERSÃO (us_version_id) — Fase 3, resolver estrito (lib/engine/match-version.ts):
- *   backfill natural dos ativos sem us_version_id (ou TODOS com --rematch), a
- *   escrever us_version_id/match_confidence/match_evidence em lotes. NÃO toca em
- *   fuel/model_id/updated_at (SQL cru → sem $onUpdate); só reescreve as 3 colunas
- *   quando a resolução muda (determinístico ⇒ 2.ª corrida = 0 updates).
+ * B) VERSÃO — resolver estrito (lib/engine/match-version.ts):
+ *   backfill natural dos ativos sem versão (ou TODOS com --rematch), a escrever
+ *   us_version_id/match_confidence/match_evidence/designation_facts em lotes.
+ *   `exato` grava a versão; `designacao` grava os factos; `provavel`/null gravam
+ *   tudo a null (só contam no relatório). NÃO toca em fuel/model_id/updated_at
+ *   (SQL cru → sem $onUpdate); só reescreve quando a resolução muda
+ *   (determinístico ⇒ 2.ª corrida = 0 updates).
  */
+import type { DesignationFacts } from "../../lib/engine/match-version";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -117,10 +121,31 @@ export async function matchModels(opts: { rematch?: boolean } = {}) {
 }
 
 /**
- * Resolve anúncio → versão do catálogo e escreve as 3 colunas em lotes.
- * `rematch` false: só os ativos com us_version_id null (backfill natural).
- * `rematch` true: reavalia TODOS os ativos (limpa os que já não resolvem).
- * Escreve só quando a resolução (versão+tier) muda — determinístico ⇒ idempotente.
+ * Serialização canónica (chaves ordenadas recursivamente) para comparar factos:
+ * o jsonb do Postgres reordena as chaves, por isso um JSON.stringify direto de
+ * `curFacts` vs os novos daria falsos "changed". null → null.
+ */
+function canon(v: unknown): string | null {
+  if (v == null) return null;
+  const sort = (x: unknown): unknown => {
+    if (x === null || typeof x !== "object") return x;
+    if (Array.isArray(x)) return x.map(sort);
+    const o = x as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(o).sort()) out[k] = sort(o[k]);
+    return out;
+  };
+  return JSON.stringify(sort(v));
+}
+
+/**
+ * Resolve anúncio → versão do catálogo e escreve as 4 colunas em lotes.
+ * `rematch` false: só os ativos sem us_version_id E que não são já `designacao`
+ * (senão as linhas designacao — que têm us_version_id null — seriam re-resolvidas
+ * todos os dias). `rematch` true: reavalia TODOS os ativos.
+ * Só escreve `exato` (us_version_id) e `designacao` (designation_facts); `provavel`
+ * e null gravam tudo a null (só contam no relatório). Escreve só quando a
+ * resolução muda — determinístico ⇒ idempotente.
  */
 async function resolveVersions(
   db: typeof import("../../db").db,
@@ -135,10 +160,12 @@ async function resolveVersions(
     select id::text as id, make_raw as "makeRaw", model_raw as "modelRaw", variant,
            fuel_raw as "fuelRaw", year, power_hp as "powerHp",
            displacement_cc as "displacementCc", co2,
-           us_version_id as "curVid", match_confidence as "curConf"
+           gearbox, doors, raw->>'engine_code' as "engineCode",
+           us_version_id as "curVid", match_confidence as "curConf",
+           designation_facts as "curFacts"
     from listings
     where deleted_at is null and make_raw is not null and model_raw is not null
-      ${rematch ? sql`` : sql`and us_version_id is null`}
+      ${rematch ? sql`` : sql`and us_version_id is null and match_confidence is distinct from 'designacao'`}
   `)) as unknown as {
     id: string;
     makeRaw: string;
@@ -149,84 +176,140 @@ async function resolveVersions(
     powerHp: number | null;
     displacementCc: number | null;
     co2: number | null;
+    gearbox: string | null;
+    doors: number | null;
+    engineCode: string | null;
     curVid: string | null;
     curConf: string | null;
+    curFacts: unknown;
   }[];
 
-  // Só escrever o que muda: como o resolver é determinístico, versão+tier iguais
-  // ⇒ evidência igual (não vale a pena reescrever jsonb nem tocar no updated_at).
-  const changed: { id: string; vid: string | null; conf: string | null; ev: string | null }[] = [];
+  // Só escrever o que muda. Como o resolver é determinístico, comparar (vid, conf,
+  // factos canónicos) chega — a evidência é derivada e muda com eles.
+  const changed: {
+    id: string;
+    vid: string | null;
+    conf: string | null;
+    ev: string | null;
+    df: string | null;
+  }[] = [];
+  let provavelRun = 0; // contado in-memory (não é escrito): só relatório
+  const splitterCounts: Record<string, number> = {};
   for (const row of rows) {
     const r = resolveVersion(row, cat);
-    const vid = r?.versionId ?? null;
-    const conf = r?.confidence ?? null;
-    if (vid === row.curVid && conf === row.curConf) continue;
-    changed.push({ id: row.id, vid, conf, ev: r ? JSON.stringify(r.evidence) : null });
+    let vid: string | null = null;
+    let conf: string | null = null;
+    let evidence: unknown = null;
+    let facts: DesignationFacts | null = null;
+    if (r?.kind === "exato") {
+      vid = r.versionId;
+      conf = "exato";
+      evidence = r.evidence;
+      for (const s of r.evidence.splitters ?? []) splitterCounts[s] = (splitterCounts[s] ?? 0) + 1;
+    } else if (r?.kind === "designacao") {
+      conf = "designacao";
+      evidence = r.evidence;
+      facts = r.facts;
+    } else if (r?.kind === "provavel") {
+      provavelRun++;
+    }
+    if (vid === row.curVid && conf === row.curConf && canon(facts) === canon(row.curFacts))
+      continue;
+    changed.push({
+      id: row.id,
+      vid,
+      conf,
+      ev: evidence ? JSON.stringify(evidence) : null,
+      df: facts ? JSON.stringify(facts) : null,
+    });
   }
 
   // UPDATE batched via `from (values …)` — um statement por lote (não 22k).
   for (const batch of chunk(changed, 500)) {
     const values = sql.join(
-      batch.map((c) => sql`(${c.id}::uuid, ${c.vid}::text, ${c.conf}::text, ${c.ev}::jsonb)`),
+      batch.map(
+        (c) =>
+          sql`(${c.id}::uuid, ${c.vid}::text, ${c.conf}::text, ${c.ev}::jsonb, ${c.df}::jsonb)`,
+      ),
       sql`, `,
     );
     await db.execute(sql`
       update listings as l set
         us_version_id = data.uv,
         match_confidence = data.mc,
-        match_evidence = data.me
-      from (values ${values}) as data(id, uv, mc, me)
+        match_evidence = data.me,
+        designation_facts = data.df
+      from (values ${values}) as data(id, uv, mc, me, df)
       where l.id = data.id
     `);
   }
 
   // ── Relatório: por tier e por fonte (sobre TODOS os ativos) ──
+  // Tiers da BD: exato · designacao · legado (confirmado+provavel, sobrevive até
+  // ao rematch) · null. Mais o provavel desta corrida (in-memory) e o breakdown
+  // dos splitters que separaram exatos.
   const dist = (await db.execute(sql`
     select source_site, match_confidence as conf, count(*)::int as n
     from listings where deleted_at is null
     group by source_site, match_confidence
   `)) as unknown as { source_site: string; conf: string | null; n: number }[];
 
-  const perSource = new Map<string, { confirmado: number; provavel: number; null: number }>();
-  const tiers = { confirmado: 0, provavel: 0, null: 0 };
+  type Tiers = { exato: number; designacao: number; legado: number; null: number };
+  const tierOf = (conf: string | null): keyof Tiers =>
+    conf === "exato"
+      ? "exato"
+      : conf === "designacao"
+        ? "designacao"
+        : conf == null
+          ? "null"
+          : "legado";
+  const perSource = new Map<string, Tiers>();
+  const tiers: Tiers = { exato: 0, designacao: 0, legado: 0, null: 0 };
   for (const d of dist) {
-    const b = perSource.get(d.source_site) ?? { confirmado: 0, provavel: 0, null: 0 };
-    const key = (d.conf ?? "null") as keyof typeof tiers;
+    const b = perSource.get(d.source_site) ?? { exato: 0, designacao: 0, legado: 0, null: 0 };
+    const key = tierOf(d.conf);
     b[key] += d.n;
     tiers[key] += d.n;
     perSource.set(d.source_site, b);
   }
-  const ativos = tiers.confirmado + tiers.provavel + tiers.null;
+  const total = (t: Tiers) => t.exato + t.designacao + t.legado + t.null;
+  const ativos = total(tiers);
   const pct = (n: number) => (ativos ? Math.round((n / ativos) * 1000) / 10 : 0);
+  const splitterStr =
+    Object.entries(splitterCounts)
+      .map(([s, n]) => `${s}=${n}`)
+      .join(" ") || "—";
   console.log(
     `\nmatch-version${rematch ? " (--rematch)" : ""}: ${changed.length} escritos · ` +
-      `confirmado ${tiers.confirmado} (${pct(tiers.confirmado)}%) · ` +
-      `provavel ${tiers.provavel} (${pct(tiers.provavel)}%) · sem match ${tiers.null}`,
+      `exato ${tiers.exato} (${pct(tiers.exato)}%) · designacao ${tiers.designacao} (${pct(tiers.designacao)}%) · ` +
+      `legado ${tiers.legado} · sem match ${tiers.null} · provavel(desta corrida) ${provavelRun} · splitters ${splitterStr}`,
   );
-  const linhas = [...perSource.entries()].sort(
-    (a, b) =>
-      b[1].confirmado + b[1].provavel + b[1].null - (a[1].confirmado + a[1].provavel + a[1].null),
-  );
+  const linhas = [...perSource.entries()].sort((a, b) => total(b[1]) - total(a[1]));
   for (const [s, b] of linhas) {
-    console.log(`  ${s.padEnd(22)} conf=${b.confirmado} prov=${b.provavel} null=${b.null}`);
+    console.log(
+      `  ${s.padEnd(22)} exato=${b.exato} desig=${b.designacao} legado=${b.legado} null=${b.null}`,
+    );
   }
 
-  // ── Top-20 alvos: anúncios COM potência mas SEM confirmado (análogo aos não-mapeados) ──
+  // ── Top-20 alvos: anúncios COM potência mas sem cobertura de versão. Coberto =
+  // exato, designacao OU o legado confirmado (dual-read até ao rematch). ──
   const alvos = (await db.execute(sql`
     select make_raw as make, model_raw as model, fuel_raw as fuel, count(*)::int as n
     from listings
     where deleted_at is null and power_hp is not null
+      and match_confidence is distinct from 'exato'
+      and match_confidence is distinct from 'designacao'
       and match_confidence is distinct from 'confirmado'
     group by make_raw, model_raw, fuel_raw
     order by n desc, make_raw, model_raw, fuel_raw
     limit 20
   `)) as unknown as { make: string | null; model: string | null; fuel: string | null; n: number }[];
   if (alvos.length) {
-    console.log("top-20 com potência mas sem confirmado (make | model | fuel → n):");
+    console.log("top-20 com potência mas sem cobertura de versão (make | model | fuel → n):");
     for (const a of alvos) console.log(`  ${a.make} | ${a.model} | ${a.fuel} → ${a.n}`);
   }
 
-  return { escritos: changed.length, tiers };
+  return { escritos: changed.length, tiers, provavelRun };
 }
 
 // Executável direto (também importável pelo run-daily)

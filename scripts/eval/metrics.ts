@@ -25,9 +25,10 @@ export interface SourceMetrics {
   pctDisplacementCc: number;
   pctCo2: number;
   pctVariant: number;
-  /** matching de versão (Fase 3): % de ativos com versão confirmada / provável */
-  pctVersaoConfirmado: number;
-  pctVersaoProvavel: number;
+  /** matching de versão: % de ativos exatos (inclui o legado `confirmado` no
+   * dual-read) e de designacao (motor provado, variante não única) */
+  pctVersaoExato: number;
+  pctVersaoDesignacao: number;
 }
 
 export interface Snapshot {
@@ -35,8 +36,9 @@ export interface Snapshot {
   global: {
     taxaMatch: number;
     vehicleModels: number;
-    /** matching de versão (Fase 3): ativos por tier do resolver estrito */
-    versao: { confirmado: number; provavel: number; semMatch: number };
+    /** matching de versão: ativos por tier (exato inclui o legado `confirmado`;
+     * semMatch = o resto, incluindo o legado `provavel`) */
+    versao: { exato: number; designacao: number; semMatch: number };
     estimativas: { total: number; calculadas: number; semDados: number; semAmostra: number };
     vereditos: Record<string, number>;
     oportunidadesAtivas: number;
@@ -59,8 +61,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       count(*) filter (where deleted_at is null and displacement_cc is not null) as com_cc,
       count(*) filter (where deleted_at is null and co2 is not null) as com_co2,
       count(*) filter (where deleted_at is null and variant is not null) as com_variant,
-      count(*) filter (where deleted_at is null and match_confidence = 'confirmado') as com_confirmado,
-      count(*) filter (where deleted_at is null and match_confidence = 'provavel') as com_provavel
+      count(*) filter (where deleted_at is null and match_confidence in ('exato','confirmado')) as com_exato,
+      count(*) filter (where deleted_at is null and match_confidence = 'designacao') as com_designacao
     from listings
     group by source_site
     having count(*) filter (where deleted_at is null) > 0
@@ -73,8 +75,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     com_cc: number;
     com_co2: number;
     com_variant: number;
-    com_confirmado: number;
-    com_provavel: number;
+    com_exato: number;
+    com_designacao: number;
   }[];
 
   const porFonte: Record<string, SourceMetrics> = {};
@@ -86,8 +88,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       pctDisplacementCc: pct(Number(r.com_cc), Number(r.ativos)),
       pctCo2: pct(Number(r.com_co2), Number(r.ativos)),
       pctVariant: pct(Number(r.com_variant), Number(r.ativos)),
-      pctVersaoConfirmado: pct(Number(r.com_confirmado), Number(r.ativos)),
-      pctVersaoProvavel: pct(Number(r.com_provavel), Number(r.ativos)),
+      pctVersaoExato: pct(Number(r.com_exato), Number(r.ativos)),
+      pctVersaoDesignacao: pct(Number(r.com_designacao), Number(r.ativos)),
     };
   }
 
@@ -102,30 +104,39 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     select count(*) as n from vehicle_models
   `)) as unknown as { n: number }[];
 
-  // Matching de versão: ativos por tier do resolver estrito (Fase 3).
+  // Matching de versão: ativos por tier. exato inclui o legado `confirmado`
+  // (dual-read); semMatch = o resto, incluindo o legado `provavel` e null.
   const [ver] = (await db.execute(sql`
     select
-      count(*) filter (where match_confidence = 'confirmado') as confirmado,
-      count(*) filter (where match_confidence = 'provavel') as provavel,
-      count(*) filter (where match_confidence is null) as sem_match
+      count(*) filter (where match_confidence in ('exato','confirmado')) as exato,
+      count(*) filter (where match_confidence = 'designacao') as designacao,
+      count(*) filter (where match_confidence is distinct from 'exato'
+        and match_confidence is distinct from 'confirmado'
+        and match_confidence is distinct from 'designacao') as sem_match
     from listings where deleted_at is null
-  `)) as unknown as { confirmado: number; provavel: number; sem_match: number }[];
+  `)) as unknown as { exato: number; designacao: number; sem_match: number }[];
 
   // Estimativas: espelha a elegibilidade de compute-costs.ts, incluindo as specs
-  // efetivas do catálogo (SÓ confirmado) — sem isto, um confirmado sem CO₂ próprio
-  // mas com CO₂ do catálogo apareceria como semDados em vez de calculadas/semAmostra.
+  // efetivas do catálogo — 3 ramos: exato (inclui legado confirmado) via versão;
+  // designacao via factos; resto só o anúncio. Sem isto, um match sem CO₂ próprio
+  // mas com CO₂ efetivo apareceria como semDados em vez de calculadas/semAmostra.
   const [est] = (await db.execute(sql`
     with eligible as (
       select l.fuel,
              coalesce(l.displacement_cc,
-               case when l.match_confidence = 'confirmado' then v.displacement_cc end) as cc,
+               case when l.match_confidence in ('exato','confirmado') then v.displacement_cc
+                    when l.match_confidence = 'designacao' then (l.designation_facts->>'displacementCc')::int end) as cc,
              coalesce(l.co2,
-               case when l.match_confidence = 'confirmado' then
-                 case when coalesce(extract(year from l.first_registration)::int, l.year) >= 2019
-                      then v.co2_wltp else v.co2_nedc end
+               case when l.match_confidence in ('exato','confirmado') then
+                      case when coalesce(extract(year from l.first_registration)::int, l.year) >= 2019
+                           then v.co2_wltp else v.co2_nedc end
+                    when l.match_confidence = 'designacao' then
+                      case when coalesce(extract(year from l.first_registration)::int, l.year) >= 2019
+                           then (l.designation_facts->>'co2Wltp')::int else (l.designation_facts->>'co2Nedc')::int end
                end) as co2,
              coalesce(l.power_hp,
-               case when l.match_confidence = 'confirmado' then v.power_hp end) as power_hp,
+               case when l.match_confidence in ('exato','confirmado') then v.power_hp
+                    when l.match_confidence = 'designacao' then (l.designation_facts->>'powerHp')::int end) as power_hp,
              (e.id is not null) as tem_estimativa
       from listings l
       join vehicle_models m on m.id = l.model_id
@@ -190,8 +201,8 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       taxaMatch: pct(Number(tot.com_model), Number(tot.ativos)),
       vehicleModels: Number(vm.n),
       versao: {
-        confirmado: Number(ver.confirmado),
-        provavel: Number(ver.provavel),
+        exato: Number(ver.exato),
+        designacao: Number(ver.designacao),
         semMatch: Number(ver.sem_match),
       },
       estimativas: {
