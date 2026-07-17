@@ -1,0 +1,402 @@
+{
+  "porFonte": {
+    "aramisauto.com": {
+      "ativos": 336,
+      "pctModelId": 99.1,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 72.3,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 16.4,
+      "pctVersaoDesignacao": 7.7
+    },
+    "auto.pt": {
+      "ativos": 500,
+      "pctModelId": 95.8,
+      "pctPowerHp": 3.2,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 4.2,
+      "pctVersaoDesignacao": 4
+    },
+    "auto.sapo.pt": {
+      "ativos": 500,
+      "pctModelId": 99,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 40.4,
+      "pctVersaoExato": 12.4,
+      "pctVersaoDesignacao": 14
+    },
+    "autoboerse.de": {
+      "ativos": 257,
+      "pctModelId": 100,
+      "pctPowerHp": 98.8,
+      "pctDisplacementCc": 82.9,
+      "pctCo2": 80.2,
+      "pctVariant": 100,
+      "pctVersaoExato": 35.4,
+      "pctVersaoDesignacao": 8.9
+    },
+    "autocasion.com": {
+      "ativos": 374,
+      "pctModelId": 98.9,
+      "pctPowerHp": 95.7,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 32.1,
+      "pctVersaoDesignacao": 13.1
+    },
+    "autohero.com": {
+      "ativos": 1500,
+      "pctModelId": 100,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 97.1,
+      "pctCo2": 99.5,
+      "pctVariant": 100,
+      "pctVersaoExato": 55.8,
+      "pctVersaoDesignacao": 28.9
+    },
+    "autoline.pt": {
+      "ativos": 125,
+      "pctModelId": 84,
+      "pctPowerHp": 0,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 0,
+      "pctVersaoDesignacao": 0
+    },
+    "autoscout24.de": {
+      "ativos": 8231,
+      "pctModelId": 97.7,
+      "pctPowerHp": 98.1,
+      "pctDisplacementCc": 76.9,
+      "pctCo2": 59.8,
+      "pctVariant": 100,
+      "pctVersaoExato": 40,
+      "pctVersaoDesignacao": 20.6
+    },
+    "autotrader.nl": {
+      "ativos": 246,
+      "pctModelId": 100,
+      "pctPowerHp": 97.6,
+      "pctDisplacementCc": 89.4,
+      "pctCo2": 78,
+      "pctVariant": 100,
+      "pctVersaoExato": 45.1,
+      "pctVersaoDesignacao": 23.6
+    },
+    "autouncle.pt": {
+      "ativos": 151,
+      "pctModelId": 99.3,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 93.4,
+      "pctCo2": 66.9,
+      "pctVariant": 47.7,
+      "pctVersaoExato": 52.3,
+      "pctVersaoDesignacao": 15.2
+    },
+    "caetano.pt": {
+      "ativos": 2388,
+      "pctModelId": 96.9,
+      "pctPowerHp": 96.1,
+      "pctDisplacementCc": 86.5,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 32,
+      "pctVersaoDesignacao": 27.6
+    },
+    "carplus.pt": {
+      "ativos": 1042,
+      "pctModelId": 95.8,
+      "pctPowerHp": 99.3,
+      "pctDisplacementCc": 84.3,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 36,
+      "pctVersaoDesignacao": 23.5
+    },
+    "coches.trovit.es": {
+      "ativos": 242,
+      "pctModelId": 32.2,
+      "pctPowerHp": 41.7,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 9.9,
+      "pctVersaoDesignacao": 1.2
+    },
+    "custojusto.pt": {
+      "ativos": 880,
+      "pctModelId": 99,
+      "pctPowerHp": 32.2,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 10.8,
+      "pctVersaoDesignacao": 8
+    },
+    "encontracarros.pt": {
+      "ativos": 600,
+      "pctModelId": 94.5,
+      "pctPowerHp": 98.5,
+      "pctDisplacementCc": 2.7,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 28.8,
+      "pctVersaoDesignacao": 15.7
+    },
+    "flexicar.es": {
+      "ativos": 132,
+      "pctModelId": 95.5,
+      "pctPowerHp": 62.9,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 14.4,
+      "pctVersaoDesignacao": 7.6
+    },
+    "meinauto.de": {
+      "ativos": 705,
+      "pctModelId": 98.9,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 73.3,
+      "pctCo2": 96.2,
+      "pctVariant": 69.2,
+      "pctVersaoExato": 67.4,
+      "pctVersaoDesignacao": 7.4
+    },
+    "ocasionplus.com": {
+      "ativos": 299,
+      "pctModelId": 98.7,
+      "pctPowerHp": 99.3,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 28.4,
+      "pctVersaoDesignacao": 23.1
+    },
+    "olx.pt": {
+      "ativos": 942,
+      "pctModelId": 89.7,
+      "pctPowerHp": 89,
+      "pctDisplacementCc": 82.8,
+      "pctCo2": 2.7,
+      "pctVariant": 94.8,
+      "pctVersaoExato": 31.6,
+      "pctVersaoDesignacao": 25.1
+    },
+    "ooyyo.com": {
+      "ativos": 45,
+      "pctModelId": 73.3,
+      "pctPowerHp": 2.2,
+      "pctDisplacementCc": 31.1,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 0,
+      "pctVersaoDesignacao": 0
+    },
+    "piscapisca.pt": {
+      "ativos": 394,
+      "pctModelId": 98.2,
+      "pctPowerHp": 100,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 98.2,
+      "pctVersaoExato": 31.7,
+      "pctVersaoDesignacao": 18
+    },
+    "quoka.de": {
+      "ativos": 191,
+      "pctModelId": 78,
+      "pctPowerHp": 6.3,
+      "pctDisplacementCc": 79.1,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 3.7,
+      "pctVersaoDesignacao": 3.7
+    },
+    "santogal.pt": {
+      "ativos": 392,
+      "pctModelId": 100,
+      "pctPowerHp": 0,
+      "pctDisplacementCc": 0,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 3.1,
+      "pctVersaoDesignacao": 0
+    },
+    "standvirtual.com": {
+      "ativos": 959,
+      "pctModelId": 98.6,
+      "pctPowerHp": 99.9,
+      "pctDisplacementCc": 87,
+      "pctCo2": 0,
+      "pctVariant": 87.9,
+      "pctVersaoExato": 41,
+      "pctVersaoDesignacao": 32.5
+    },
+    "theparking.eu": {
+      "ativos": 1045,
+      "pctModelId": 98.8,
+      "pctPowerHp": 68.7,
+      "pctDisplacementCc": 86.3,
+      "pctCo2": 0,
+      "pctVariant": 100,
+      "pctVersaoExato": 27.9,
+      "pctVersaoDesignacao": 23.8
+    }
+  },
+  "global": {
+    "taxaMatch": 96.6,
+    "vehicleModels": 1628,
+    "versao": {
+      "exato": 7808,
+      "designacao": 4471,
+      "semMatch": 10197
+    },
+    "estimativas": {
+      "total": 12722,
+      "calculadas": 1970,
+      "semDados": 3427,
+      "semAmostra": 7325
+    },
+    "vereditos": {
+      "compensa": 667,
+      "marginal": 244,
+      "nao_compensa": 1059
+    },
+    "oportunidadesAtivas": 210,
+    "amostraPt": {
+      "observacoes": 15772,
+      "comPotencia": 13498,
+      "semPotencia": 2274
+    }
+  },
+  "naoMapeados": [
+    {
+      "make": "Dacia",
+      "model": "Sandero",
+      "fuel": "Autogas (LPG)",
+      "n": 58
+    },
+    {
+      "make": "Renault",
+      "model": "Clio",
+      "fuel": "GPL",
+      "n": 43
+    },
+    {
+      "make": "Dacia",
+      "model": "Sandero",
+      "fuel": "GPL",
+      "n": 35
+    },
+    {
+      "make": "Renault",
+      "model": "Captur",
+      "fuel": "GPL",
+      "n": 31
+    },
+    {
+      "make": "Dacia",
+      "model": "Duster",
+      "fuel": "GPL",
+      "n": 26
+    },
+    {
+      "make": null,
+      "model": null,
+      "fuel": "benzin",
+      "n": 22
+    },
+    {
+      "make": "Dacia",
+      "model": "Duster",
+      "fuel": "Autogas (LPG)",
+      "n": 19
+    },
+    {
+      "make": "Renault",
+      "model": "Clio",
+      "fuel": "LPG",
+      "n": 18
+    },
+    {
+      "make": "Dacia",
+      "model": "Sandero",
+      "fuel": "LPG",
+      "n": 15
+    },
+    {
+      "make": null,
+      "model": null,
+      "fuel": "diesel",
+      "n": 14
+    },
+    {
+      "make": "Dacia",
+      "model": "Jogger",
+      "fuel": "GPL",
+      "n": 11
+    },
+    {
+      "make": "Dacia",
+      "model": "Duster",
+      "fuel": "LPG",
+      "n": 8
+    },
+    {
+      "make": "LYNK & CO",
+      "model": "01",
+      "fuel": null,
+      "n": 8
+    },
+    {
+      "make": "Dacia",
+      "model": "Jogger",
+      "fuel": "Autogas (LPG)",
+      "n": 7
+    },
+    {
+      "make": "Dacia",
+      "model": "Sandero",
+      "fuel": "GLP",
+      "n": 7
+    },
+    {
+      "make": "Ford",
+      "model": "Focus",
+      "fuel": null,
+      "n": 7
+    },
+    {
+      "make": "Renault",
+      "model": "Clio",
+      "fuel": "Autogas (LPG)",
+      "n": 7
+    },
+    {
+      "make": "Renault",
+      "model": "Clio",
+      "fuel": null,
+      "n": 6
+    },
+    {
+      "make": "BYD",
+      "model": null,
+      "fuel": "Eléctrico",
+      "n": 5
+    },
+    {
+      "make": "Dacia",
+      "model": "Jogger",
+      "fuel": "LPG",
+      "n": 5
+    }
+  ]
+}

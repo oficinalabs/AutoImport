@@ -314,8 +314,7 @@ export const listings = pgTable(
       onDelete: "set null",
     }),
     /** tier do match de versão: "exato" (versão única provada) | "designacao"
-     * (motor provado, variante não única — factos em designation_facts) | null.
-     * Valores legados "confirmado"/"provavel" sobrevivem até ao rematch. */
+     * (motor provado, variante não única — factos em designation_facts) | null. */
     matchConfidence: text("match_confidence"),
     /** evidência compacta do match (MatchEvidence) — auditoria do porquê */
     matchEvidence: jsonb("match_evidence"),

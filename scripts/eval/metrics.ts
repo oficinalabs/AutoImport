@@ -25,8 +25,8 @@ export interface SourceMetrics {
   pctDisplacementCc: number;
   pctCo2: number;
   pctVariant: number;
-  /** matching de versão: % de ativos exatos (inclui o legado `confirmado` no
-   * dual-read) e de designacao (motor provado, variante não única) */
+  /** matching de versão: % de ativos exatos e de designacao (motor provado,
+   * variante não única) */
   pctVersaoExato: number;
   pctVersaoDesignacao: number;
 }
@@ -36,8 +36,7 @@ export interface Snapshot {
   global: {
     taxaMatch: number;
     vehicleModels: number;
-    /** matching de versão: ativos por tier (exato inclui o legado `confirmado`;
-     * semMatch = o resto, incluindo o legado `provavel`) */
+    /** matching de versão: ativos por tier (semMatch = o resto) */
     versao: { exato: number; designacao: number; semMatch: number };
     estimativas: { total: number; calculadas: number; semDados: number; semAmostra: number };
     vereditos: Record<string, number>;
@@ -61,7 +60,7 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
       count(*) filter (where deleted_at is null and displacement_cc is not null) as com_cc,
       count(*) filter (where deleted_at is null and co2 is not null) as com_co2,
       count(*) filter (where deleted_at is null and variant is not null) as com_variant,
-      count(*) filter (where deleted_at is null and match_confidence in ('exato','confirmado')) as com_exato,
+      count(*) filter (where deleted_at is null and match_confidence = 'exato') as com_exato,
       count(*) filter (where deleted_at is null and match_confidence = 'designacao') as com_designacao
     from listings
     group by source_site
@@ -104,30 +103,28 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
     select count(*) as n from vehicle_models
   `)) as unknown as { n: number }[];
 
-  // Matching de versão: ativos por tier. exato inclui o legado `confirmado`
-  // (dual-read); semMatch = o resto, incluindo o legado `provavel` e null.
+  // Matching de versão: ativos por tier. semMatch = o resto (inclui null).
   const [ver] = (await db.execute(sql`
     select
-      count(*) filter (where match_confidence in ('exato','confirmado')) as exato,
+      count(*) filter (where match_confidence = 'exato') as exato,
       count(*) filter (where match_confidence = 'designacao') as designacao,
       count(*) filter (where match_confidence is distinct from 'exato'
-        and match_confidence is distinct from 'confirmado'
         and match_confidence is distinct from 'designacao') as sem_match
     from listings where deleted_at is null
   `)) as unknown as { exato: number; designacao: number; sem_match: number }[];
 
   // Estimativas: espelha a elegibilidade de compute-costs.ts, incluindo as specs
-  // efetivas do catálogo — 3 ramos: exato (inclui legado confirmado) via versão;
-  // designacao via factos; resto só o anúncio. Sem isto, um match sem CO₂ próprio
-  // mas com CO₂ efetivo apareceria como semDados em vez de calculadas/semAmostra.
+  // efetivas do catálogo — 3 ramos: exato via versão; designacao via factos;
+  // resto só o anúncio. Sem isto, um match sem CO₂ próprio mas com CO₂ efetivo
+  // apareceria como semDados em vez de calculadas/semAmostra.
   const [est] = (await db.execute(sql`
     with eligible as (
       select l.fuel,
              coalesce(l.displacement_cc,
-               case when l.match_confidence in ('exato','confirmado') then v.displacement_cc
+               case when l.match_confidence = 'exato' then v.displacement_cc
                     when l.match_confidence = 'designacao' then (l.designation_facts->>'displacementCc')::int end) as cc,
              coalesce(l.co2,
-               case when l.match_confidence in ('exato','confirmado') then
+               case when l.match_confidence = 'exato' then
                       case when coalesce(extract(year from l.first_registration)::int, l.year) >= 2019
                            then v.co2_wltp else v.co2_nedc end
                     when l.match_confidence = 'designacao' then
@@ -135,7 +132,7 @@ export async function computeSnapshot(db: typeof Db): Promise<Snapshot> {
                            then (l.designation_facts->>'co2Wltp')::int else (l.designation_facts->>'co2Nedc')::int end
                end) as co2,
              coalesce(l.power_hp,
-               case when l.match_confidence in ('exato','confirmado') then v.power_hp
+               case when l.match_confidence = 'exato' then v.power_hp
                     when l.match_confidence = 'designacao' then (l.designation_facts->>'powerHp')::int end) as power_hp,
              (e.id is not null) as tem_estimativa
       from listings l

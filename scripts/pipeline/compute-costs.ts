@@ -11,9 +11,9 @@
  * (nunca adivinhar, nunca mostrar veredito fraco).
  *
  * Specs efetivas do catálogo (fill-only-missing) por tier do match:
- *  - `exato` (ou legado `confirmado`, dual-read até ao rematch): cc/CO₂/potência
- *    em falta vêm da versão canónica; a janela de geração da versão confina a
- *    mediana PT (evita contaminar com a geração vizinha);
+ *  - `exato`: cc/CO₂/potência em falta vêm da versão canónica; a janela de
+ *    geração da versão confina a mediana PT (evita contaminar com a geração
+ *    vizinha);
  *  - `designacao`: vêm dos factos gravados (specs medianas + janela direta),
  *    sem versão canónica (o motor está provado, a variante não);
  *  - resto: só o anúncio.
@@ -112,12 +112,12 @@ export async function computeCosts() {
       and (
         e.id is null
         or l.updated_at > e.computed_at
-        or (case when l.match_confidence in ('exato','confirmado') and l.us_version_id is not null then 'exato'
+        or (case when l.match_confidence = 'exato' and l.us_version_id is not null then 'exato'
                  when l.match_confidence = 'designacao' and l.designation_facts is not null then 'designacao' end)
            is distinct from e.inputs->>'matchKind'
         or (l.match_confidence = 'designacao'
             and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
-        or (l.match_confidence in ('exato','confirmado') and l.us_version_id is not null
+        or (l.match_confidence = 'exato' and l.us_version_id is not null
             and e.inputs->>'derivative' is null)
       )
   `)) as unknown as {
@@ -167,13 +167,11 @@ export async function computeCosts() {
 
     // Specs efetivas: fill-only-missing (nunca substituímos um valor que o
     // anúncio traz). 3 ramos consoante o tier do match:
-    //  - exato (ou legado confirmado, dual-read até ao rematch): a versão do
-    //    catálogo via join; janela de geração da versão (off se geracaoAmbigua);
+    //  - exato: a versão do catálogo via join; janela de geração da versão
+    //    (off se geracaoAmbigua);
     //  - designacao: os factos gravados (specs medianas + janela direta);
     //  - resto: só o anúncio.
-    const exato =
-      (l.match_confidence === "exato" || l.match_confidence === "confirmado") &&
-      l.us_version_id != null;
+    const exato = l.match_confidence === "exato" && l.us_version_id != null;
     let matchKind: "exato" | "designacao" | null = null;
     const fromCatalog: string[] = [];
     let ccEfetivo = l.cc;
