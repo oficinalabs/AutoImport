@@ -41,6 +41,7 @@ function model(mid: string, make: string, slug: string, modelYear: number | null
       versionId: String(VID++), mid, name: v.name, fuelSection: v.fuelSection, fuel: v.fuel,
       year: v.year, powerHp: v.hp, powerKw: v.hp != null ? Math.round(v.hp / 1.35962) : null,
       displacementCc: v.cc, co2Wltp: v.co2w ?? null, co2Nedc: v.co2n ?? null,
+      doors: null, gearbox: null, engineCode: null,
     });
   }
 }

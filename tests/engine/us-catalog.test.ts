@@ -10,6 +10,8 @@ import {
   type UsVersionRow,
   buildIndex,
   genKeyOf,
+  normEngineCode,
+  normGearbox,
   resolveFamily,
   resolveVersionFuel,
 } from "../../lib/engine/us-catalog";
@@ -111,6 +113,49 @@ test("fuel map: secção other (bi-fuel LPG/CNG) excluída", () => {
   assert.equal(resolveVersionFuel("other", null), null);
 });
 
+// ── normGearbox (partilhada anúncio/catálogo) ────────────────────
+
+test("normGearbox: manual multilingue (deep, alemão, espanhol, francês)", () => {
+  assert.equal(normGearbox("6 speed Manual"), "manual");
+  assert.equal(normGearbox("Manual"), "manual");
+  assert.equal(normGearbox("Schaltgetriebe"), "manual");
+  assert.equal(normGearbox("mecánica"), "manual");
+  assert.equal(normGearbox("mécanique"), "manual");
+});
+
+test("normGearbox: auto (badges e multilingue; ordem vence 'automatic'⊃'man')", () => {
+  assert.equal(normGearbox("Automatic"), "auto");
+  assert.equal(normGearbox("8 speed Automatic"), "auto");
+  assert.equal(normGearbox("DSG"), "auto");
+  assert.equal(normGearbox("S tronic"), "auto");
+  assert.equal(normGearbox("S-tronic"), "auto");
+  assert.equal(normGearbox("Steptronic"), "auto");
+  assert.equal(normGearbox("Tiptronic"), "auto");
+  assert.equal(normGearbox("Multitronic"), "auto");
+  assert.equal(normGearbox("PowerShift"), "auto");
+  assert.equal(normGearbox("DCT"), "auto");
+  assert.equal(normGearbox("EDC"), "auto");
+  assert.equal(normGearbox("PDK"), "auto");
+  assert.equal(normGearbox("CVT"), "auto");
+  assert.equal(normGearbox("Automaat"), "auto");
+  assert.equal(normGearbox("Automatique"), "auto");
+});
+
+test("normGearbox: semi-automática é ambígua → null; null/vazio/desconhecido → null", () => {
+  assert.equal(normGearbox("Semi-automatic"), null);
+  assert.equal(normGearbox("Semiautomática"), null);
+  assert.equal(normGearbox(null), null);
+  assert.equal(normGearbox(""), null);
+  assert.equal(normGearbox("5"), null);
+});
+
+test("normEngineCode: remove não-alfanuméricos e uppercase; vazio → null", () => {
+  assert.equal(normEngineCode("N47 D20"), "N47D20");
+  assert.equal(normEngineCode(" ea189 "), "EA189");
+  assert.equal(normEngineCode(null), null);
+  assert.equal(normEngineCode(""), null);
+});
+
 // ── Janelas de geração (buildIndex sobre linhas sintéticas) ──────
 
 function mkModel(mid: string, make: string, slug: string, modelYear: number | null = null): UsModelRow {
@@ -120,6 +165,7 @@ function mkVersion(mid: string, year: number, i = 0): UsVersionRow {
   return {
     versionId: `${mid}-${i}`, mid, name: `${mid} 1.0`, fuelSection: "petrol", fuel: "Petrol",
     year, powerHp: 100, powerKw: 74, displacementCc: 999, co2Wltp: null, co2Nedc: null,
+    doors: null, gearbox: null, engineCode: null,
   };
 }
 
@@ -179,6 +225,24 @@ test("gerações BMW: variantes de carroçaria/LCI do mesmo chassis fundem-se", 
   const f = idx.byFamily.get("bmw|serie-3")!;
   assert.equal(f.generations.length, 1, "E90/E91/E92 + LCI = uma só geração");
   assert.equal(f.generations[0].mids.length, 4);
+});
+
+test("buildIndex propaga doors/gearbox/engineCode para CatalogVersion", () => {
+  // Versão com os campos preenchidos + versão sem (crus null → CatalogVersion null).
+  const v1: UsVersionRow = {
+    ...mkVersion("M1", 2020, 0), doors: 5, gearbox: "6 speed Manual", engineCode: "N47 D20",
+  };
+  const v2 = mkVersion("M1", 2020, 1); // doors/gearbox/engineCode a null (default da fixture)
+  const idx = buildIndex([mkModel("M1", "BMW", "E90-3-Series")], [v1, v2]);
+  const vers = idx.byFamily.get("bmw|serie-3")!.versions;
+  const c1 = vers.find((v) => v.versionId === "M1-0")!;
+  const c2 = vers.find((v) => v.versionId === "M1-1")!;
+  assert.equal(c1.doors, 5);
+  assert.equal(c1.gearbox, "manual"); // normGearbox do texto deep livre
+  assert.equal(c1.engineCode, "N47D20"); // normEngineCode
+  assert.equal(c2.doors, null);
+  assert.equal(c2.gearbox, null);
+  assert.equal(c2.engineCode, null);
 });
 
 // ── Property test sobre o catálogo real (só com BD docker) ───────

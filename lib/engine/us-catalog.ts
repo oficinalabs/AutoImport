@@ -44,6 +44,11 @@ export interface CatalogVersion {
   co2Nedc: number | null;
   /** tokens minúsculos do `name` (badges, litragem, potência, corpo, tração) */
   tokens: string[];
+  doors: number | null;
+  /** caixa pré-classificada via normGearbox (o texto deep é livre — "6 speed Manual") */
+  gearbox: "manual" | "auto" | null;
+  /** engine_code normalizado ([A-Z0-9]) para igualdade exata */
+  engineCode: string | null;
 }
 
 export interface Generation {
@@ -103,6 +108,9 @@ export interface UsVersionRow {
   displacementCc: number | null;
   co2Wltp: number | null;
   co2Nedc: number | null;
+  doors: number | null;
+  gearbox: string | null;
+  engineCode: string | null;
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -384,6 +392,29 @@ export function nameTokens(name: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Classifica a caixa em manual/auto a partir de texto livre (o catálogo tem
+ * "6 speed Manual", anúncios têm "Schaltgetriebe", "DSG", "S-tronic", …).
+ * Partilhada pelos dois lados (anúncio e catálogo) para classificarem igual.
+ * A ORDEM dos ramos importa: `/semi/` primeiro (semi-automática é ambígua —
+ * nunca a classificamos); depois auto ANTES de manual, porque "automatic"
+ * contém "man" e cairia no ramo manual se este viesse primeiro.
+ */
+export function normGearbox(text: string | null): "manual" | "auto" | null {
+  const s = text?.toLowerCase().trim() ?? "";
+  if (!s) return null;
+  if (/semi/.test(s)) return null;
+  if (/(autom|dsg|s[- ]?tronic|steptronic|tiptronic|multitronic|powershift|dct|edc|pdk|cvt|automaat|automatique)/.test(s)) return "auto";
+  if (/(man|schalt|m[eé]c[aá]n)/.test(s)) return "manual";
+  return null;
+}
+
+/** engine_code cru → normalizado ([A-Z0-9] uppercase) para igualdade exata; vazio → null. */
+export function normEngineCode(text: string | null): string | null {
+  const s = (text ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+  return s || null;
+}
+
 // ════════════════════════════════════════════════════════════════
 // 4. Build do índice a partir das linhas da BD
 // ════════════════════════════════════════════════════════════════
@@ -473,6 +504,7 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
           versionId: v.versionId, mid, generationId, year: v.year,
           powerHp: v.powerHp, powerKw: v.powerKw, displacementCc: v.displacementCc,
           fuel, co2Wltp: v.co2Wltp, co2Nedc: v.co2Nedc, tokens: nameTokens(v.name),
+          doors: v.doors, gearbox: normGearbox(v.gearbox), engineCode: normEngineCode(v.engineCode),
         });
       }
     }
@@ -494,7 +526,8 @@ export async function buildUsCatalog(db: typeof Db): Promise<UsCatalogIndex> {
   const versions = (await db.execute(sql`
     select version_id as "versionId", mid, name, fuel_section as "fuelSection", fuel,
            year, power_hp as "powerHp", power_kw as "powerKw",
-           displacement_cc as "displacementCc", co2_wltp as "co2Wltp", co2_nedc as "co2Nedc"
+           displacement_cc as "displacementCc", co2_wltp as "co2Wltp", co2_nedc as "co2Nedc",
+           doors, gearbox, engine_code as "engineCode"
     from us_versions
   `)) as unknown as UsVersionRow[];
   return buildIndex(models, versions);
