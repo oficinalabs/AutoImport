@@ -436,10 +436,17 @@ export function distinctiveTokensByMid(
 
 /**
  * Combustível da versão alinhado com o `normFuel` dos anúncios. A coluna deep
- * `fuel` é a autoridade; sem ela cai-se na `fuel_section`. Secção `other`
+ * `fuel` é a autoridade; sem ela, o NOME da versão desambigua os plug-in que o
+ * site estaciona na secção errada (caso real: BYD "Seal U DM-i 1.5 Plug-in
+ * Hybrid e-CVT" em `electric` com deep fuel vazio — classificado elétrico, um
+ * anúncio PHEV nunca casava); só então cai-se na `fuel_section`. Secção `other`
  * (bi-fuel LPG/CNG/etanol) → null (excluída). Devolve null → versão fora do índice.
  */
-export function resolveVersionFuel(fuelSection: string | null, deepFuel: string | null): FuelType | null {
+export function resolveVersionFuel(
+  fuelSection: string | null,
+  deepFuel: string | null,
+  name?: string | null,
+): FuelType | null {
   if (fuelSection === "other") return null; // bi-fuel/GPL/GN — fora do âmbito
   const f = deepFuel?.toLowerCase().trim() ?? "";
   if (f) {
@@ -451,6 +458,9 @@ export function resolveVersionFuel(fuelSection: string | null, deepFuel: string 
     if (f.startsWith("diesel")) return "diesel";
     if (f.startsWith("lpg") || f.includes("cng")) return null;
   }
+  // Sem deep fuel: nome com marcador plug-in inequívoco (Plug-in/PHEV/DM-i) vence
+  // a secção. "dmi" só com fronteiras — não apanhar substrings de outras palavras.
+  if (name && /plug[- ]?in|phev|\bdm-?i\b/i.test(name)) return "phev";
   switch (fuelSection) {
     case "petrol": return "gasolina";
     case "diesel": return "diesel";
@@ -458,6 +468,18 @@ export function resolveVersionFuel(fuelSection: string | null, deepFuel: string 
     case "pluginhybrid": return "phev";
     default: return null;
   }
+}
+
+/**
+ * Cilindrada dos PHEV reclassificados a partir da secção `electric`: nesses, o
+ * `displacement_cc` do site guarda os kWh da BATERIA (18 ≈ 18,3 kWh), não o
+ * motor. A litragem no nome ("DM-i 1.5 …" → 1500) é a melhor aproximação
+ * (±30cc de tolerância do resolver cobre o real 1497); sem litragem → null
+ * (sem dado não há sinal — nunca deixar os kWh passar por cilindrada).
+ */
+function phevCcFromName(name: string): number | null {
+  const m = /\b([1-9])[.,](\d)\b/.exec(name);
+  return m ? Number(m[1]) * 1000 + Number(m[2]) * 100 : null;
 }
 
 /** Tokens do nome da versão (badges/litragem/potência/corpo/tração), minúsculos. */
@@ -613,11 +635,15 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
       const derivative = derivativeOfMid.get(mid)!;
       midInfo.set(mid, { makeSlug, family, rule: r.rule, generationId, slugTokens: r.slugTokens, derivative });
       for (const v of versionsByMid.get(mid) ?? []) {
-        const fuel = resolveVersionFuel(v.fuelSection, v.fuel);
+        const fuel = resolveVersionFuel(v.fuelSection, v.fuel, v.name);
         if (fuel === null) { stats.versoesExcluidasOther++; continue; }
+        // PHEV vindo da secção electric: o displacement_cc traz os kWh da
+        // bateria — substituir pela litragem do nome (senão null; ver phevCcFromName).
+        const displacementCc =
+          fuel === "phev" && v.fuelSection === "electric" ? phevCcFromName(v.name) : v.displacementCc;
         famVersions.push({
           versionId: v.versionId, mid, generationId, year: v.year,
-          powerHp: v.powerHp, powerKw: v.powerKw, displacementCc: v.displacementCc,
+          powerHp: v.powerHp, powerKw: v.powerKw, displacementCc,
           fuel, co2Wltp: v.co2Wltp, co2Nedc: v.co2Nedc, tokens: nameTokens(v.name),
           doors: v.doors, gearbox: normGearbox(v.gearbox), engineCode: normEngineCode(v.engineCode),
         });

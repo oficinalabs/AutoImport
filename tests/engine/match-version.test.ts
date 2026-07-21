@@ -129,6 +129,16 @@ model("DOLPH", "BYD", "Dolphin", 2021, [
 model("SURF", "BYD", "Dolphin-Surf", 2025, [
   { name: "Dolphin Surf Comfort 43.2kWh 156HP", fuelSection: "electric", fuel: null, year: 2025, hp: 156, cc: 43, co2w: 0 },
 ]);
+// BYD Seal (sedan) ≠ Seal U (SUV, família própria); o Seal U DM-i vive na secção
+// electric com deep fuel vazio e cc=kWh da bateria — o índice reclassifica-o PHEV
+// e tira a cilindrada do nome (caso real da auditoria BYD).
+model("SEAL", "BYD", "Seal", 2023, [
+  { name: "Seal 83kWh 313HP", fuelSection: "electric", fuel: null, year: 2023, hp: 313, cc: 83, co2w: 0 },
+]);
+model("SEALU", "BYD", "Seal-U", 2024, [
+  { name: "Seal U 87 kWh Electric", fuelSection: "electric", fuel: null, year: 2024, hp: 218, cc: 87, co2w: 0 },
+  { name: "Seal U DM-i 1.5 Plug-in Hybrid e-CVT", fuelSection: "electric", fuel: null, year: 2024, hp: 218, cc: 18, co2w: 22 },
+]);
 // Hyundai Kona (Kauai) — 1.0 gaso + elétrico
 model("KONA", "Hyundai", "Kona", null, [
   { name: "Kona 1.0 T-GDI", fuelSection: "petrol", fuel: "Petrol", year: 2018, hp: 120, cc: 998, co2w: 127 },
@@ -302,6 +312,22 @@ test("BYD Dolphin 204 ≠ Dolphin Surf (família própria)", () => {
   assert.equal(d?.evidence.family, "byd|dolphin");
   const surf = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "DOLPHIN SURF", variant: "Comfort", fuelRaw: "Electrico", year: 2025, powerHp: 156 }), CAT);
   assert.equal(surf?.evidence.family, "byd|dolphin-surf");
+});
+
+test("BYD Seal U: família própria (≠ Seal) e o DM-i é PHEV apesar da secção electric", () => {
+  // PHEV: casa o DM-i reclassificado, com a cilindrada tirada do nome (1.5 → 1500).
+  const phev = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "Seal U", variant: "BOOST PHEV 1.5 160KW", fuelRaw: "Elektro/Benzin", year: 2025, powerHp: 218, displacementCc: 1497 }), CAT);
+  assert.equal(phev?.evidence.family, "byd|seal-u");
+  assert.equal(phev?.kind, "exato");
+  assert.equal(vspec(phev)?.fuel, "phev");
+  assert.equal(vspec(phev)?.displacementCc, 1500);
+  // Elétrico: casa a versão Electric do Seal U, nunca o sedan Seal (família própria).
+  const ev = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "SEAL U", variant: "87 kWh", fuelRaw: "Electrico", year: 2025, powerHp: 218 }), CAT);
+  assert.equal(ev?.evidence.family, "byd|seal-u");
+  assert.equal(vspec(ev)?.fuel, "elétrico");
+  // O sedan continua na família seal.
+  const sedan = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "Seal", variant: "Excellence", fuelRaw: "Electrico", year: 2024, powerHp: 313 }), CAT);
+  assert.equal(sedan?.evidence.family, "byd|seal");
 });
 
 test("Kauai → Kona; elétrico nunca casa térmico", () => {

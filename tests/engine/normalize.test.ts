@@ -80,9 +80,20 @@ test("normModel BYD: Dolphin Surf é modelo próprio, nunca compara com Dolphin"
   // Dolphin normal continua dolphin
   assert.equal(normModel("byd", "Dolphin"), "dolphin");
   assert.equal(normModel("byd", "Dolphin", "Comfort 60,4 kWh"), "dolphin");
-  // "surfer" não é "surf"; Seal não é afetado
+  // "surfer" não é "surf"
   assert.equal(normModel("byd", "Dolphin", "Surfer Edition"), "dolphin");
-  assert.equal(normModel("byd", "Seal", "U DM-i"), "seal");
+});
+
+test("normModel BYD: Seal U é modelo próprio (SUV) ≠ Seal (sedan)", () => {
+  assert.equal(normModel("byd", "Seal U"), "seal-u");
+  assert.equal(normModel("byd", "SEAL U DM-I"), "seal-u");
+  // o "U" pode vir na variante (model genérico "Seal") — era o buraco que
+  // fundia Seal U com Seal na mesma família (auditoria BYD)
+  assert.equal(normModel("byd", "Seal", "U DM-i"), "seal-u");
+  // Seal e Sealion não são afetados
+  assert.equal(normModel("byd", "Seal"), "seal");
+  assert.equal(normModel("byd", "Seal", "82.5 kWh Excellence"), "seal");
+  assert.equal(normModel("byd", "Sealion 7"), "sealion");
 });
 
 test("normFuel multi-língua", () => {
@@ -102,8 +113,8 @@ test("normFuel multi-língua", () => {
   for (const raw of ["Híbrido", "Hybrid", "Hybride", "Elektro/Benzin", "Hibrido (Diesel)"]) {
     assert.equal(normFuel(raw), "híbrido", raw);
   }
-  // phev
-  for (const raw of ["Plug-in Hybrid", "Híbrido Plug-In", "PHEV"]) {
+  // phev (incl. o francês "hybride rechargeable" — o termo FR para plug-in)
+  for (const raw of ["Plug-in Hybrid", "Híbrido Plug-In", "PHEV", "Hybride essence rechargeable"]) {
     assert.equal(normFuel(raw), "phev", raw);
   }
   // phev escondido na variante (caso real Caetano: fuel="Hibrido",

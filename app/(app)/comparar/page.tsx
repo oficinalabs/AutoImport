@@ -67,7 +67,11 @@ export default async function CompararPage({
                     )}
                   >
                     <Link href={`/anuncio/${l.id}`} className="block">
-                      <CarImage label={l.title} className="mb-2 aspect-[4/3] w-full" />
+                      <CarImage
+                        src={l.catalogImage}
+                        label={l.title}
+                        className="mb-2 aspect-[4/3] w-full"
+                      />
                       <div className="flex items-center gap-1.5">
                         {winner && <Trophy className="size-4 text-good" />}
                         <span className="font-display font-semibold leading-tight hover:underline">

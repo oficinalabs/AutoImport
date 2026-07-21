@@ -165,6 +165,10 @@ const MODEL_RULES: Record<string, ModelRule[]> = {
     [/^dolphin(?:-.*)?-surf(-|$)/, "dolphin-surf"],
     [/^atto-?2(?:$|-)/, "atto-2"],
     [/^atto-?3(?:$|-)/, "atto-3"],
+    // Seal U é modelo próprio (SUV) ≠ Seal (sedan). Tem de vir ANTES da regra
+    // genérica (que mapearia "seal-u" → "seal"); o "U" de uma letra seria
+    // tratado como ruído pela família/derivados — a regra fixa a separação.
+    [/^seal-?u(?:$|-)/, "seal-u"],
     [/^(dolphin|seal|han|tang|sealion)(?:$|-)/, "$1"],
   ],
   mg: [
@@ -251,8 +255,9 @@ export function normFuel(
   if (!s) return null;
   const variant = variantRaw ?? "";
 
-  // plug-in primeiro (contém também "hybrid")
-  if (/plug|phev/.test(s)) return "phev";
+  // plug-in primeiro (contém também "hybrid"); "recharge" apanha o francês
+  // "hybride (essence) rechargeable" — o termo FR para PHEV (BEV é "électrique").
+  if (/plug|phev|recharge/.test(s)) return "phev";
   // híbrido: hybrid/hibrido/hybride, ou padrão AS24 "elektro/benzin"
   const isHybrid =
     /hybrid|hibrid|hybride/.test(s) ||

@@ -5804,5 +5804,31 @@
       "cc": 1798
     },
     "note": "auditoria jul/2026: Corolla híbrido sem corpo no texto → base (sedan/hatch são ambos base), nunca Touring Sports; sem midEsperado (o mid base pode variar)"
+  },
+  {
+    "source_site": "autoscout24.de",
+    "listing_id": "audit-byd-seal-u-dmi",
+    "input": {
+      "makeRaw": "BYD",
+      "modelRaw": "Seal U",
+      "variant": "BOOST PHEV 1.5 160KW NAVI,KLIMA,SITZHZG,CARPLAY",
+      "fuelRaw": "Elektro/Benzin",
+      "year": 2025,
+      "powerHp": 218,
+      "displacementCc": 1497,
+      "co2": null,
+      "gearbox": "Automatik",
+      "doors": null
+    },
+    "label": {
+      "kind": "signature",
+      "family": "byd|seal-u",
+      "fuel": "phev",
+      "powerHp": 218,
+      "cc": 1500,
+      "mustConfirm": true,
+      "midEsperado": "M13614"
+    },
+    "note": "auditoria BYD jul/2026: Seal U DM-i vivia na secção electric com deep fuel vazio (classificado elétrico → nunca casava) e Seal U fundia-se com Seal na família; pós-correção → exato v138309 (fuel por nome + cc da litragem do nome + família seal-u)"
   }
 ]
