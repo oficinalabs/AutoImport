@@ -107,6 +107,16 @@ test("fuel map: fallback à secção quando deep fuel é null", () => {
   assert.equal(resolveVersionFuel("pluginhybrid", null), "phev");
 });
 
+test("fuel map: nome plug-in vence a secção quando o deep fuel falta (BYD DM-i)", () => {
+  // caso real: Seal U DM-i na secção electric com deep fuel vazio → PHEV, não elétrico
+  assert.equal(resolveVersionFuel("electric", null, "Seal U DM-i 1.5 Plug-in Hybrid e-CVT"), "phev");
+  assert.equal(resolveVersionFuel("electric", null, "Seal U 87 kWh Electric"), "elétrico");
+  // com deep fuel presente, a autoridade mantém-se (o nome não sobrepõe)
+  assert.equal(resolveVersionFuel("electric", "Electric", "DM-i qualquer"), "elétrico");
+  // "dmi" só com fronteiras: não apanhar substrings ("Redmi"-like)
+  assert.equal(resolveVersionFuel("electric", null, "Admiral 50 kWh"), "elétrico");
+});
+
 test("fuel map: secção other (bi-fuel LPG/CNG) excluída", () => {
   assert.equal(resolveVersionFuel("other", "Petrol or LPG"), null);
   assert.equal(resolveVersionFuel("other", "LPG or CNG"), null);
