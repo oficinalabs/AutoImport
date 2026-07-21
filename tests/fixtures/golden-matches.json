@@ -4105,10 +4105,13 @@
       "co2": null
     },
     "label": {
-      "kind": "null",
-      "reason": "família fora do catálogo"
+      "kind": "signature",
+      "family": "mg|4",
+      "fuel": "elétrico",
+      "powerHp": 170,
+      "cc": 51
     },
-    "note": "estrato olx.pt"
+    "note": "F6: MG4 Standard EV — a família mg|4 já está no catálogo (label 'família fora do catálogo' obsoleta); o kWh (51, do variant) é o 2.º sinal duro → exato"
   },
   {
     "source_site": "olx.pt",
@@ -4973,10 +4976,13 @@
       "co2": null
     },
     "label": {
-      "kind": "null",
-      "reason": "família fora do catálogo"
+      "kind": "signature",
+      "family": "citroen|c4",
+      "fuel": "elétrico",
+      "powerHp": 136,
+      "cc": 50
     },
-    "note": "estrato standvirtual.com"
+    "note": "F6: Citroën e-C4 EV — a família citroen|c4 já está no catálogo (label 'família fora do catálogo' obsoleta); o kWh (50, do variant) é o 2.º sinal duro → exato"
   },
   {
     "source_site": "standvirtual.com",
@@ -5830,5 +5836,106 @@
       "midEsperado": "M13614"
     },
     "note": "auditoria BYD jul/2026: Seal U DM-i vivia na secção electric com deep fuel vazio (classificado elétrico → nunca casava) e Seal U fundia-se com Seal na família; pós-correção → exato v138309 (fuel por nome + cc da litragem do nome + família seal-u)"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "28832955-2fae-4313-876b-a1d7cf423f7d",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "8 SERIES",
+      "variant": "BMW 8 SERIES 840D 3.0 340 M SPORT XDRIVE",
+      "fuelRaw": "Diesel",
+      "year": 2022,
+      "powerHp": 340,
+      "displacementCc": 3000,
+      "co2": null,
+      "gearbox": "Automatic",
+      "doors": 2,
+      "sellerTitle": "m-sport-320d-190-mild-hybrid-steptronic-8"
+    },
+    "label": {
+      "kind": "null",
+      "reason": "F1: dados do balde errado do agregador — os campos estruturados dizem 840d 340cv mas o título do vendedor no URL diz 320d 190 mild-hybrid; conflito badge+potência (regra dupla) demove a null"
+    },
+    "note": "auditoria jul/2026 (theparking, external K5GYIBIQ): a guarda de coerência do sellerTitle apanha o balde trocado"
+  },
+  {
+    "source_site": "caetano.pt",
+    "listing_id": "1223009c-b2b6-4888-80a4-c27fcb0678d5",
+    "input": {
+      "makeRaw": "Xpeng",
+      "modelRaw": "G6",
+      "variant": "RWD LONG RANGE 80.8kWh",
+      "fuelRaw": "Electrico",
+      "year": 2026,
+      "powerHp": 296,
+      "displacementCc": null,
+      "co2": null,
+      "gearbox": "Automática",
+      "doors": 5,
+      "sellerTitle": "xpeng-g6-rwd-long-range-808kwh-l1nnsghaxtd804013"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "xpeng|g6",
+      "fuel": "elétrico",
+      "powerHp": 296,
+      "cc": 81,
+      "mustConfirm": true,
+      "midEsperado": "M15508"
+    },
+    "note": "auditoria jul/2026 (F6): EV com '80.8kWh' colado no variant → o kWh bate o displacement_cc EV (81±2) e é o 2.º sinal duro → exato (antes era provavel: só a potência)"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "846941db-3e33-492e-afab-f7e1ccc6d82a",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "SERIE 8 GRAN COUPE",
+      "variant": "BMW SERIE 8 GRAN COUPE 840I 3.0 340 M SPORT XDRIVE",
+      "fuelRaw": "Gasoline",
+      "year": 2021,
+      "powerHp": 340,
+      "displacementCc": 3000,
+      "co2": null,
+      "gearbox": "Automatic",
+      "doors": null,
+      "sellerTitle": "bmw-serie-8-gran-coupe-840i-xdrive-340ch-auto-pack-m-sport-toitpano-brower-et-wilkins-gar12mois"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-8",
+      "fuel": "gasolina",
+      "powerHp": 340,
+      "cc": 2998,
+      "mustConfirm": true
+    },
+    "note": "auditoria jul/2026 (F1 não-disparo): mesmo balde serie-8 do caso K5, mas o sellerTitle é COERENTE (840i 340) → a guarda avalia e não dispara → continua exato"
+  },
+  {
+    "source_site": "theparking.eu",
+    "listing_id": "4ea067d1-620f-4aa1-9c2e-f9c972f90b2b",
+    "input": {
+      "makeRaw": "BMW",
+      "modelRaw": "2 SERIES",
+      "variant": "BMW 2 SERIES 218I 1.5 156",
+      "fuelRaw": "Gasoline",
+      "year": 2023,
+      "powerHp": 156,
+      "displacementCc": 1500,
+      "co2": null,
+      "gearbox": "Automatic",
+      "doors": 2,
+      "sellerTitle": "bmw-2-series-218i"
+    },
+    "label": {
+      "kind": "signature",
+      "family": "bmw|serie-2",
+      "fuel": "gasolina",
+      "powerHp": 156,
+      "cc": 1499,
+      "mustConfirm": true
+    },
+    "note": "auditoria jul/2026 (F1 não-disparo): sellerTitle com badge 218i que ESTÁ no survivor → não é badge estranho → guarda não dispara → exato"
   }
 ]
