@@ -30,10 +30,15 @@ const nextConfig = {
   // Não anunciar a stack.
   poweredByHeader: false,
 
-  // Imagens dos anúncios virão de fontes externas (AutoScout24, mobile.de, etc.).
-  // O backend devolve URLs e os hosts entram aqui. Ver docs/07-FRONTEND-HANDOFF.md.
+  // Imagens externas autorizadas no <Image>. Por agora SÓ o catálogo
+  // ultimatespecs (imagem principal da versão/galeria do modelo — ver
+  // Listing.catalogImage); as fotos dos próprios anúncios (AutoScout24,
+  // leparking, olxcdn…) entram aqui quando as formos mostrar.
+  // Ver docs/07-FRONTEND-HANDOFF.md.
   images: {
-    remotePatterns: [],
+    remotePatterns: [
+      { protocol: "https", hostname: "www.ultimatespecs.com", pathname: "/cargallery/**" },
+    ],
   },
 
   async headers() {

@@ -15,6 +15,7 @@ import {
   opportunities,
   organization,
   sources,
+  usModels,
   usVersions,
   user,
   vehicleModels,
@@ -43,9 +44,22 @@ type ListingRow = typeof listings.$inferSelect;
 type EstimateRow = typeof importCostEstimates.$inferSelect;
 type ModelRow = typeof vehicleModels.$inferSelect;
 type VersionRow = typeof usVersions.$inferSelect;
+type UsModelRow = typeof usModels.$inferSelect;
 
 function transmissionOf(gearbox: string | null): Transmission {
   return gearbox && /auto/i.test(gearbox) ? "automática" : "manual";
+}
+
+/** Nome do modelo do catálogo sem o ruído de slug — "208 II (2023)" → "208 II". */
+function cleanCatalogModel(model: string): string {
+  return model.replace(/\s*\([^)]*\)/g, "").trim();
+}
+
+/** Nome da versão sem o código de chassis à cabeça — "G16 8 Series Gran Coupe
+ * 840d xDrive" → "8 Series Gran Coupe 840d xDrive". Só remove tokens
+ * letra+dígitos iniciais (G16, W213, E65); nunca um nome-modelo como "208". */
+function cleanVersionName(name: string): string {
+  return name.replace(/^(?:[a-z]{1,2}\d{1,3}[a-z]?\s+)+/i, "").trim() || name;
 }
 
 function rowToListing(
@@ -53,6 +67,7 @@ function rowToListing(
   e: EstimateRow,
   vm: ModelRow,
   usv: VersionRow | null,
+  usm: UsModelRow | null,
   sourceName: string | null,
   isFavorite: boolean,
   history: { month: string; price: number }[] = [],
@@ -91,7 +106,22 @@ function rowToListing(
       co2: l.co2 ?? verCo2 ?? factsCo2 ?? vm.co2 ?? undefined,
       powerHp: l.powerHp ?? ver?.powerHp ?? facts?.powerHp ?? vm.powerHp ?? undefined,
     },
-    title: [l.makeRaw, l.variant ?? l.modelRaw].filter(Boolean).join(" ") || "Anúncio",
+    // Título e imagem: preferir o catálogo ultimatespecs — nome canónico da
+    // versão (exato) ou modelo+potência (designacao) em vez do texto cru do
+    // anúncio ("BMW BMW 2 SERIES…"); imagem principal da versão, senão a 1.ª da
+    // galeria do modelo. Sem match de catálogo, fica o título cru de sempre.
+    title:
+      (ver && usm
+        ? `${usm.make} ${cleanVersionName(ver.name)}`
+        : facts && usm
+          ? [
+              `${usm.make} ${cleanCatalogModel(usm.model)}`,
+              facts.powerHp ? `${facts.powerHp} cv` : null,
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : null) ??
+      ([l.makeRaw, l.variant ?? l.modelRaw].filter(Boolean).join(" ") || "Anúncio"),
     year: l.year ?? 0,
     km: l.km ?? 0,
     color: l.color ?? undefined,
@@ -99,6 +129,9 @@ function rowToListing(
     source: sourceName ?? l.sourceSite,
     sourceUrl: l.detailUrl ?? undefined,
     images: l.imageUrl ? [l.imageUrl] : [],
+    catalogImage:
+      (ver ? (ver.imageUrl ?? usm?.imageUrls?.[0]) : facts ? usm?.imageUrls?.[0] : null) ??
+      undefined,
     cost,
     ptMarket: {
       estimatedPrice: e.ptEstimatedPrice,
@@ -117,30 +150,39 @@ function rowToListing(
 
 /** Junta as 4 peças de um Listing; devolve linhas cruas para o mapper. */
 function baseSelect(standId: string | null) {
-  return db
-    .select({
-      l: listings,
-      e: importCostEstimates,
-      vm: vehicleModels,
-      usv: usVersions,
-      sourceName: sources.name,
-      favoriteId: favorites.id,
-    })
-    .from(listings)
-    .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
-    .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
-    .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
-    .leftJoin(sources, eq(sources.id, listings.sourceId))
-    .leftJoin(
-      favorites,
-      and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? "")),
-    );
+  return (
+    db
+      .select({
+        l: listings,
+        e: importCostEstimates,
+        vm: vehicleModels,
+        usv: usVersions,
+        usm: usModels,
+        sourceName: sources.name,
+        favoriteId: favorites.id,
+      })
+      .from(listings)
+      .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
+      .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
+      .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
+      // Modelo do catálogo para nome/imagem: via versão exata, senão via o mid dos
+      // factos de designação (não-nulo ⟺ designacao com modelo único).
+      .leftJoin(
+        usModels,
+        sql`${usModels.mid} = coalesce(${usVersions.mid}, ${listings.designationFacts}->>'mid')`,
+      )
+      .leftJoin(sources, eq(sources.id, listings.sourceId))
+      .leftJoin(
+        favorites,
+        and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? "")),
+      )
+  );
 }
 
 type BaseRow = Awaited<ReturnType<ReturnType<typeof baseSelect>["execute"]>>[number];
 
 const toListing = (r: BaseRow, history: { month: string; price: number }[] = []) =>
-  rowToListing(r.l, r.e, r.vm, r.usv, r.sourceName, r.favoriteId != null, history);
+  rowToListing(r.l, r.e, r.vm, r.usv, r.usm, r.sourceName, r.favoriteId != null, history);
 
 // ── Pesquisa / detalhe ───────────────────────────────────────────
 

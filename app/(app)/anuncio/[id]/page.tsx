@@ -91,7 +91,11 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
 
           {/* Galeria */}
           <div className="grid grid-cols-4 gap-2">
-            <CarImage label={listing.title} className="col-span-4 aspect-[16/9] w-full" />
+            <CarImage
+              src={listing.catalogImage}
+              label={listing.title}
+              className="col-span-4 aspect-[16/9] w-full"
+            />
             {listing.images.slice(1, 5).map((img) => (
               <CarImage key={img} className="aspect-square w-full" />
             ))}

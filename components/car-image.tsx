@@ -1,23 +1,38 @@
 import { cn } from "@/lib/utils";
 import { Car } from "lucide-react";
+import Image from "next/image";
 
 /**
- * Placeholder de foto de carro.
- *
- * O protótipo e o MVP não têm fotos reais. Quando o backend devolver
- * `Listing.images` com URLs, trocar este componente por <Image> do Next
- * (e adicionar os hosts em next.config.mjs → images.remotePatterns).
+ * Foto do carro: renderiza `src` (imagem do catálogo ultimatespecs — o único
+ * host autorizado em next.config → images.remotePatterns) via <Image>; sem
+ * `src` mantém o placeholder de sempre. As fotos dos próprios anúncios
+ * (hosts variados, hotlinking incerto) ficam para uma iteração futura.
  * Ver docs/07-FRONTEND-HANDOFF.md.
  */
 export function CarImage({
+  src,
   label,
   className,
   rounded = "rounded-[8px]",
 }: {
+  src?: string;
   label?: string;
   className?: string;
   rounded?: string;
 }) {
+  if (src) {
+    return (
+      <div className={cn("relative overflow-hidden bg-surface", rounded, className)}>
+        <Image
+          src={src}
+          alt={label ? `Foto de ${label}` : ""}
+          fill
+          sizes="(max-width: 768px) 100vw, 400px"
+          className="object-cover"
+        />
+      </div>
+    );
+  }
   return (
     <div
       className={cn(

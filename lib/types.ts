@@ -81,6 +81,10 @@ export interface Listing {
   /** URL original (o backend pode mascarar/proxiar) */
   sourceUrl?: string;
   images: string[];
+  /** imagem principal do catálogo ultimatespecs (versão exata ou galeria do
+   * modelo da designação) — a única cujo host o next/image autoriza; as fotos
+   * dos anúncios (`images`) ficam para uma iteração futura */
+  catalogImage?: string;
   cost: CostBreakdown;
   ptMarket: PtMarket;
   /** poupança em € (ptMarket.estimatedPrice - cost.totalPt) */
