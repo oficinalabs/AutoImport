@@ -20,7 +20,23 @@ try {
 }
 
 const DB_URL = process.env.DATABASE_URL;
-const skip = !DB_URL ? "sem DATABASE_URL — teste de integração saltado" : false;
+// Guarda anti-produção: este teste ESCREVE (ingest de fixtures, deletes no
+// cleanup) e o .env.local aponta para a Supabase REAL — correr `pnpm test` com
+// ele carregado já deixou resíduos na montra ("Testgen GenModel 1.0"). Só corre
+// contra Postgres LOCAL (docker `pnpm db:up` ou o serviço do CI, ambos em
+// localhost); URL não-local ou ilegível → salta.
+function isLocal(url: string): boolean {
+  try {
+    return ["localhost", "127.0.0.1"].includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+const skip = !DB_URL
+  ? "sem DATABASE_URL — teste de integração saltado"
+  : !isLocal(DB_URL)
+    ? "DATABASE_URL não é local — o teste de integração escreve; só docker/CI"
+    : false;
 
 async function cleanup() {
   const { db } = await import("../../db");
