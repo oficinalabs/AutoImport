@@ -869,6 +869,21 @@ test("F6: 'kW' de potência (não 'kWh') não é lido como kWh", () => {
   assert.equal(r?.evidence.hardSignals, 1); // só a potência
 });
 
+test("F6: kWh fora da gama [10,150] é ruído de slug, não prova contra", () => {
+  // O extraText traz o path do URL com `.`/`-` → espaços: "80.8kWh" no slug vira
+  // "808kwh" ou "80 8kwh". Sem limites, o 808/8 seria um kWh fantasma que não
+  // bate nenhum candidato → null (demovia um anúncio legítimo). Com limites, é
+  // ignorado e o match fica como estava (potência → provavel).
+  for (const mangled of ["Dolphin 808kwh Comfort", "Dolphin 80 8kwh Comfort"]) {
+    const r = resolveVersion(inp({
+      makeRaw: "BYD", modelRaw: "Dolphin", variant: "Comfort",
+      fuelRaw: "Electrico", year: 2023, powerHp: 204, extraText: mangled,
+    }), CAT);
+    assert.equal(r?.kind, "provavel", `"${mangled}" não pode demover a null`);
+    assert.equal(r?.evidence.signals.batteryKwh, undefined);
+  }
+});
+
 // ════════════════════════════════════════════════════════════════
 // 2. Golden (só com BD docker)
 // ════════════════════════════════════════════════════════════════

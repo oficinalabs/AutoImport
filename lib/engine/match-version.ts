@@ -188,10 +188,16 @@ export function litersFromVariant(variant: string | null): number | null {
  * kWh da bateria no texto do anúncio ("54 kWh", "80.8kWh", "43,2 kWh"). A unidade
  * kWh é inequívoca (exige o "h" — "115 kW" de potência NÃO casa); vírgula ou ponto
  * decimal; espaço opcional. Primeiro match; null se ausente.
+ * Limites de plausibilidade [10, 150]: o extraText traz o path do URL com `.`/`-`
+ * convertidos em espaços, e um slug "80-8kwh"/"808kwh" viraria "8kwh"/"808kwh" —
+ * um kWh fantasma fora da gama de qualquer EV que, como "prova contra", demovia
+ * anúncios legítimos a null. Fora da gama = ruído de slug, não sinal.
  */
 function batteryKwhFromText(text: string): number | null {
   const m = /(\d{1,3}(?:[.,]\d)?)\s*kwh/i.exec(text);
-  return m ? Number(m[1].replace(",", ".")) : null;
+  if (!m) return null;
+  const kwh = Number(m[1].replace(",", "."));
+  return kwh >= 10 && kwh <= 150 ? kwh : null;
 }
 
 /** Potência efetiva: a estruturada do anúncio, senão extraída do texto. */
