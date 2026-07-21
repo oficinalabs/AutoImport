@@ -13,13 +13,17 @@ try {
 export async function flagOpportunities() {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
+  const { carIdentitySql } = await import("../../lib/engine/car-identity");
 
   // Dedup por CARRO físico (auditoria: duplicado_estrangeiro): agregadores
-  // (trovit/theparking) reindexam o mesmo anúncio — identidade = VIN; sem
-  // VIN, modelo+preço+ano+km_band. Fica só o listing com maior savings.
+  // (trovit/theparking) reindexam o mesmo anúncio, e caetano/carplus cross-listam
+  // o mesmo stock — a identidade partilhada (VIN, senão chassis no URL, senão
+  // modelo+ano+km+preço; ver lib/engine/car-identity.ts) colapsa-os. Fica só o
+  // listing com maior savings.
+  const identity = carIdentitySql("l");
   const winnersCte = sql`
     with winners as (
-      select distinct on (coalesce(l.vin, l.model_id::text || ':' || l.price::text || ':' || l.year::text || ':' || floor(l.km / 25000)::text))
+      select distinct on (${identity})
              e.listing_id, e.savings, e.savings_pct
       from import_cost_estimates e
       join listings l on l.id = e.listing_id
@@ -27,8 +31,7 @@ export async function flagOpportunities() {
         and e.pt_confidence = 'normal'
         and l.deleted_at is null
         and l.is_damaged is not true
-      order by coalesce(l.vin, l.model_id::text || ':' || l.price::text || ':' || l.year::text || ':' || floor(l.km / 25000)::text),
-               e.savings desc
+      order by ${identity}, e.savings desc
     )
   `;
 
