@@ -186,11 +186,12 @@ const toListing = (r: BaseRow, history: { month: string; price: number }[] = [])
 
 // ── Pesquisa / detalhe ───────────────────────────────────────────
 
-/** Superfícies de descoberta só mostram anúncios com match de catálogo (decisão
- * de produto, 21 jul): sem versão/designação provada não há nome nem imagem
- * canónicos nem confiança na comparação. Favoritos/detalhe/comparar continuam a
- * abrir itens já guardados (desaparecer sem explicação é pior — docs/08). */
-const COM_CATALOGO = inArray(listings.matchConfidence, ["exato", "designacao"]);
+/** Superfícies de descoberta só mostram anúncios com match EXATO ao ultimatespecs
+ * (decisão de produto, 21 jul): certeza absoluta de modelo+motor+versão — a
+ * designacao (motor provado, variante entre gémeas) fica de fora da montra.
+ * Favoritos/detalhe/comparar continuam a abrir itens já guardados
+ * (desaparecer sem explicação é pior — docs/08). */
+const COM_CATALOGO = eq(listings.matchConfidence, "exato");
 
 export async function searchListingsQuery(
   filters: SearchFilters,
