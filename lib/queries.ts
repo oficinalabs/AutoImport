@@ -186,11 +186,17 @@ const toListing = (r: BaseRow, history: { month: string; price: number }[] = [])
 
 // ── Pesquisa / detalhe ───────────────────────────────────────────
 
+/** Superfícies de descoberta só mostram anúncios com match de catálogo (decisão
+ * de produto, 21 jul): sem versão/designação provada não há nome nem imagem
+ * canónicos nem confiança na comparação. Favoritos/detalhe/comparar continuam a
+ * abrir itens já guardados (desaparecer sem explicação é pior — docs/08). */
+const COM_CATALOGO = inArray(listings.matchConfidence, ["exato", "designacao"]);
+
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
 ): Promise<Listing[]> {
-  const conds = [isNull(listings.deletedAt)];
+  const conds = [isNull(listings.deletedAt), COM_CATALOGO];
   if (filters.query) {
     const q = `%${filters.query}%`;
     const textMatch = or(
@@ -250,7 +256,7 @@ export async function topOpportunitiesQuery(
       opportunities,
       and(eq(opportunities.listingId, listings.id), isNull(opportunities.deletedAt)),
     )
-    .where(isNull(listings.deletedAt))
+    .where(and(isNull(listings.deletedAt), COM_CATALOGO))
     .orderBy(desc(opportunities.savings))
     .limit(limit);
   return rows.map((r) => toListing(r));
@@ -266,10 +272,12 @@ export async function dashboardCountsQuery(standId: string | null): Promise<Dash
   const [opp] = await db
     .select({
       recent: sql<number>`count(*) filter (where flagged_at > now() - interval '24 hours')::int`,
-      savings: sql<number>`coalesce(sum(savings), 0)::int`,
+      savings: sql<number>`coalesce(sum(${opportunities.savings}), 0)::int`,
     })
     .from(opportunities)
-    .where(isNull(opportunities.deletedAt));
+    .innerJoin(listings, eq(listings.id, opportunities.listingId))
+    // contar só o que o painel mostra (COM_CATALOGO) — senão "3 novas" com 2 visíveis
+    .where(and(isNull(opportunities.deletedAt), COM_CATALOGO));
   const [al] = standId
     ? await db
         .select({ n: sql<number>`count(*)::int` })
@@ -292,7 +300,7 @@ export async function countryInsightsQuery(): Promise<CountryInsight[]> {
     })
     .from(listings)
     .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
-    .where(isNull(listings.deletedAt))
+    .where(and(isNull(listings.deletedAt), COM_CATALOGO))
     .groupBy(listings.country)
     .orderBy(desc(sql`avg(${importCostEstimates.savings})`));
   return rows
