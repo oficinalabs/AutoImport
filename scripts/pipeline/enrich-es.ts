@@ -54,19 +54,32 @@ export async function enrichEs(opts: { limit?: number } = {}) {
   let corrigidos = 0;
   let semContado = 0;
   let falhas = 0;
+  let mortos = 0;
 
   for (const l of pending) {
     let contado: number | null = null;
+    let gone = false;
     try {
       const res = await fetch(l.detail_url, { headers: { "user-agent": UA } });
       if (res.ok) {
         const text = (await res.text()).replace(/<[^>]+>/g, " ");
         contado = parsePrecioContado(text, l.price);
+      } else if (res.status === 404 || res.status === 410) {
+        // Anúncio removido: soft-delete já (não esperar pelo sweep de 14 dias).
+        // Não marcamos precio_contado_checked — é irrelevante num morto.
+        await db.execute(sql`update listings set deleted_at = now() where id = ${l.id}`);
+        gone = true;
+        mortos++;
       } else {
         falhas++;
       }
     } catch {
       falhas++;
+    }
+
+    if (gone) {
+      await sleep(RATE_MS);
+      continue;
     }
 
     if (contado != null && contado !== l.price) {
@@ -93,9 +106,9 @@ export async function enrichEs(opts: { limit?: number } = {}) {
   }
 
   console.log(
-    `enrich-es: ${pending.length} verificados · ${corrigidos} preços corrigidos para contado · ${semContado} sem contado na descrição · ${falhas} falhas de fetch`,
+    `enrich-es: ${pending.length} verificados · ${corrigidos} preços corrigidos para contado · ${semContado} sem contado na descrição · ${mortos} mortos (404/410) · ${falhas} falhas de fetch`,
   );
-  return { checked: pending.length, corrigidos, semContado, falhas };
+  return { checked: pending.length, corrigidos, semContado, mortos, falhas };
 }
 
 if (process.argv[1]?.endsWith("enrich-es.ts")) {

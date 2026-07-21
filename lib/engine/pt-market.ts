@@ -1,13 +1,17 @@
 /**
  * Estimativa do preço de mercado PT para um modelo canónico.
  * Amostra primária: mesmo model_id, year±1, km_band±1, observações dos
- * últimos 60 dias (a mais recente por listing) → MEDIANA (robusta a
- * outliers), com mínimo de 5 anúncios. Fallback: year±2/band±2, mínimo 3,
- * marcado `alargada`. Sem amostra suficiente → null (o anúncio não recebe
- * veredito — nunca mostrar comparação fraca).
+ * últimos 60 dias (a mais recente por CARRO físico) → MEDIANA (robusta a
+ * outliers), com mínimo de 5 anúncios e dispersão mínima de preços/vendedores.
+ * Fallback `alargada`: alarga SÓ a banda de km para ±2 (o ANO fica ±1, como a
+ * primária — esticar o ano puxa gerações/facelifts vizinhos), mínimo 3, com as
+ * MESMAS guardas de dispersão mais um teto de spread relativo (a amostra tem de
+ * ser coerente, não um par de outliers). Sem amostra que passe as guardas →
+ * null (o anúncio não recebe veredito — nunca adivinhar, nunca comparar fraco).
  */
 import { sql } from "drizzle-orm";
 import type { db as Db } from "../../db";
+import { carIdentitySql } from "./car-identity";
 
 export type PtConfidence = "normal" | "alargada";
 
@@ -33,26 +37,43 @@ const MIN_SAMPLE_NORMAL = 5;
 const MIN_SAMPLE_WIDE = 3;
 const WINDOW_DAYS = 60;
 // Guarda anti-frota (auditoria): amostras de um único stand a preço de tabela
-// (ex.: 6× "La Prima" santogal a 23.490 €) não são mercado — a confiança
-// 'normal' exige dispersão mínima de preços e de vendedores.
+// (ex.: 6× "La Prima" santogal a 23.490 €) não são mercado — TODA a estimativa
+// (normal e alargada) exige dispersão mínima de preços e de vendedores.
 const MIN_DISTINCT_PRICES = 3;
 const MIN_DISTINCT_SELLERS = 2;
+// Teto de spread relativo (max−min)/mediana da amostra ALARGADA. Calibração
+// read-only na produção (21 jul, 1970 estimativas): das amostras que o novo
+// fallback recupera, o spread relativo tem p50 0,22 · p75 0,29 · p95 0,46 ·
+// máx 0,85. Cortar em 0,30 (≈p75) mata o quartil patológico — o típico "n=3,
+// 57,5k–75k" que não é um preço de mercado, é um intervalo. Sobrevivência por
+// teto medida: 0,25→427 · 0,30→550 · 0,35→617. Escolhido 0,30 (honestidade >
+// cobertura: as ~550 que passam são amostras coerentes).
+const MAX_WIDE_SPREAD = 0.3;
 
 async function sample(
   db: typeof Db,
   modelId: string,
   year: number,
   kmBand: number,
-  spread: number,
+  yearSpread: number,
+  kmSpread: number,
   powerHp?: number | null,
   genWindow?: GenWindow,
   excludeMids?: string[],
-): Promise<{ median: number; n: number; distinctPrices: number; distinctSellers: number } | null> {
-  // Interseção da janela year±spread com a janela de geração (quando presente):
-  // o guard NUNCA relaxa (só aperta) — o fallback alargado (spread=2) continua
-  // confinado à geração. Interseção vazia (lo>hi) → o `between` não devolve nada.
-  const yearLo = genWindow ? Math.max(year - spread, genWindow.start) : year - spread;
-  const yearHi = genWindow?.end != null ? Math.min(year + spread, genWindow.end) : year + spread;
+): Promise<{
+  median: number;
+  n: number;
+  distinctPrices: number;
+  distinctSellers: number;
+  min: number;
+  max: number;
+} | null> {
+  // Interseção da janela year±yearSpread com a janela de geração (quando
+  // presente): o guard NUNCA relaxa (só aperta) — mantém-se mesmo no fallback.
+  // Interseção vazia (lo>hi) → o `between` não devolve nada.
+  const yearLo = genWindow ? Math.max(year - yearSpread, genWindow.start) : year - yearSpread;
+  const yearHi =
+    genWindow?.end != null ? Math.min(year + yearSpread, genWindow.end) : year + yearSpread;
   // Matching ESTRITO por designação (regra do produto: um veículo só compara
   // com o mesmo modelo): a potência é a assinatura objetiva da designação
   // (840i 333cv ≠ M850i 530cv; xDrive40 326 ≠ xDrive45 408; Golf 1.5 150 ≠
@@ -73,19 +94,20 @@ async function sample(
     ? sql`and (coalesce(uv.mid, l.designation_facts->>'mid') is null
               or not (coalesce(uv.mid, l.designation_facts->>'mid') = any(${`{${excludeMids.join(",")}}`}::text[])))`
     : sql``;
-  // Dedupe por CARRO físico, não por anúncio: grupos como Caetano/CarPlus
-  // listam o mesmo stock (mesmo VIN) em vários sites — contar 2× inflaciona
-  // a amostra. Identidade = VIN; sem VIN, preço+ano+km (o mesmo carro
-  // cross-listado partilha os três; carros distintos raramente).
+  // Dedupe por CARRO físico, não por anúncio (ver lib/engine/car-identity.ts):
+  // grupos como Caetano/CarPlus listam o mesmo stock em vários sites — contar
+  // 2× inflaciona a amostra. min/max saem para o teto de spread do fallback.
   const rows = (await db.execute(sql`
     select percentile_cont(0.5) within group (order by price)::int as median,
            count(*)::int as n,
            count(distinct price)::int as distinct_prices,
-           count(distinct seller_key)::int as distinct_sellers
+           count(distinct seller_key)::int as distinct_sellers,
+           min(price)::int as min_price,
+           max(price)::int as max_price
     from (
       select distinct on (identity) price, seller_key
       from (
-        select coalesce(l.vin, l.price::text || ':' || coalesce(l.year, 0)::text || ':' || coalesce(l.km, 0)::text) as identity,
+        select ${carIdentitySql("l")} as identity,
                coalesce(l.seller_name, l.id::text) as seller_key,
                o.price, o.observed_at
         from pt_price_observations o
@@ -93,7 +115,7 @@ async function sample(
         left join us_versions uv on uv.version_id = l.us_version_id
         where o.model_id = ${modelId}
           and o.year between ${yearLo} and ${yearHi}
-          and o.km_band between ${kmBand - spread} and ${kmBand + spread}
+          and o.km_band between ${kmBand - kmSpread} and ${kmBand + kmSpread}
           and o.observed_at > now() - make_interval(days => ${WINDOW_DAYS})
           ${powerFilter}
           ${midExclusion}
@@ -105,6 +127,8 @@ async function sample(
     n: number;
     distinct_prices: number;
     distinct_sellers: number;
+    min_price: number;
+    max_price: number;
   }[];
   const row = rows[0];
   return row?.median != null
@@ -113,6 +137,8 @@ async function sample(
         n: row.n,
         distinctPrices: row.distinct_prices,
         distinctSellers: row.distinct_sellers,
+        min: row.min_price,
+        max: row.max_price,
       }
     : null;
 }
@@ -126,7 +152,7 @@ export async function estimatePtPrice(
   genWindow?: GenWindow,
   excludeMids?: string[],
 ): Promise<PtEstimate | null> {
-  const primary = await sample(db, modelId, year, kmBand, 1, powerHp, genWindow, excludeMids);
+  const primary = await sample(db, modelId, year, kmBand, 1, 1, powerHp, genWindow, excludeMids);
   if (
     primary &&
     primary.n >= MIN_SAMPLE_NORMAL &&
@@ -135,8 +161,17 @@ export async function estimatePtPrice(
   ) {
     return { estimatedPrice: primary.median, sampleSize: primary.n, confidence: "normal" };
   }
-  const wide = await sample(db, modelId, year, kmBand, 2, powerHp, genWindow, excludeMids);
-  if (wide && wide.n >= MIN_SAMPLE_WIDE) {
+  // Fallback alargado: ano ±1 (como a primária), só a banda de km alarga para ±2.
+  // As guardas de dispersão aplicam-se na mesma, mais o teto de spread relativo.
+  const wide = await sample(db, modelId, year, kmBand, 1, 2, powerHp, genWindow, excludeMids);
+  if (
+    wide &&
+    wide.n >= MIN_SAMPLE_WIDE &&
+    wide.distinctPrices >= MIN_DISTINCT_PRICES &&
+    wide.distinctSellers >= MIN_DISTINCT_SELLERS &&
+    wide.median > 0 &&
+    (wide.max - wide.min) / wide.median <= MAX_WIDE_SPREAD
+  ) {
     return { estimatedPrice: wide.median, sampleSize: wide.n, confidence: "alargada" };
   }
   return null;

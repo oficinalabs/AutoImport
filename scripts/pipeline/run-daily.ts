@@ -1,7 +1,8 @@
 /**
  * Batch diário — orquestrador sequencial do pipeline completo:
  *   ingest NDJSON → precio al contado (ES) → match-models → pt-market →
- *   soft-delete de desaparecidos → compute-costs → flag-opportunities
+ *   soft-delete de desaparecidos → verificar oportunidades (HEAD) →
+ *   compute-costs → flag-opportunities
  *   pnpm pipeline:daily [--dir tools/collector/out] [--stale-days 14]
  * Cada passo loga o seu sumário; no fim sai o painel de saúde do matching.
  */
@@ -26,7 +27,7 @@ async function main() {
   const dir = arg("--dir", "tools/collector/out");
   const staleDays = Number(arg("--stale-days", "14"));
 
-  console.log("── 1/7 ingest ──");
+  console.log("── 1/8 ingest ──");
   if (existsSync(dir)) {
     // processo separado: o ingest gere a própria ligação/saída
     execFileSync("pnpm", ["exec", "tsx", "scripts/pipeline/ingest.ts", "--dir", dir], {
@@ -43,17 +44,18 @@ async function main() {
   const { computeCosts } = await import("./compute-costs");
   const { flagOpportunities } = await import("./flag-opportunities");
   const { enrichEs } = await import("./enrich-es");
+  const { checkGone } = await import("./check-gone");
 
-  console.log("── 2/7 precio al contado (ES) ──");
+  console.log("── 2/8 precio al contado (ES) ──");
   await enrichEs();
 
-  console.log("── 3/7 match-models ──");
+  console.log("── 3/8 match-models ──");
   const match = await matchModels();
 
-  console.log("── 4/7 pt-market ──");
+  console.log("── 4/8 pt-market ──");
   await collectPtObservations();
 
-  console.log("── 5/7 desaparecidos ──");
+  console.log("── 5/8 desaparecidos ──");
   const stale = (await db.execute(sql`
     update listings set deleted_at = now()
     where deleted_at is null
@@ -62,10 +64,15 @@ async function main() {
   `)) as unknown as { id: string }[];
   console.log(`soft-delete: ${stale.length} anúncios sem sinal há ${staleDays}+ dias`);
 
-  console.log("── 6/7 compute-costs ──");
+  // Antes do compute: apanha as oportunidades ativas que já morreram (404/410)
+  // para não recalcular veredito sobre um carro que já não existe.
+  console.log("── 6/8 verificar oportunidades (HEAD) ──");
+  await checkGone();
+
+  console.log("── 7/8 compute-costs ──");
   const costs = await computeCosts();
 
-  console.log("── 7/7 flag-opportunities ──");
+  console.log("── 8/8 flag-opportunities ──");
   const opps = await flagOpportunities();
 
   // Painel de saúde do pipeline (métricas de qualidade do matching)

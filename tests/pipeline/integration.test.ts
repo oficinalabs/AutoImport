@@ -20,7 +20,23 @@ try {
 }
 
 const DB_URL = process.env.DATABASE_URL;
-const skip = !DB_URL ? "sem DATABASE_URL — teste de integração saltado" : false;
+// Guarda anti-produção: este teste ESCREVE (ingest de fixtures, deletes no
+// cleanup) e o .env.local aponta para a Supabase REAL — correr `pnpm test` com
+// ele carregado já deixou resíduos na montra ("Testgen GenModel 1.0"). Só corre
+// contra Postgres LOCAL (docker `pnpm db:up` ou o serviço do CI, ambos em
+// localhost); URL não-local ou ilegível → salta.
+function isLocal(url: string): boolean {
+  try {
+    return ["localhost", "127.0.0.1"].includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+const skip = !DB_URL
+  ? "sem DATABASE_URL — teste de integração saltado"
+  : !isLocal(DB_URL)
+    ? "DATABASE_URL não é local — o teste de integração escreve; só docker/CI"
+    : false;
 
 async function cleanup() {
   const { db } = await import("../../db");
@@ -35,7 +51,9 @@ async function cleanup() {
   await db.execute(sql`delete from us_models where mid like 'TG-%'`);
   // modelos das marcas sintéticas criados pelo match-models/pelos fixtures — sem
   // isto ficam na BD partilhada
-  await db.execute(sql`delete from vehicle_models where make in ('testmarke', 'testgen')`);
+  await db.execute(
+    sql`delete from vehicle_models where make in ('testmarke', 'testgen', 'testcross')`,
+  );
 }
 
 test(
@@ -397,6 +415,92 @@ test(
       comExcl.estimatedPrice < semExcl.estimatedPrice,
       `excluir o derivado cabrio baixa a mediana (com=${comExcl.estimatedPrice} sem=${semExcl.estimatedPrice})`,
     );
+  },
+);
+
+test(
+  "dedupe de cross-listing (chassis no URL): caetano + carplus contam 1× na amostra",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { estimatePtPrice } = await import("../../lib/engine/pt-market");
+    const { kmBand } = await import("../../lib/engine/normalize-vehicle");
+
+    await cleanup();
+
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testcross', 'atto-2', 'elétrico', 'testcross|atto-2|elétrico')
+      returning id
+    `)) as unknown as { id: string }[];
+    const modelId = model.id;
+
+    // 5 carros PT distintos (vendedores e preços distintos, sem chassis no URL →
+    // caem na identidade por modelo+ano+km+preço) + 1 DUPLICADO do carro 1: o
+    // MESMO chassis (lgxce4cb3t2078822) no slug do URL, mas noutro portal e com
+    // preço/km ligeiramente diferentes — o cross-listing real caetano↔carplus.
+    // Sem o dedupe por VIN-no-URL contava 6; com ele, 5.
+    const chassisCaetano = "https://www.caetano.pt/usados/byd-atto-2-boost-lgxce4cb3t2078822";
+    const chassisCarplus =
+      "https://www.carplus.pt/viatura/byd-atto-2-boost-lgxce4cb3t2078822-usado";
+    const cars = [
+      { id: "fixture-cross-pt-1", price: 30000, km: 30000, seller: "Caetano", url: chassisCaetano },
+      // duplicado do 1: chassis igual, portal/preço/km diferentes → mesma identidade
+      {
+        id: "fixture-cross-pt-1b",
+        price: 30150,
+        km: 30500,
+        seller: "CarPlus",
+        url: chassisCarplus,
+      },
+      {
+        id: "fixture-cross-pt-2",
+        price: 30200,
+        km: 30000,
+        seller: "Stand Dois",
+        url: "https://example.test/fixture-cross-pt-2",
+      },
+      {
+        id: "fixture-cross-pt-3",
+        price: 30400,
+        km: 30000,
+        seller: "Stand Três",
+        url: "https://example.test/fixture-cross-pt-3",
+      },
+      {
+        id: "fixture-cross-pt-4",
+        price: 30600,
+        km: 30000,
+        seller: "Stand Quatro",
+        url: "https://example.test/fixture-cross-pt-4",
+      },
+      {
+        id: "fixture-cross-pt-5",
+        price: 30800,
+        km: 30000,
+        seller: "Stand Cinco",
+        url: "https://example.test/fixture-cross-pt-5",
+      },
+    ];
+    for (const c of cars) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${c.id}, ${modelId}, 'BYD', 'Atto 2', 'Elétrico', 'elétrico',
+           'Atto 2 Boost', 2022, ${c.km}, 130, ${c.price}, 'PT', ${c.seller}, ${c.url})
+      `);
+    }
+
+    await collectPtObservations();
+
+    const est = await estimatePtPrice(db, modelId, 2022, kmBand(30000), 130);
+    assert.ok(est, "amostra existe");
+    assert.equal(est.sampleSize, 5, "o cross-listing caetano/carplus conta 1× (5 carros, não 6)");
+    assert.equal(est.confidence, "normal", "5 carros, preços e vendedores distintos → normal");
   },
 );
 
