@@ -46,3 +46,6 @@ tools/collector/out/
 tools/net-capture/node_modules
 tools/net-capture/out/
 tools/net-capture/package-lock.json
+
+# Claude Code — worktrees temporárias de subagentes (artefacto local)
+.claude/worktrees/
