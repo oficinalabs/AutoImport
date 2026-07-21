@@ -48,11 +48,18 @@ export interface ResolveInput {
   doors?: number | null;
   /** raw->>'engine_code' (só standvirtual; SEM splitter de motor ativo — ver nota) */
   engineCode?: string | null;
-  /** texto extra do anúncio (título + slug do detail_url) — SÓ para tokens de
-   * desambiguação (derivativeGuard, desempate de trim, trimset); NUNCA alimenta
+  /** texto extra do anúncio (título + slug do detail_url) — para tokens de
+   * desambiguação (derivativeGuard, desempate de trim, trimset). NÃO alimenta
    * badges/potência/litragem/família (o slug do URL traz ruído — cores,
-   * equipamento — que não pode virar sinal duro). */
+   * equipamento — que não pode virar sinal duro). ÚNICA exceção deliberada: o
+   * kWh da bateria dos elétricos (ver ramo do kWh) — a unidade "kWh" é inequívoca,
+   * não é ruído de cor/equipamento. */
   extraText?: string | null;
+  /** título do vendedor (o segmento-slug do detail_url que o VENDEDOR escreveu,
+   * distinto do balde do agregador) — SÓ para a guarda de coerência: um badge
+   * forte + potência que apontem inequivocamente para OUTRA designação do mesmo
+   * make demovem o match a null. NUNCA alimenta um match positivo. */
+  sellerTitle?: string | null;
 }
 
 /**
@@ -87,6 +94,8 @@ export interface MatchEvidence {
     displacementCc?: number;
     displacementL?: number;
     badges?: string[];
+    /** kWh da bateria (só elétricos): 2.º sinal duro batido no displacement_cc EV. */
+    batteryKwh?: number;
   };
   /** nº de tipos de sinal duro batidos (potência/cilindrada/badge) */
   hardSignals: number;
@@ -105,6 +114,11 @@ export interface MatchEvidence {
    * "engine" fica reservado no contrato mas NÃO é implementado (a auditoria de
    * cobertura do engine_code ainda não correu). */
   splitters?: ("trimset" | "gearbox" | "doors" | "co2")[];
+  /** o título do vendedor prova (badge forte + potência) uma designação que os
+   * candidatos não explicam ⇒ o match foi demovido. NUNCA presente num resultado
+   * não-null (a demoção devolve null); fica no contrato para o invariante do
+   * property test ("nenhum não-null transporta dadosIncoerentes"). */
+  dadosIncoerentes?: true;
 }
 
 export type MatchResult =
@@ -168,6 +182,16 @@ export function litersFromVariant(variant: string | null): number | null {
   if (!variant) return null;
   const m = /\b([1-9])[.,](\d)(?![\d.,])/.exec(variant);
   return m ? Number(m[1]) + Number(m[2]) / 10 : null;
+}
+
+/**
+ * kWh da bateria no texto do anúncio ("54 kWh", "80.8kWh", "43,2 kWh"). A unidade
+ * kWh é inequívoca (exige o "h" — "115 kW" de potência NÃO casa); vírgula ou ponto
+ * decimal; espaço opcional. Primeiro match; null se ausente.
+ */
+function batteryKwhFromText(text: string): number | null {
+  const m = /(\d{1,3}(?:[.,]\d)?)\s*kwh/i.exec(text);
+  return m ? Number(m[1].replace(",", ".")) : null;
 }
 
 /** Potência efetiva: a estruturada do anúncio, senão extraída do texto. */
@@ -504,6 +528,24 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
     }
   }
 
+  // kWh da bateria: 2.º sinal duro dos ELÉTRICOS (ramo paralelo ao da cilindrada,
+  // que fica ignorada neles porque o catálogo guarda o kWh no displacement_cc das
+  // versões EV). Extraído de variant + extraText (a exceção deliberada em que o
+  // extraText alimenta um sinal duro — a unidade "kWh" é inequívoca). Sinal
+  // presente que não bate NENHUM candidato = prova contra ⇒ null (como a cc).
+  if (fuel === "elétrico") {
+    const kwh = batteryKwhFromText(`${input.variant ?? ""} ${input.extraText ?? ""}`);
+    if (kwh != null) {
+      const filtered = cands.filter(
+        (v) => v.displacementCc != null && Math.abs(v.displacementCc - Math.round(kwh)) <= 2,
+      );
+      if (!filtered.length) return null;
+      cands = filtered;
+      signals.batteryKwh = kwh;
+      hardSignals++;
+    }
+  }
+
   // Badge forte (alfanumérico): só conta se ALGUM candidato o contém (senão é
   // ruído, não filtra — evita descartar tudo por um selo que o catálogo não
   // nomeia). Conta como sinal duro (o principal 2.º sinal dos elétricos).
@@ -623,6 +665,57 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   }
   // Splitter `engine` (engine_code) NÃO é implementado: a auditoria de cobertura
   // do engine_code ainda não correu (o campo fica no contrato para quando existir).
+
+  // ── Guarda de coerência do título do vendedor (sellerTitle) ──
+  // Fontes agregadoras (theparking) metem por vezes o anúncio no BALDE ERRADO: os
+  // campos estruturados dizem "840d 340cv" mas o slug do título do vendedor diz a
+  // verdade ("320d 190 mild-hybrid"). Quando o sellerTitle prova — por regra DUPLA
+  // (badge forte E potência) — uma designação de OUTRA família do mesmo make que os
+  // candidatos sobreviventes NÃO explicam, o match é dado podre e demove-se a null.
+  // A regra é dupla de propósito (um badge OU uma potência sozinhos são ruído);
+  // NUNCA alimenta um match positivo — só o mata. O lookup make-wide é on-demand:
+  // só corre quando o sellerTitle traz um badge que nenhum sobrevivente explica.
+  if (input.sellerTitle) {
+    const stTokens = slugify(input.sellerTitle).split("-").filter(Boolean);
+    const stBadges = strongBadges(input.sellerTitle, null);
+    const alienBadges = stBadges.filter(
+      (b) => b !== familySlug && !cands.some((v) => v.tokens.includes(b)),
+    );
+    if (alienBadges.length) {
+      // Números que são DESIGNAÇÃO DE MODELO (o run de dígitos de um badge: "220"
+      // de "220d"/"glc220", "350" de "350d", "200" de "e200") NÃO são potência — o
+      // "220" de um "GLC 220 220d" é a classe, não 220 cv. Sem isto, a coincidência
+      // modelo-número ↔ cv de um 4matic/chassis de outra família gerava conflitos
+      // falsos em massa (auditoria: 17 Mercedes/BMW coerentes demovidos vs 1 real).
+      // E um dígito seguido de unidade kW/kWh é kW/bateria, não cv ("152 kW").
+      const modelNums = new Set<number>();
+      for (const b of stBadges) for (const m of b.matchAll(/\d+/g)) modelNums.add(Number(m[0]));
+      const stPowers: number[] = [];
+      for (let i = 0; i < stTokens.length; i++) {
+        const t = stTokens[i];
+        if (!/^\d+$/.test(t)) continue;
+        const n = Number(t);
+        if (n < 60 || n > 900 || modelNums.has(n)) continue;
+        if (/^kw/i.test(stTokens[i + 1] ?? "")) continue;
+        stPowers.push(n);
+      }
+      if (stPowers.length) {
+        const matchesSurvivor = (p: number) =>
+          cands.some((c) => c.powerHp != null && Math.abs(c.powerHp - p) <= powerTol(p));
+        const conflito = [...catalog.byFamily.entries()].some(
+          ([key, fam]) =>
+            key.startsWith(`${makeSlug}|`) &&
+            fam.versions.some(
+              (v) =>
+                v.powerHp != null &&
+                alienBadges.some((b) => v.tokens.includes(b)) &&
+                stPowers.some((p) => Math.abs(v.powerHp! - p) <= powerTol(p) && !matchesSurvivor(p)),
+            ),
+        );
+        if (conflito) return null;
+      }
+    }
+  }
 
   // ── Escolha e flags (sobre o conjunto final, pós-splitters) ──
   const gens = new Set(cands.map((v) => v.generationId));
