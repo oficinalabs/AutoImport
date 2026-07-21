@@ -224,6 +224,17 @@ model("F45-LCI", "BMW", "F45-LCI-2-Series-Active-Tourer", null, [
   { name: "F45 LCI 216d Active Tourer", fuelSection: "diesel", fuel: "Diesel", year: 2017, hp: 116, cc: 1499, co2w: 122, gearbox: "7 speed Automatic" },
 ]);
 
+// Mercedes — reproduz o falso-positivo da guarda F1: o número de modelo "220" de
+// um "GLC 220 d" (RWD, sem 4matic) coincide com a potência de um "CLA 250 4matic"
+// (218cv) de OUTRA classe, via o badge de tração partilhado "4matic". Sem a
+// exclusão do número-de-modelo, a guarda demovia falsamente o 220d coerente.
+model("GLC-X253", "Mercedes", "GLC-X253", 2016, [
+  { name: "GLC 220 d", fuelSection: "diesel", fuel: "Diesel", year: 2016, hp: 170, cc: 2143, co2w: 143 },
+]);
+model("CLA-C117", "Mercedes", "CLA-C117", 2016, [
+  { name: "CLA 250 4matic", fuelSection: "petrol", fuel: "Petrol", year: 2016, hp: 218, cc: 1991, co2w: 155 },
+]);
+
 const CAT: UsCatalogIndex = buildIndex(models, versions);
 
 // ── helper de input ──
@@ -755,6 +766,124 @@ test("degrau exato: 928 '4S' (token não bate 's4') → S4 320, não GT 330", ()
   assert.equal(vspec(r)?.powerHp, 320);
 });
 
+// ── F1: guarda de coerência do título do vendedor (sellerTitle) ───
+// O balde do agregador (theparking) mete campos estruturados errados; o slug do
+// título do vendedor no URL diz a verdade. A regra DUPLA (badge forte + potência
+// de OUTRA designação do mesmo make) demove o match a null.
+
+test("F1: 840d estruturado mas sellerTitle diz '320d 190' (balde errado) → null", () => {
+  // Sem sellerTitle o balde estruturado resolve exato no 840d.
+  const base = inp({
+    makeRaw: "BMW", modelRaw: "8 SERIES", variant: "840D 3.0 320 M SPORT XDRIVE",
+    fuelRaw: "Diesel", year: 2019, powerHp: 320, displacementCc: 2993,
+  });
+  assert.equal(resolveVersion(base, CAT)?.kind, "exato");
+  // Com o sellerTitle do vendedor (320d 190 mild-hybrid) → conflito (badge "320d"
+  // vive na serie-3 com 190cv, que o 840d survivor não explica) → demovido a null.
+  const r = resolveVersion({ ...base, sellerTitle: "m-sport-320d-190-mild-hybrid-steptronic-8" }, CAT);
+  assert.equal(r, null);
+});
+
+test("F1: sellerTitle coerente ('840d 340') NÃO dispara → continua exato", () => {
+  const r = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "8 SERIES", variant: "840D 3.0 320 M SPORT XDRIVE",
+    fuelRaw: "Diesel", year: 2019, powerHp: 320, displacementCc: 2993,
+    sellerTitle: "m-sport-840d-340-mild-hybrid-steptronic-8",
+  }), CAT);
+  // "840d" está no survivor (não é badge estranho); nenhum outro badge do título
+  // bate outra versão do make → sem conflito.
+  assert.equal(r?.kind, "exato");
+});
+
+test("F1: sellerTitle sem badges fortes NÃO dispara → continua exato", () => {
+  const r = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "8 SERIES", variant: "840D 3.0 320 M SPORT XDRIVE",
+    fuelRaw: "Diesel", year: 2019, powerHp: 320, displacementCc: 2993,
+    sellerTitle: "berlina-cinzento-full-extras-nacional",
+  }), CAT);
+  assert.equal(r?.kind, "exato");
+});
+
+test("F1: número de modelo ('220' Mercedes) não é lido como potência → não demove o 220d coerente", () => {
+  // Sem sellerTitle o GLC 220d resolve exato (potência + cilindrada).
+  const base = inp({ makeRaw: "Mercedes", modelRaw: "GLC", variant: "GLC 220 d", fuelRaw: "Diesel", year: 2016, powerHp: 170, displacementCc: 2143 });
+  assert.equal(resolveVersion(base, CAT)?.kind, "exato");
+  // sellerTitle coerente "glc-220-220d-4matic": o "220" é a designação do modelo
+  // (não 220 cv) e "4matic" é tração partilhada; a coincidência 220↔CLA 250 4matic
+  // (218cv) de outra classe NÃO pode demover. Continua exato.
+  const r = resolveVersion({ ...base, sellerTitle: "mercedes-glc-220-220d-4matic" }, CAT);
+  assert.equal(r?.kind, "exato");
+});
+
+test("F1: número seguido de 'kW' é kW (não cv) → não demove", () => {
+  // "218 kW" é potência em kW, não cv; sem esta exclusão, o "218" coincidiria com
+  // o CLA 250 4matic (218cv) via o badge "4matic" e demovia o GLC 220d coerente.
+  const base = inp({ makeRaw: "Mercedes", modelRaw: "GLC", variant: "GLC 220 d", fuelRaw: "Diesel", year: 2016, powerHp: 170, displacementCc: 2143 });
+  const r = resolveVersion({ ...base, sellerTitle: "mercedes-glc-220d-4matic-218-kw" }, CAT);
+  assert.equal(r?.kind, "exato");
+});
+
+test("F1: badge estranho existe mas a potência não bate essa versão (regra DUPLA) → exato", () => {
+  // "320d" vive na serie-3 (190cv), mas o título traz potência 500 — que a versão
+  // 320d NÃO tem. Só o badge (sem a potência a confirmar) não demove.
+  const r = resolveVersion(inp({
+    makeRaw: "BMW", modelRaw: "8 SERIES", variant: "840D 3.0 320 M SPORT XDRIVE",
+    fuelRaw: "Diesel", year: 2019, powerHp: 320, displacementCc: 2993,
+    sellerTitle: "m-sport-320d-500-steptronic-8",
+  }), CAT);
+  assert.equal(r?.kind, "exato");
+});
+
+// ── F6: kWh da bateria como 2.º sinal duro dos elétricos ──────────
+
+test("F6: EV com kWh no variant a bater o cc do candidato → 2 sinais → exato", () => {
+  // Dolphin EV cc=60 (o catálogo guarda o kWh no displacement_cc). Sem o kWh só há
+  // potência (1 sinal → provavel); com o kWh a bater a cc → 2 sinais → exato.
+  const semKwh = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "Dolphin", variant: "Comfort", fuelRaw: "Electrico", year: 2023, powerHp: 204 }), CAT);
+  assert.equal(semKwh?.kind, "provavel");
+  const r = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "Dolphin", variant: "60 kWh Comfort", fuelRaw: "Electrico", year: 2023, powerHp: 204 }), CAT);
+  assert.equal(r?.kind, "exato");
+  assert.equal(r?.evidence.hardSignals, 2);
+  assert.equal(r?.evidence.signals.batteryKwh, 60);
+});
+
+test("F6: kWh que não bate nenhum candidato → null (prova contra, como a cc)", () => {
+  const r = resolveVersion(inp({ makeRaw: "BYD", modelRaw: "Dolphin", variant: "99 kWh Comfort", fuelRaw: "Electrico", year: 2023, powerHp: 204 }), CAT);
+  assert.equal(r, null);
+});
+
+test("F6: térmico com 'kWh' no texto NÃO é afetado (o ramo é só dos elétricos)", () => {
+  const r = resolveVersion(inp({
+    makeRaw: "Volkswagen", modelRaw: "Golf", variant: "1.5 TSI",
+    fuelRaw: "Benzin", year: 2021, powerHp: 150, displacementCc: 1498,
+    extraText: "Golf 1.5 TSI 12 kWh mild hybrid",
+  }), CAT);
+  assert.equal(r?.kind, "exato");
+  assert.equal(r?.evidence.signals.batteryKwh, undefined);
+});
+
+test("F6: 'kW' de potência (não 'kWh') não é lido como kWh", () => {
+  // Kona EV, "150 kW" no texto é potência, não capacidade — o kWh exige o "h".
+  const r = resolveVersion(inp({ makeRaw: "Hyundai", modelRaw: "Kona", variant: "150 kW", fuelRaw: "Elektro", year: 2020, powerHp: 204 }), CAT);
+  assert.equal(r?.evidence.signals.batteryKwh, undefined);
+  assert.equal(r?.evidence.hardSignals, 1); // só a potência
+});
+
+test("F6: kWh fora da gama [10,150] é ruído de slug, não prova contra", () => {
+  // O extraText traz o path do URL com `.`/`-` → espaços: "80.8kWh" no slug vira
+  // "808kwh" ou "80 8kwh". Sem limites, o 808/8 seria um kWh fantasma que não
+  // bate nenhum candidato → null (demovia um anúncio legítimo). Com limites, é
+  // ignorado e o match fica como estava (potência → provavel).
+  for (const mangled of ["Dolphin 808kwh Comfort", "Dolphin 80 8kwh Comfort"]) {
+    const r = resolveVersion(inp({
+      makeRaw: "BYD", modelRaw: "Dolphin", variant: "Comfort",
+      fuelRaw: "Electrico", year: 2023, powerHp: 204, extraText: mangled,
+    }), CAT);
+    assert.equal(r?.kind, "provavel", `"${mangled}" não pode demover a null`);
+    assert.equal(r?.evidence.signals.batteryKwh, undefined);
+  }
+});
+
 // ════════════════════════════════════════════════════════════════
 // 2. Golden (só com BD docker)
 // ════════════════════════════════════════════════════════════════
@@ -905,6 +1034,9 @@ test(
       perSource.set(row.source_site, bucket);
       if (!r) continue;
       checked++;
+      // Invariante F1: um resultado não-null NUNCA transporta dadosIncoerentes (a
+      // demoção por incoerência devolve sempre null).
+      assert.ok(!r.evidence.dadosIncoerentes, `não-null com dadosIncoerentes em ${row.id}`);
 
       if (r.kind === "exato") {
         // mid string + ≥2 sinais duros + ano presente + cross-fuel + ano∈janela.

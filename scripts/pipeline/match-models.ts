@@ -42,6 +42,32 @@ function pathText(url: string | null): string | null {
   }
 }
 
+/** Título do vendedor no detail_url: o segmento do pathname (sem extensão) com
+ * MAIS hífens (empate → o último). Máximo <2 hífens → null. É o slug que o
+ * VENDEDOR escreveu (a verdade da motorização), distinto do balde do agregador
+ * (outro segmento, por vezes errado). Alimenta só a guarda de coerência. */
+function sellerTitleFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const segs = new URL(url).pathname
+      .split("/")
+      .filter(Boolean)
+      .map((s) => decodeURIComponent(s).replace(/\.[a-z0-9]+$/i, ""));
+    let best: string | null = null;
+    let bestH = -1;
+    for (const s of segs) {
+      const h = (s.match(/-/g) ?? []).length;
+      if (h >= bestH) {
+        bestH = h;
+        best = s;
+      } // >= ⇒ em empate fica o último
+    }
+    return bestH >= 2 ? best : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function matchModels(opts: { rematch?: boolean } = {}) {
   const { db } = await import("../../db");
   const { inArray, sql } = await import("drizzle-orm");
@@ -214,7 +240,10 @@ async function resolveVersions(
     // tourer") que make/model/variant perdem; SÓ alimenta a desambiguação
     // (derivativeGuard/trim), nunca sinais duros — o resolver garante-o.
     const extraText = [row.rawTitle, pathText(row.detailUrl)].filter(Boolean).join(" ") || null;
-    const r = resolveVersion({ ...row, extraText }, cat);
+    // sellerTitle = o segmento-slug do vendedor no detail_url (a verdade da
+    // motorização), SÓ para a guarda de coerência — nunca para sinais duros.
+    const sellerTitle = sellerTitleFromUrl(row.detailUrl);
+    const r = resolveVersion({ ...row, extraText, sellerTitle }, cat);
     let vid: string | null = null;
     let conf: string | null = null;
     let evidence: unknown = null;
