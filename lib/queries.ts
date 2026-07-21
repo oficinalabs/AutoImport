@@ -22,6 +22,7 @@ import {
 } from "../db/schema";
 import { co2Norm } from "./cost-engine";
 import type { SearchFilters } from "./data";
+import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
 import type {
   Alert,
@@ -31,6 +32,7 @@ import type {
   FuelType,
   Listing,
   Notification,
+  PtMarket,
   Stand,
   Transmission,
   Verdict,
@@ -136,6 +138,7 @@ function rowToListing(
     ptMarket: {
       estimatedPrice: e.ptEstimatedPrice,
       sampleSize: e.ptSampleSize,
+      confidence: e.ptConfidence as PtMarket["confidence"],
       history,
     },
     savings: e.savings,
@@ -189,15 +192,43 @@ const toListing = (r: BaseRow, history: { month: string; price: number }[] = [])
 /** Superfícies de descoberta só mostram anúncios com match EXATO ao ultimatespecs
  * (decisão de produto, 21 jul): certeza absoluta de modelo+motor+versão — a
  * designacao (motor provado, variante entre gémeas) fica de fora da montra.
- * Favoritos/detalhe/comparar continuam a abrir itens já guardados
- * (desaparecer sem explicação é pior — docs/08). */
-const COM_CATALOGO = eq(listings.matchConfidence, "exato");
+ * Exige TAMBÉM confiança `normal` na estimativa PT (amostra fechada, não a
+ * `alargada`) — alinhado com o flag-opportunities: a montra não mostra margens
+ * assentes em amostras esticadas. Favoritos/detalhe/comparar continuam a abrir
+ * itens já guardados (desaparecer sem explicação é pior — docs/08). */
+const COM_CATALOGO = and(
+  eq(listings.matchConfidence, "exato"),
+  eq(importCostEstimates.ptConfidence, "normal"),
+);
+
+/**
+ * Dedupe da pesquisa por CARRO físico (ver lib/engine/car-identity.ts): o mesmo
+ * Tucson listado por caetano.pt e carplus.pt (chassis igual no slug do URL, preço
+ * e km ligeiramente diferentes) aparecia 2×. Mantém só o REPRESENTANTE de cada
+ * identidade — o de maior savings, desempate pelo id mais baixo — via "não existe
+ * outro visível do mesmo carro que ganhe". Determinístico e sem mexer no ORDER
+ * BY/LIMIT: o corte é anterior ao limite, logo dá sempre 1 linha por carro.
+ * Restrito ao MESMO conjunto visível da montra (não-apagado, exato, normal) para
+ * não esconder um anúncio bom por causa de um duplicado que a montra nem mostra.
+ */
+const MONTRA_REPRESENTANTE = sql`not exists (
+  select 1
+  from listings l2
+  join import_cost_estimates e2 on e2.listing_id = l2.id
+  where l2.deleted_at is null
+    and l2.match_confidence = 'exato'
+    and e2.pt_confidence = 'normal'
+    and l2.id <> ${listings.id}
+    and ${carIdentitySql("l2")} = ${carIdentitySql("listings")}
+    and (e2.savings > ${importCostEstimates.savings}
+         or (e2.savings = ${importCostEstimates.savings} and l2.id < ${listings.id}))
+)`;
 
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
 ): Promise<Listing[]> {
-  const conds = [isNull(listings.deletedAt), COM_CATALOGO];
+  const conds = [isNull(listings.deletedAt), COM_CATALOGO, MONTRA_REPRESENTANTE];
   if (filters.query) {
     const q = `%${filters.query}%`;
     const textMatch = or(
@@ -277,6 +308,8 @@ export async function dashboardCountsQuery(standId: string | null): Promise<Dash
     })
     .from(opportunities)
     .innerJoin(listings, eq(listings.id, opportunities.listingId))
+    // join à estimativa: o COM_CATALOGO exige pt_confidence normal (coluna daqui)
+    .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
     // contar só o que o painel mostra (COM_CATALOGO) — senão "3 novas" com 2 visíveis
     .where(and(isNull(opportunities.deletedAt), COM_CATALOGO));
   const [al] = standId

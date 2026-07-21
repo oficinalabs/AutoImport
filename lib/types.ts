@@ -57,12 +57,21 @@ export interface CostBreakdown {
   totalPt: number;
 }
 
+/**
+ * Confiança da estimativa PT: `normal` = amostra fechada (ano±1/km±1); `alargada`
+ * = fallback com a banda de km esticada. A montra só mostra `normal`; a
+ * `alargada` só chega à UI em itens já guardados (favoritos/detalhe), com aviso.
+ */
+export type PtConfidence = "normal" | "alargada";
+
 /** Referência do mercado português para o mesmo modelo. */
 export interface PtMarket {
   /** preço equivalente estimado em PT */
   estimatedPrice: number;
   /** nº de anúncios PT usados na amostra */
   sampleSize: number;
+  /** confiança da amostra (undefined no mock de UI) */
+  confidence?: PtConfidence;
   /** histórico de preço médio PT (para o gráfico) */
   history: { month: string; price: number }[];
 }

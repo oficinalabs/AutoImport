@@ -118,13 +118,27 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
 
           {/* Histórico de preço PT */}
           <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">
                 Preço de mercado em Portugal
               </h2>
-              <span className="text-xs text-ink-soft">
-                amostra de {formatNumber(listing.ptMarket.sampleSize)} anúncios
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Transparência: itens guardados/favoritos abrem mesmo com
+                    estimativa alargada (banda de km esticada) — a montra não os
+                    mostra, mas quem cá chega merece saber que a amostra é menos
+                    fechada. Nota discreta, não alarme. */}
+                {listing.ptMarket.confidence === "alargada" && (
+                  <span
+                    className="rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-soft"
+                    title="Amostra com a banda de quilómetros alargada — menos anúncios comparáveis, estimativa menos fechada."
+                  >
+                    estimativa alargada
+                  </span>
+                )}
+                <span className="text-xs text-ink-soft">
+                  amostra de {formatNumber(listing.ptMarket.sampleSize)} anúncios
+                </span>
+              </div>
             </div>
             <PriceChart data={listing.ptMarket.history} />
           </div>
