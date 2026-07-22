@@ -58,8 +58,10 @@ function runFull(site) {
     const rate = rates[site] ?? 1000;
     const t0 = Date.now();
     console.log(`▶ ${site} — --full @ ${rate}ms`);
-    const child = spawn('node', [`run-${site}.ts`, '--full', '--resume', '--rate', String(rate),
-      '--out', OUT], { cwd: COLLECTOR_DIR });
+    // --max-pages ALTO: sem isto, o default (5) capa cada site a ~5 páginas/facetas. Um teto
+    // enorme = "recolhe tudo" (o crawl pára quando as facetas/páginas esgotam).
+    const child = spawn('node', [`run-${site}.ts`, '--full', '--resume', '--max-pages', '100000',
+      '--rate', String(rate), '--out', OUT], { cwd: COLLECTOR_DIR });
     let tail = '';
     const onData = (d) => { tail = (tail + d).split('\n').slice(-3).join('\n'); };
     child.stdout.on('data', onData);
