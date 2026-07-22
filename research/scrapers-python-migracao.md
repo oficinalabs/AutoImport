@@ -147,8 +147,12 @@ completos). Para esses — e **só esses** — usa-se browser stealth:
 O **bridge** [`autouncle/stealth.ts`](../tools/collector/autouncle/stealth.ts) é a peça-chave
 desta investigação: um `StealthHttpClient` com a **mesma interface** do `HttpClient`, que em vez
 de `fetch()` fala com o daemon Python por STDIN + FD 3 (JSON por linha, HTML em base64). Isto
-prova que **o padrão híbrido TS↔Python já está resolvido e é elegante**: o Node orquestra tudo,
-o Python entra só onde é insubstituível (o browser stealth).
+prova que **o padrão híbrido TS↔Python já está resolvido**: o Node orquestra tudo, o Python
+entra só onde é insubstituível (o browser stealth).
+
+> **Nota de honestidade:** este bridge STDIN/FD3 é também a **peça mais frágil** da arquitetura
+> atual (spawn de processo, protocolo por linha, casamento FIFO de respostas). É o **argumento
+> mais forte a favor** de unificar em Python — ver secção 4.2.
 
 Dependência isolada: `scrapling[fetchers]==0.4.11`, cada um no seu venv (`piscapisca/.venv`,
 `autouncle/.venv`), Camoufox de centenas de MB. Os 23 coletores Node continuam zero-deps.
@@ -209,6 +213,16 @@ migrar o coletor** — é reutilizar o **bridge stealth** (secção 2, `stealth.
 parse/schema/crawl em TS e trocar só o transporte. O autouncle já faz exatamente isto para 4
 domínios sem reescrever nada.
 
+**O único argumento sério a favor de migrar tudo:** unificar a stack **eliminaria o bridge
+STDIN/FD3** (a peça mais frágil hoje) e a camada `lib/` é pequena (~600 linhas, port mecânico —
+o `piscapisca/` já prova o port 1:1 módulo-a-módulo). É real, mas o preço é reescrever os ~26
+`parse.ts` (onde vive o risco) e, sobretudo, o `db-sink.ts` — o ficheiro mais complexo do
+projeto (SQL cru, conflito `(source_site, external_id)`, histórico de preço, lógica do "precio
+contado ES"). Sinal de aviso: o `piscapisca/sink.py` **já** está atrás do `lib/db-sink.ts` (só
+NDJSON, sem o upsert Postgres completo) — a dívida que uma migração a meio-caminho gera não é
+hipotética, já existe. Trocar uma peça frágil e isolada (o bridge) por risco espalhado pelos 26
+coletores + o upsert canónico é um mau negócio.
+
 ### 4.3 Anti-deteção / anti-bloqueio: o que realmente faria diferença
 
 Se o objetivo é **ir mais depressa sem apanhar bloqueio de IP**, o que falta não é linguagem — é
@@ -260,8 +274,10 @@ ficando com uma só arquitetura.
   Os Python correm com o venv do subdiretório: `piscapisca/.venv/bin/python run-piscapisca.py`.
 - **Sem scheduler de recolha:** os coletores são lançados à mão (batch ou watch contínuo). O
   `pnpm pipeline:daily` só faz *ingest* do NDJSON acumulado em `out/` para a BD.
-- **Anti-bot por site:** ~19 passam a HTTP puro (CF/DataDome/Imperva passivos); 2 casos usam
-  stealth Python (piscapisca; 4 domínios autouncle: de/it/es/uk). Detalhe site-a-site no
+- **Anti-bot por site:** dos 24 coletores de anúncios, **23 passam a HTTP puro** (Cloudflare /
+  DataDome / Imperva / CloudFront *passivos* — 200 com UA de browser, sem challenge). Só o
+  **piscapisca** é 100% stealth Python; o **autouncle** é misto (10 domínios HTTP puro + 4 com CF
+  ativo, de/it/es/uk, via bridge stealth). Detalhe site-a-site no
   [`README`](../tools/collector/README.md) do collector.
 - **Sem proxies, sem rotação de UA** em lado nenhum (verificado por grep).
 </content>
