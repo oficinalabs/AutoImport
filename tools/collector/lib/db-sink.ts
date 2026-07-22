@@ -162,6 +162,15 @@ export class DbSink {
     const cashPrice = int(record.cash_price);
     const price = cashPrice != null && cashPrice > 0 ? cashPrice : int(record.price);
 
+    // raw ENXUTO: dos ~30 campos do coletor, só `engine_code` e `title` têm leitores
+    // (scripts/pipeline/match-models.ts lê `raw->>'engine_code'` e `raw->>'title'`). Guardar o
+    // registo INTEIRO inflava a linha ~1 KB+ sem ninguém o ler — e o arquivo completo já vive no
+    // NDJSON em disco. Os campos do "precio al contado" (ES) NÃO entram aqui: são acrescentados
+    // depois pelo enrich-es.ts (`raw::jsonb || …`) e preservados no on-conflict abaixo.
+    const rawMin: Record<string, unknown> = {};
+    if (record.engine_code != null) rawMin.engine_code = record.engine_code;
+    if (record.title != null) rawMin.title = record.title;
+
     const rows = await this.sql`
       insert into listings (
         source_site, external_id, source_id,
@@ -185,7 +194,7 @@ export class DbSink {
         ${str(record.source)}, ${sellerType(record)},
         ${(() => { const n = int(record.price_evaluation); return n != null && n >= 1 && n <= 5 ? n : null; })()},
         ${typeof record.is_damaged === 'boolean' ? record.is_damaged : null},
-        ${str(record.vin)}, ${this.sql.json(record as never)}, ${firstSeenAt}, ${seenAt}
+        ${str(record.vin)}, ${this.sql.json(rawMin as never)}, ${firstSeenAt}, ${seenAt}
       )
       on conflict (source_site, external_id) do update set
         -- Preço: o re-crawl NÃO pode desfazer a correção do "precio al contado"

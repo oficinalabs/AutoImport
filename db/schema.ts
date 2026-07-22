@@ -305,7 +305,9 @@ export const listings = pgTable(
     priceEvaluation: integer("price_evaluation"),
     isDamaged: boolean("is_damaged"),
     vin: text("vin"),
-    /** registo completo do coletor — nada se perde */
+    /** raw ENXUTO: só os campos com leitores — `engine_code`/`title` (match-models) e, mais
+     * tarde, `precio_contado`/`precio_financiado`/`precio_contado_checked` (enrich-es). O registo
+     * completo do coletor vive no NDJSON em disco, não aqui (ver tools/collector/lib/db-sink.ts). */
     raw: jsonb("raw"),
     // ── matching de versão (lib/engine/match-version.ts, Fase 3) ──
     /** versão canónica do catálogo ultimatespecs resolvida pelo matching estrito;
