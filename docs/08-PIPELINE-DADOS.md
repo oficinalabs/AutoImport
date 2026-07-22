@@ -14,17 +14,19 @@ pnpm pipeline:daily # ingest → match → mercado PT → custos → oportunidad
 pnpm dev            # a UI passa a mostrar dados reais (sem DATABASE_URL → mock)
 ```
 
-## Os 6 passos do `pipeline:daily` (scripts/pipeline/run-daily.ts)
+## Os 9 passos do `pipeline:daily` (scripts/pipeline/run-daily.ts)
 
 | # | Passo | O que faz |
 |---|---|---|
-| 1 | `ingest.ts` | replay dos NDJSON de `tools/collector/out` → upsert em `listings` (chave `source_site`+`external_id`) + `listing_price_history`. Idempotente. O modo watch dos coletores escreve direto na BD via `tools/collector/lib/db-sink.ts` quando há `DATABASE_URL`. Preço: fontes com contado estruturado (flexicar `cash_price`) usam-no em vez do financiado de montra; leilões (`/leilao/`) nunca geram estimativa. |
-| 1b | `enrich-es.ts` | stands ES anunciam o FINANCIADO; para anúncios AS24-ES com estimativa, busca a página de detalhe e extrai o "precio al contado" da descrição (`lib/engine/precio-contado.ts`), corrigindo o preço (1 visita por anúncio, rate 1,5 s). |
+| 1 | `ingest.ts` | replay dos NDJSON de `tools/collector/out` → upsert em `listings` (chave `source_site`+`external_id`) + `listing_price_history`. Idempotente. O modo watch dos coletores escreve direto na BD via `tools/collector/lib/db-sink.ts` quando há `DATABASE_URL`. Preço: fontes com contado estruturado (flexicar `cash_price`) usam-no em vez do financiado de montra; leilões (`/leilao/`) nunca geram estimativa. O upsert **preserva** o contado já verificado (passo 7) enquanto o preço de montra não mudar — se mudar, larga as marcas e o anúncio volta à fila. |
 | 2 | `match-models.ts` | **(A) modelo:** normalização determinística (`lib/engine/normalize-vehicle.ts`): `norm_key = make\|model\|fuel` → `vehicle_models`; a variante desambigua HEV vs PHEV ("Plug-in" muitas vezes só aparece aí); loga taxa de match + top não-mapeados (alimentar o dicionário). GPL/GN ficam de fora por decisão. **(B) versão:** resolve cada anúncio ativo → versão do catálogo `us_versions` (`us_version_id`/`match_confidence`/`match_evidence`); loga a distribuição por tier e fonte + top-20 de anúncios com potência mas sem confirmado. Ver "Resolução de versão" abaixo. |
 | 3 | `pt-market.ts` | 1 observação de preço/dia por anúncio PT ativo → `pt_price_observations`. |
 | 4 | desaparecidos | soft-delete de anúncios sem sinal há 14+ dias (`--stale-days`). |
-| 5 | `compute-costs.ts` | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos; fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). Ver "Resolução de versão" e "Specs efetivas" abaixo. |
-| 6 | `flag-opportunities.ts` | veredito `compensa` + confiança `normal` → `opportunities`. |
+| 5 | `check-gone.ts` | HEAD às oportunidades ativas: 404/410 → soft-delete, antes de recalcular veredito sobre um carro que já não existe. |
+| 6 | `compute-costs.ts` (1.ª) | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos; fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). Ver "Resolução de versão" e "Specs efetivas" abaixo. |
+| 7 | `enrich-es.ts` | stands ES anunciam o FINANCIADO. Para os AS24-ES que a 1.ª passagem deu como `compensa`/`marginal`, busca a página de detalhe e extrai o "precio al contado" da descrição (`lib/engine/precio-contado.ts`), corrigindo o preço (1 visita por anúncio, rate 1,5 s). Só visita quem já parece negócio: o contado é ≥ ao anunciado, logo nunca cria uma oportunidade — só a pode desfazer. |
+| 8 | `compute-costs.ts` (2.ª) | recalcula os anúncios corrigidos no passo 7 (o `pending` filtra por `updated_at > computed_at`). |
+| 9 | `flag-opportunities.ts` | veredito `compensa` + confiança `normal` → `opportunities`. Corre no fim: nada é publicado como oportunidade ao preço financiado. |
 
 ## Tabelas fiscais (ISV/IUC)
 

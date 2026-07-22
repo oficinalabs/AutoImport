@@ -504,6 +504,106 @@ test(
   },
 );
 
+test(
+  "re-crawl não desfaz o precio al contado (e desfaz quando o stand muda o preço)",
+  { skip, timeout: 60_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { DbSink } = await import("../../tools/collector/lib/db-sink");
+
+    await cleanup();
+
+    // Anúncio ES como o coletor o vê: o preço de MONTRA é o financiado.
+    const record = {
+      id: "fixture-es-contado",
+      source_site: "autoscout24.de",
+      make: "Testmarke",
+      model: "T900",
+      variant: "T900d (contado ES)",
+      year: 2023,
+      km: 80000,
+      fuel: "Gasolina",
+      engine: "999 cm³",
+      power_hp: 91,
+      country: "SPAIN",
+      price: 11900,
+      detail_url: "https://www.autoscout24.de/angebote/fixture-es-contado",
+      collected_at: "2000-01-01T00:00:00.000Z",
+      source: "Fixture Concesionario",
+      seller_type: "Dealer",
+    };
+    const sink = new DbSink(DB_URL as string);
+    const state = async () => {
+      const [row] = (await db.execute(sql`
+        select l.price,
+               (l.raw->>'precio_contado')::int as contado,
+               (l.raw->>'precio_financiado')::int as financiado,
+               (l.raw->>'precio_contado_checked') as checked,
+               l.raw->>'variant' as raw_variant,
+               (select count(*) from listing_price_history h where h.listing_id = l.id)::int as n_hist
+        from listings l where l.external_id = 'fixture-es-contado'
+      `)) as unknown as {
+        price: number;
+        contado: number | null;
+        financiado: number | null;
+        checked: string | null;
+        raw_variant: string;
+        n_hist: number;
+      }[];
+      return row;
+    };
+
+    try {
+      await sink.upsertListing(record, "new", "autoscout24");
+      assert.equal((await state()).price, 11900, "1.º crawl: fica o preço de montra");
+
+      // O que o enrich-es faz quando encontra "Precio al contado: 12900 euros".
+      await db.execute(sql`
+        update listings set
+          price = 12900,
+          raw = raw::jsonb || jsonb_build_object(
+            'precio_contado', 12900, 'precio_contado_checked', true, 'precio_financiado', 11900),
+          updated_at = now()
+        where external_id = 'fixture-es-contado'
+      `);
+      await db.execute(sql`
+        insert into listing_price_history (listing_id, price)
+        select id, 12900 from listings where external_id = 'fixture-es-contado'
+      `);
+
+      // 2.º crawl com o MESMO preço de montra: a correção sobrevive.
+      await sink.upsertListing(
+        { ...record, variant: "T900d (contado ES, re-crawl)" },
+        "new",
+        "autoscout24",
+      );
+      const depois = await state();
+      assert.equal(depois.price, 12900, "o re-crawl não repõe o financiado");
+      assert.equal(depois.contado, 12900, "a marca do contado sobrevive");
+      assert.equal(depois.financiado, 11900, "o financiado observado sobrevive");
+      assert.equal(depois.checked, "true", "a marca de verificado sobrevive");
+      assert.equal(
+        depois.raw_variant,
+        "T900d (contado ES, re-crawl)",
+        "o resto do raw é o registo fresco da fonte",
+      );
+      assert.equal(depois.n_hist, 2, "sem descida fantasma no histórico (11900 → 12900, e nada)");
+
+      // 3.º crawl com o preço de montra MUDADO: o contado caduca e o anúncio
+      // volta à fila do enrich (sem marcas).
+      await sink.upsertListing({ ...record, price: 11500 }, "price_change", "autoscout24");
+      const mudou = await state();
+      assert.equal(mudou.price, 11500, "preço de montra novo manda");
+      assert.equal(mudou.contado, null, "marca do contado largada");
+      assert.equal(mudou.checked, null, "volta à fila do enrich");
+      assert.equal(mudou.n_hist, 3, "a mudança real entra no histórico");
+    } finally {
+      await sink.close();
+    }
+  },
+);
+
 after(async () => {
   if (!skip) {
     await cleanup();

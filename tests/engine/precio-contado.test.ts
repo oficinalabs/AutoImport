@@ -12,6 +12,12 @@ test("formatos reais de contado nas descrições ES", () => {
   assert.equal(parsePrecioContado("PRECIO AL CONTADO 46.790 €", 41790), 46790);
   assert.equal(parsePrecioContado("precio al contado: 20.490,00€ financiado 16.990€", 16990), 20490);
   assert.equal(parsePrecioContado("Al contado - 23 500 EUR", 21000), 23500);
+  // caso real (Clio TCe 90 anunciado a 11.900 na montra AS24-ES):
+  // "Fahrzeugbeschreibung: Precio al contado: 12900 euros"
+  assert.equal(
+    parsePrecioContado("Fahrzeugbeschreibung Precio al contado: 12900 euros", 11900),
+    12900,
+  );
 });
 
 test("guardas: só aceita valores plausíveis (≥ anunciado, ≤ 1,4×)", () => {

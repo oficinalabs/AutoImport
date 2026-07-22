@@ -188,7 +188,20 @@ export class DbSink {
         ${str(record.vin)}, ${this.sql.json(record as never)}, ${firstSeenAt}, ${seenAt}
       )
       on conflict (source_site, external_id) do update set
-        price = coalesce(excluded.price, listings.price),
+        -- Preço: o re-crawl NÃO pode desfazer a correção do "precio al contado"
+        -- (scripts/pipeline/enrich-es.ts). O que a fonte traz é o preço de
+        -- MONTRA (o financiado, nos stands ES); enquanto ele não mudar, o
+        -- contado que já verificámos continua a valer e é ele que fica no preço.
+        -- Se o stand mexer no preço de montra, o contado antigo caduca: volta a
+        -- valer o da fonte e as marcas caem (ver raw, abaixo), pondo o anúncio
+        -- outra vez na fila do enrich.
+        price = case
+          when listings.raw->>'precio_contado_checked' is not null
+           and (excluded.price is null
+                or excluded.price = coalesce((listings.raw->>'precio_financiado')::int, listings.price))
+            then listings.price
+          else coalesce(excluded.price, listings.price)
+        end,
         km = coalesce(excluded.km, listings.km),
         variant = coalesce(excluded.variant, listings.variant),
         displacement_cc = coalesce(excluded.displacement_cc, listings.displacement_cc),
@@ -197,25 +210,41 @@ export class DbSink {
         first_registration = coalesce(excluded.first_registration, listings.first_registration),
         price_evaluation = coalesce(excluded.price_evaluation, listings.price_evaluation),
         image_url = coalesce(excluded.image_url, listings.image_url),
-        raw = excluded.raw,
+        -- raw é sempre o registo fresco da fonte, mas as marcas do contado não
+        -- vivem no coletor — vivem aqui. Mesma condição do preço: enquanto o
+        -- preço de montra não mudar, sobrevivem ao re-crawl.
+        raw = case
+          when listings.raw->>'precio_contado_checked' is not null
+           and (excluded.price is null
+                or excluded.price = coalesce((listings.raw->>'precio_financiado')::int, listings.price))
+            then excluded.raw || jsonb_strip_nulls(jsonb_build_object(
+              'precio_contado', listings.raw->'precio_contado',
+              'precio_financiado', listings.raw->'precio_financiado',
+              'precio_contado_checked', listings.raw->'precio_contado_checked'))
+          else excluded.raw
+        end,
         last_seen_at = greatest(listings.last_seen_at, excluded.last_seen_at),
         deleted_at = null,
         updated_at = now()
-      returning id
+      returning id, price
     `;
 
     // Histórico de preço: 1 linha na primeira observação + 1 por mudança.
+    // O preço registado é o da LINHA (devolvido pelo upsert), não o da fonte:
+    // num anúncio ES já corrigido para contado, o preço da fonte é o financiado
+    // e registá-lo inventava uma descida a cada crawl.
     const listingId = rows[0]?.id as string | undefined;
-    if (listingId && price != null) {
+    const storedPrice = rows[0]?.price as number | undefined;
+    if (listingId && storedPrice != null) {
       await this.sql`
         insert into listing_price_history (listing_id, price, observed_at)
-        select ${listingId}, ${price}, ${seenAt}
+        select ${listingId}, ${storedPrice}, ${seenAt}
         where coalesce(
           (select price from listing_price_history
             where listing_id = ${listingId}
             order by observed_at desc limit 1),
           -1
-        ) <> ${price}
+        ) <> ${storedPrice}
       `;
     }
   }
