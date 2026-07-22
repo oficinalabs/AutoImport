@@ -197,6 +197,11 @@ export interface AlertDraft {
   criteria: string;
   countries: CountryCode[];
   maxPrice?: number;
+  /** Preenchidos quando o alerta nasce de um anúncio (ver
+   * components/listing-actions.tsx) — vão para o JSONB de criteria, para o
+   * futuro job de matching comparar exato em vez de reanalisar texto livre. */
+  make?: string;
+  model?: string;
 }
 
 export async function createAlert(draft: AlertDraft): Promise<void> {
