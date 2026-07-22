@@ -2,15 +2,15 @@ import { CarImage } from "@/components/car-image";
 import { CostBreakdown } from "@/components/cost-breakdown";
 import { CountryFlag } from "@/components/country-flag";
 import { KmTrustBadge } from "@/components/km-trust-badge";
+import { ListingActions } from "@/components/listing-actions";
 import { PriceChart } from "@/components/price-chart";
 import { SavingsBadge } from "@/components/savings-badge";
-import { Button } from "@/components/ui/button";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { getListing } from "@/lib/data";
 import { formatCc, formatEuro, formatKm, formatNumber, relativeDay } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { ArrowLeft, BellPlus, Heart, MessagesSquare, PackageX } from "lucide-react";
+import { ArrowLeft, PackageX } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -193,38 +193,7 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
           </div>
 
           {/* Ações */}
-          <div className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-4">
-            {/* Não convidamos ninguém a negociar um carro que já não está à
-                venda — o alerta é que faz sentido, para apanhar outro igual. */}
-            {indisponivel ? (
-              <>
-                <Button asChild variant="accent" size="lg">
-                  <Link href="/alertas">
-                    <BellPlus className="size-4" /> Avisar-me se aparecer outro igual
-                  </Link>
-                </Button>
-                <Button variant="outline">
-                  <Heart className="size-4" /> Tirar dos favoritos
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild variant="accent" size="lg">
-                  <Link href="/negociacoes">
-                    <MessagesSquare className="size-4" /> Iniciar negociação
-                  </Link>
-                </Button>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant="outline">
-                    <Heart className="size-4" /> Favoritar
-                  </Button>
-                  <Button variant="outline">
-                    <BellPlus className="size-4" /> Criar alerta
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
+          <ListingActions listing={listing} />
         </div>
       </div>
     </div>

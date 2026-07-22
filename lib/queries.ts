@@ -377,6 +377,12 @@ export async function toggleFavoriteMutation(standId: string, listingId: string)
 interface AlertCriteria {
   summary?: string;
   maxPrice?: number;
+  /** Marca/modelo exatos, quando o alerta nasce de um anúncio (ver
+   * components/listing-actions.tsx) — sem migration, é só mais uma chave no
+   * JSONB. Preparado para o futuro job de matching comparar exato, em vez de
+   * ter de reanalisar o resumo em texto livre. */
+  make?: string;
+  model?: string;
 }
 
 export async function alertsQuery(standId: string): Promise<Alert[]> {
@@ -387,10 +393,14 @@ export async function alertsQuery(standId: string): Promise<Alert[]> {
     .orderBy(desc(alerts.createdAt));
   return rows.map((a) => {
     const criteria = (a.criteria ?? {}) as AlertCriteria;
+    // Sem summary (não devia acontecer nos caminhos de criação atuais, mas o
+    // JSONB não obriga), tenta reconstruir a partir de marca/modelo antes de
+    // cair no nome do alerta.
+    const fromMakeModel = [criteria.make, criteria.model].filter(Boolean).join(" ");
     return {
       id: a.id,
       name: a.name,
-      criteria: criteria.summary ?? a.name,
+      criteria: criteria.summary ?? (fromMakeModel || a.name),
       countries: (a.countries ?? []) as CountryCode[],
       active: a.active,
       matchCount: 0, // preenchido quando o job de matching de alertas existir
@@ -401,12 +411,24 @@ export async function alertsQuery(standId: string): Promise<Alert[]> {
 
 export async function createAlertMutation(
   standId: string,
-  draft: { name: string; criteria: string; countries: CountryCode[]; maxPrice?: number },
+  draft: {
+    name: string;
+    criteria: string;
+    countries: CountryCode[];
+    maxPrice?: number;
+    make?: string;
+    model?: string;
+  },
 ): Promise<void> {
   await db.insert(alerts).values({
     standId,
     name: draft.name,
-    criteria: { summary: draft.criteria, maxPrice: draft.maxPrice } satisfies AlertCriteria,
+    criteria: {
+      summary: draft.criteria,
+      maxPrice: draft.maxPrice,
+      make: draft.make,
+      model: draft.model,
+    } satisfies AlertCriteria,
     countries: draft.countries,
     active: true,
   });
