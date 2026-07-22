@@ -89,10 +89,12 @@ export interface Listing {
   source: string;
   /** URL original (o backend pode mascarar/proxiar) */
   sourceUrl?: string;
+  /** fotos do próprio anúncio; hoje só a 1.ª (a capa) — vazio se a fonte não
+   * deu foto ou se o URL não é utilizável (ver `listingPhoto` em lib/queries.ts) */
   images: string[];
   /** imagem principal do catálogo ultimatespecs (versão exata ou galeria do
-   * modelo da designação) — a única cujo host o next/image autoriza; as fotos
-   * dos anúncios (`images`) ficam para uma iteração futura */
+   * modelo da designação) — **fallback** da capa, para os anúncios sem foto
+   * própria e para as fontes que bloqueiam hotlinking */
   catalogImage?: string;
   cost: CostBreakdown;
   ptMarket: PtMarket;

@@ -30,10 +30,13 @@ const nextConfig = {
   // Não anunciar a stack.
   poweredByHeader: false,
 
-  // Imagens externas autorizadas no <Image>. Por agora SÓ o catálogo
-  // ultimatespecs (imagem principal da versão/galeria do modelo — ver
-  // Listing.catalogImage); as fotos dos próprios anúncios (AutoScout24,
-  // leparking, olxcdn…) entram aqui quando as formos mostrar.
+  // Imagens externas autorizadas no <Image>: SÓ o catálogo ultimatespecs
+  // (imagem principal da versão/galeria do modelo — ver Listing.catalogImage).
+  //
+  // As fotos dos próprios anúncios (AutoScout24, leparking, olxcdn…) NÃO entram
+  // aqui de propósito: são ~24 CDNs e cada coletor novo traz mais, portanto um
+  // allowlist obrigaria a editar este ficheiro + redeploy só para a foto não
+  // rebentar. Servem-se com <img> normal em components/car-image.tsx.
   // Ver docs/07-FRONTEND-HANDOFF.md.
   images: {
     remotePatterns: [

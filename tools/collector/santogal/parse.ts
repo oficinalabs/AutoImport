@@ -76,7 +76,9 @@ function parseCard(chunk: string): RawCard {
   const { price, priceOld } = parsePreco(chunk);
 
   // Primeira imagem real do slider (o `src` do 1º `<img>`; as seguintes têm só `data-src` lazy).
-  const image = (/<img[^>]*\ssrc="(\/media\/[^"]+)"/.exec(chunk) || [])[1] || null;
+  // Absoluto: o `src` do HTML é relativo (`/media/…`) e a UI usa-o como está.
+  const imagePath = (/<img[^>]*\ssrc="(\/media\/[^"]+)"/.exec(chunk) || [])[1] || null;
+  const image = imagePath ? `${BASE}${imagePath}` : null;
 
   return {
     id: id ? String(id) : null,

@@ -7,13 +7,14 @@ import { createAlert, toggleFavorite } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
 import type { CountryCode, Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { BellPlus, Check, Heart, MessagesSquare, X } from "lucide-react";
+import { BellPlus, Check, ExternalLink, Heart, MessagesSquare, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 /**
  * Bloco de "Ações" do anúncio: favoritar + criar alerta (variante disponível),
- * ou o par próprio da variante indisponível (inalterado — ver docs/08).
+ * ou o par próprio da variante indisponível (inalterado — ver docs/08); em
+ * ambas, o link para o anúncio na fonte.
  * Client component porque favoritar e criar alerta precisam de estado local
  * (otimista) e interação; a página em si continua Server Component.
  */
@@ -73,6 +74,17 @@ export function ListingActions({ listing }: { listing: Listing }) {
           </div>
           {showAlertForm && <AlertForm listing={listing} onClose={() => setShowAlertForm(false)} />}
         </>
+      )}
+
+      {/* O anúncio na fonte, para confirmar fotos e detalhes que não guardamos.
+          Ação secundária de propósito: a negociação pela plataforma é que mantém
+          o email do vendedor privado (docs/06). */}
+      {listing.sourceUrl && (
+        <Button asChild variant="outline">
+          <a href={listing.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+            <ExternalLink className="size-4" /> Ver anúncio em {listing.source}
+          </a>
+        </Button>
       )}
     </div>
   );

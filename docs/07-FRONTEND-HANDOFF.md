@@ -91,10 +91,27 @@ de ISV mudam por ano) e vir já preenchidos em `Listing.cost` / `savings` / `ver
 
 ## Imagens dos carros
 
-Não há fotos reais: [`components/car-image.tsx`](../components/car-image.tsx) é um placeholder.
-Quando `Listing.images` trouxer URLs reais:
-1. trocar o placeholder por `<Image>` do Next;
-2. adicionar os hosts em [`next.config.mjs`](../next.config.mjs) → `images.remotePatterns`.
+A capa é a **1.ª foto do próprio anúncio** (`listings.image_url`, gravada pelo coletor →
+`Listing.images[0]`). [`components/car-image.tsx`](../components/car-image.tsx) tenta por
+esta ordem: foto do anúncio → imagem do catálogo ultimatespecs (`catalogImage`) →
+placeholder. Cobertura na produção: ~99,7% dos anúncios ativos têm foto.
+
+**As fotos dos anúncios são `<img>` normal, sem o optimizer do Next — e não entram no
+`images.remotePatterns`.** São ~24 CDNs distintos e cada coletor novo traz mais: um
+allowlist obrigaria a editar o [`next.config.mjs`](../next.config.mjs) e fazer redeploy só
+para a foto não rebentar, além de fazer passar 22k fotos pelo optimizer da Vercel. O
+`remotePatterns` continua a ter só o ultimatespecs, que é servido com `<Image>`.
+
+Notas apanhadas a testar os 24 hosts:
+- `static.piscapisca.pt` (403) e `images.ooyyo.com` (415) **bloqueiam hotlinking** — ~2% dos
+  anúncios. O `onError` do `CarImage` cai no catálogo/placeholder, por isso não se vê;
+- o AutoScout24 (e o autotrader.nl, mesmo CDN) devolve miniaturas `250x188`; `listingPhoto`
+  em [`lib/queries.ts`](../lib/queries.ts) sobe-as para `640x480` trocando o sufixo do URL;
+- `referrerPolicy="no-referrer"` nas fotos: não vazamos os nossos URLs para os CDNs das fontes.
+
+O link para o anúncio de origem (`Listing.sourceUrl` ← `listings.detail_url`, 100% de
+cobertura) está na página do anúncio, como ação **secundária** — a negociação pela
+plataforma é que mantém o email do vendedor privado (ver [06](06-SERVICOS-EXTERNOS.md)).
 
 ## Tratamento de erros
 
