@@ -136,7 +136,13 @@ export class DbSink {
 
   constructor(databaseUrl: string) {
     // prepare:false — compatível com o pooler transaction-mode da Supabase.
-    this.sql = postgres(databaseUrl, { prepare: false, max: 4 });
+    // max/idle_timeout configuráveis: o daemon corre muitos processos e precisa de um
+    // orçamento de ligações baixo (senão N processos × max rebentam o pooler da Supabase).
+    this.sql = postgres(databaseUrl, {
+      prepare: false,
+      max: Number(process.env.COLLECTOR_PG_MAX) || 4,
+      idle_timeout: Number(process.env.COLLECTOR_PG_IDLE) || 20,
+    });
   }
 
   /**
@@ -268,6 +274,9 @@ export class DbSink {
  * caso contrário devolve null — os coletores ficam em modo NDJSON puro.
  */
 export function createDbSink(): DbSink | null {
+  // Escotilha de segurança: o daemon corre os watches em modo NDJSON-only (só disco), para
+  // NÃO abrir ligações à BD — a ingestão é centralizada num único processo (ingest.ts).
+  if (process.env.COLLECTOR_NDJSON_ONLY === '1') return null;
   if (!process.env.DATABASE_URL) {
     try {
       // repo root a partir de tools/collector/lib/
