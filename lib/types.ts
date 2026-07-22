@@ -229,10 +229,14 @@ export interface Stand {
 
 // ── Painel ──────────────────────────────────────────────────────
 export interface DashboardStats {
-  newOpportunities: number;
-  totalPotentialSavings: number;
-  activeNegotiations: number;
-  activeAlerts: number;
+  /** oportunidades a compensar no mercado neste momento */
+  activeOpportunities: number;
+  /** assinaladas nos últimos 7 dias (flagged_at) — não "vistas pelo utilizador" */
+  newThisWeek: number;
+  /** mediana da poupança por oportunidade — não a soma, ninguém compra todas de uma vez */
+  medianSavings: number;
+  /** maior poupança entre as oportunidades ativas agora */
+  bestSavings: number;
 }
 
 export interface CountryInsight {

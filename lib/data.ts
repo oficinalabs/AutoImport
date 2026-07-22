@@ -118,23 +118,30 @@ export async function getListingsByIds(ids: string[]): Promise<Listing[]> {
 }
 
 // ── Painel ──────────────────────────────────────────────────────
+/** Mediana de uma lista de números — 0 se vazia. Espelha o `percentile_cont(0.5)`
+ * usado em dashboardCountsQuery (interpola entre os dois valores centrais quando
+ * a contagem é par, tal como o SQL). */
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
-  if (hasDb()) {
-    const counts = await q.dashboardCountsQuery(await activeStandId());
-    return {
-      newOpportunities: counts.newOpportunities,
-      totalPotentialSavings: counts.totalPotentialSavings,
-      // negociações continuam mock até existir o email mascarado (docs/06)
-      activeNegotiations: CONVERSATIONS.filter((c) => c.status !== "acordo").length,
-      activeAlerts: counts.activeAlerts,
-    };
-  }
+  if (hasDb()) return q.dashboardCountsQuery();
+  // Espelha a definição real (flag-opportunities.ts): "compensa" e ainda vivo no
+  // mercado. O mock não tem flaggedAt (só seenAt), e comparar essas datas fixas
+  // com o "agora" real fica velho ao fim de poucos dias — por isso "novas esta
+  // semana" aproxima-se com metade das ativas, estável independentemente de
+  // quando o preview corre.
   const opportunities = LISTINGS.filter((l) => l.verdict === "compensa" && !l.unavailableSince);
+  const savings = opportunities.map((l) => l.savings);
   return settle({
-    newOpportunities: opportunities.length,
-    totalPotentialSavings: DEALS.reduce((s, d) => s + d.savings, 0),
-    activeNegotiations: CONVERSATIONS.filter((c) => c.status !== "acordo").length,
-    activeAlerts: ALERTS.filter((a) => a.active).length,
+    activeOpportunities: opportunities.length,
+    newThisWeek: Math.ceil(opportunities.length / 2),
+    medianSavings: median(savings),
+    bestSavings: savings.length ? Math.max(...savings) : 0,
   });
 }
 

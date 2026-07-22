@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCountryInsights, getDashboardStats, getDeals, getTopOpportunities } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
-import { BellRing, Car, PiggyBank, Sparkles } from "lucide-react";
+import { Award, BellRing, PiggyBank, Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 export default async function PainelPage() {
@@ -33,23 +33,20 @@ export default async function PainelPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
-          label="Oportunidades novas"
-          value={String(stats.newOpportunities)}
+          label="A compensar agora"
+          value={String(stats.activeOpportunities)}
           icon={Sparkles}
         />
+        <StatCard label="Novas esta semana" value={String(stats.newThisWeek)} icon={TrendingUp} />
         <StatCard
-          label="Poupança potencial"
-          value={formatEuro(stats.totalPotentialSavings)}
+          label="Poupança típica"
+          value={formatEuro(stats.medianSavings)}
           icon={PiggyBank}
           accent
         />
-        <StatCard
-          label="Negociações a decorrer"
-          value={String(stats.activeNegotiations)}
-          icon={Car}
-        />
+        <StatCard label="Melhor agora" value={formatEuro(stats.bestSavings)} icon={Award} />
       </div>
 
       {/* Oportunidades */}
