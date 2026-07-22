@@ -1,8 +1,8 @@
 /**
  * Batch diário — orquestrador sequencial do pipeline completo:
- *   ingest NDJSON → precio al contado (ES) → match-models → pt-market →
- *   soft-delete de desaparecidos → verificar oportunidades (HEAD) →
- *   compute-costs → flag-opportunities
+ *   ingest NDJSON → match-models → pt-market → soft-delete de desaparecidos →
+ *   verificar oportunidades (HEAD) → compute-costs (1.ª passagem) →
+ *   precio al contado (ES) → compute-costs (2.ª passagem) → flag-opportunities
  *   pnpm pipeline:daily [--dir tools/collector/out] [--stale-days 14]
  * Cada passo loga o seu sumário; no fim sai o painel de saúde do matching.
  */
@@ -27,7 +27,7 @@ async function main() {
   const dir = arg("--dir", "tools/collector/out");
   const staleDays = Number(arg("--stale-days", "14"));
 
-  console.log("── 1/8 ingest ──");
+  console.log("── 1/9 ingest ──");
   if (existsSync(dir)) {
     // processo separado: o ingest gere a própria ligação/saída
     execFileSync("pnpm", ["exec", "tsx", "scripts/pipeline/ingest.ts", "--dir", dir], {
@@ -46,16 +46,13 @@ async function main() {
   const { enrichEs } = await import("./enrich-es");
   const { checkGone } = await import("./check-gone");
 
-  console.log("── 2/8 precio al contado (ES) ──");
-  await enrichEs();
-
-  console.log("── 3/8 match-models ──");
+  console.log("── 2/9 match-models ──");
   const match = await matchModels();
 
-  console.log("── 4/8 pt-market ──");
+  console.log("── 3/9 pt-market ──");
   await collectPtObservations();
 
-  console.log("── 5/8 desaparecidos ──");
+  console.log("── 4/9 desaparecidos ──");
   const stale = (await db.execute(sql`
     update listings set deleted_at = now()
     where deleted_at is null
@@ -66,13 +63,26 @@ async function main() {
 
   // Antes do compute: apanha as oportunidades ativas que já morreram (404/410)
   // para não recalcular veredito sobre um carro que já não existe.
-  console.log("── 6/8 verificar oportunidades (HEAD) ──");
+  console.log("── 5/9 verificar oportunidades (HEAD) ──");
   await checkGone();
 
-  console.log("── 7/8 compute-costs ──");
+  console.log("── 6/9 compute-costs (1.ª passagem) ──");
   const costs = await computeCosts();
 
-  console.log("── 8/8 flag-opportunities ──");
+  // O preço de montra dos stands ES é o FINANCIADO; o contado (o que se paga)
+  // está na descrição do detalhe. Corre DEPOIS da 1.ª passagem porque só visita
+  // quem já parece negócio (ver enrich-es.ts) e ANTES do flag-opportunities —
+  // assim nenhum anúncio é publicado como oportunidade ao preço financiado.
+  console.log("── 7/9 precio al contado (ES) ──");
+  await enrichEs();
+
+  // 2.ª passagem: recalcula só os corrigidos acima (o `pending` do compute-costs
+  // filtra por updated_at > computed_at, e o enrich só toca no updated_at de
+  // quem corrigiu).
+  console.log("── 8/9 compute-costs (2.ª passagem) ──");
+  const costsContado = await computeCosts();
+
+  console.log("── 9/9 flag-opportunities ──");
   const opps = await flagOpportunities();
 
   // Painel de saúde do pipeline (métricas de qualidade do matching)
@@ -94,7 +104,7 @@ async function main() {
     `estimativas ${health.estimativas} · amostra PT média ${health.amostra_media ?? "—"} · oportunidades ativas ${health.oportunidades}`,
   );
   console.log(
-    `match novo: ${match.matched}/${match.total} · custos: ${JSON.stringify(costs.verdicts)} · opps ativas ${opps.flagged}`,
+    `match novo: ${match.matched}/${match.total} · custos: ${JSON.stringify(costs.verdicts)} · recalculados pós-contado: ${costsContado.computed} ${JSON.stringify(costsContado.verdicts)} · opps ativas ${opps.flagged}`,
   );
 
   await versionHealthPanel(db, sql);
@@ -106,7 +116,7 @@ async function main() {
  * fonte (top-8) — mais a proveniência das estimativas. O `legado`
  * (confirmado+provavel) é um smoke test: deve ser 0 pós-rematch (impresso à
  * mesma). O top-20 de anúncios com potência mas sem cobertura de versão é
- * impresso pelo passo 3/7 (match-models); este bloco fecha o painel com os
+ * impresso pelo passo 2/9 (match-models); este bloco fecha o painel com os
  * totais. Exportado para correr isolado.
  */
 export async function versionHealthPanel(

@@ -2,8 +2,8 @@
  * Enriquecimento ES: stands espanhóis anunciam o preço FINANCIADO na montra;
  * o "precio al contado" (compra direta — o que um importador paga) está na
  * descrição da página de detalhe. Para os anúncios ES do AutoScout24 que já
- * têm estimativa (os únicos que alimentam vereditos), busca a página de
- * detalhe e corrige o preço quando encontra o contado.
+ * parecem negócio ao preço de montra (veredito compensa/marginal), busca a
+ * página de detalhe e corrige o preço quando encontra o contado.
  *   pnpm exec tsx scripts/pipeline/enrich-es.ts
  * Cada anúncio é visitado UMA vez (marca precio_contado_checked no raw);
  * rate ~1,5 s/pedido. As fontes ES com contado estruturado (flexicar) são
@@ -26,28 +26,29 @@ export async function enrichEs(opts: { limit?: number } = {}) {
   const { sql } = await import("drizzle-orm");
   const { parsePrecioContado } = await import("../../lib/engine/precio-contado");
 
-  // Elegibilidade = espelho do compute-costs (SEM exigir estimativa já calculada).
-  // Antes, o join a import_cost_estimates fazia o enrich visitar só anúncios que
-  // JÁ tinham veredito — e o preço da montra ES é o FINANCIADO, logo um anúncio
-  // novo era avaliado (e podia virar oportunidade) com o preço errado durante 1
-  // dia, até ganhar estimativa e ser visitado. Agora é visitado ANTES da 1.ª
-  // estimativa. `first_seen_at desc`: o stock novo primeiro (o --limit corta a
-  // cauda no backfill; o run-daily corre sem limite).
+  // Elegibilidade: só os anúncios que JÁ parecem negócio ao preço de montra.
+  // O contado é sempre ≥ ao anunciado (guarda do parser), logo corrigi-lo só
+  // pode BAIXAR a poupança — quem não é oportunidade ao preço do cabeçalho
+  // nunca passa a sê-lo ao contado. Visitar os outros ~2.400 ES ativos era
+  // trabalho deitado fora (40 min de rede por corrida, contra ~4).
+  // `marginal` entra porque a montra mostra a % desses carros e o utilizador
+  // clica-lhes; `nao_compensa` fica de fora — nunca sobe.
+  // Isto EXIGE que o enrich corra DEPOIS do compute-costs (ver run-daily): é a
+  // 1.ª passagem que produz o veredito ao preço de montra, e a 2.ª corrige os
+  // que forem alterados aqui, antes do flag-opportunities publicar seja o que
+  // for. `savings_pct desc`: numa corrida com --limit, verifica primeiro as
+  // afirmações mais fortes.
   const pending = (await db.execute(sql`
     select l.id, l.price, l.detail_url
     from listings l
+    join import_cost_estimates e on e.listing_id = l.id
     where l.source_site = 'autoscout24.de'
       and l.country = 'ES'
       and l.deleted_at is null
-      and l.is_damaged is not true
-      and l.price is not null
-      and l.year is not null
-      and l.km is not null
-      and l.fuel is not null
-      and l.model_id is not null
       and l.detail_url is not null
+      and e.verdict in ('compensa', 'marginal')
       and (l.raw->>'precio_contado_checked') is null
-    order by l.first_seen_at desc
+    order by e.savings_pct desc
     ${opts.limit != null ? sql`limit ${opts.limit}` : sql``}
   `)) as unknown as { id: string; price: number; detail_url: string }[];
 
