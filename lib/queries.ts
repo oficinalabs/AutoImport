@@ -64,6 +64,18 @@ function cleanVersionName(name: string): string {
   return name.replace(/^(?:[a-z]{1,2}\d{1,3}[a-z]?\s+)+/i, "").trim() || name;
 }
 
+/**
+ * Foto do anúncio pronta para <img>: só URLs https absolutos (o santogal grava
+ * caminhos relativos até ao próximo crawl — ver tools/collector/santogal/parse.ts).
+ * Nas fotos do CDN do AutoScout24 (usado também pelo autotrader.nl) sobe a
+ * miniatura 250x188 para 640x480 — é o mesmo URL, só muda o sufixo, e a 250 fica
+ * desfocada no cartão.
+ */
+function listingPhoto(url: string | null): string[] {
+  if (!url?.startsWith("https://")) return [];
+  return [url.replace(/\/250x188\.webp$/, "/640x480.webp")];
+}
+
 function rowToListing(
   l: ListingRow,
   e: EstimateRow,
@@ -108,10 +120,10 @@ function rowToListing(
       co2: l.co2 ?? verCo2 ?? factsCo2 ?? vm.co2 ?? undefined,
       powerHp: l.powerHp ?? ver?.powerHp ?? facts?.powerHp ?? vm.powerHp ?? undefined,
     },
-    // Título e imagem: preferir o catálogo ultimatespecs — nome canónico da
-    // versão (exato) ou modelo+potência (designacao) em vez do texto cru do
-    // anúncio ("BMW BMW 2 SERIES…"); imagem principal da versão, senão a 1.ª da
-    // galeria do modelo. Sem match de catálogo, fica o título cru de sempre.
+    // Título: preferir o catálogo ultimatespecs — nome canónico da versão
+    // (exato) ou modelo+potência (designacao) em vez do texto cru do anúncio
+    // ("BMW BMW 2 SERIES…"). Sem match de catálogo, fica o título cru de sempre.
+    // A imagem do catálogo é só o fallback da capa (ver `images`).
     title:
       (ver && usm
         ? `${usm.make} ${cleanVersionName(ver.name)}`
@@ -130,7 +142,7 @@ function rowToListing(
     country: l.country as CountryCode,
     source: sourceName ?? l.sourceSite,
     sourceUrl: l.detailUrl ?? undefined,
-    images: l.imageUrl ? [l.imageUrl] : [],
+    images: listingPhoto(l.imageUrl),
     catalogImage:
       (ver ? (ver.imageUrl ?? usm?.imageUrls?.[0]) : facts ? usm?.imageUrls?.[0] : null) ??
       undefined,

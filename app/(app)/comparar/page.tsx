@@ -68,7 +68,8 @@ export default async function CompararPage({
                   >
                     <Link href={`/anuncio/${l.id}`} className="block">
                       <CarImage
-                        src={l.catalogImage}
+                        photo={l.images[0]}
+                        catalog={l.catalogImage}
                         label={l.title}
                         className="mb-2 aspect-[4/3] w-full"
                       />

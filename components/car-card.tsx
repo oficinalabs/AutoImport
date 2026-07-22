@@ -37,7 +37,8 @@ export function CarCard({ listing }: { listing: Listing }) {
     >
       <div className="relative">
         <CarImage
-          src={listing.catalogImage}
+          photo={listing.images[0]}
+          catalog={listing.catalogImage}
           label={listing.title}
           className={cn("aspect-[4/3] w-full", indisponivel && "opacity-40 grayscale")}
           rounded="rounded-none"
