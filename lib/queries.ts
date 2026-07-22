@@ -295,33 +295,43 @@ export async function topOpportunitiesQuery(
 }
 
 export interface DashboardCounts {
-  newOpportunities: number;
-  totalPotentialSavings: number;
-  activeAlerts: number;
+  activeOpportunities: number;
+  newThisWeek: number;
+  medianSavings: number;
+  bestSavings: number;
 }
 
-export async function dashboardCountsQuery(standId: string | null): Promise<DashboardCounts> {
-  const [opp] = await db
+/**
+ * KPIs do painel, numa só query sobre `opportunities` ⋈ `listings` (o join só
+ * serve para excluir anúncios que já saíram do mercado — `flag-opportunities.ts`
+ * já garante veredito "compensa" + confiança normal + dedupe por carro físico
+ * antes de a linha existir em `opportunities`, por isso não é preciso repetir
+ * esse filtro aqui).
+ *
+ * `totalPotentialSavings` (soma de tudo) saiu: era dinheiro de fantasia — ninguém
+ * compra todas as oportunidades ao mesmo tempo. Em vez disso, `medianSavings` dá
+ * a poupança típica de UMA compra (resistente a outliers) e `bestSavings` mostra
+ * o topo do momento.
+ *
+ * `opportunities` são globais — standId não entra aqui de propósito: uma
+ * oportunidade compensa independentemente de qual stand a está a ver.
+ */
+export async function dashboardCountsQuery(): Promise<DashboardCounts> {
+  const [row] = await db
     .select({
-      recent: sql<number>`count(*) filter (where flagged_at > now() - interval '24 hours')::int`,
-      savings: sql<number>`coalesce(sum(${opportunities.savings}), 0)::int`,
+      active: sql<number>`count(*)::int`,
+      newWeek: sql<number>`count(*) filter (where ${opportunities.flaggedAt} > now() - interval '7 days')::int`,
+      median: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${opportunities.savings}), 0)::int`,
+      best: sql<number>`coalesce(max(${opportunities.savings}), 0)::int`,
     })
     .from(opportunities)
     .innerJoin(listings, eq(listings.id, opportunities.listingId))
-    // join à estimativa: o COM_CATALOGO exige pt_confidence normal (coluna daqui)
-    .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
-    // contar só o que o painel mostra (COM_CATALOGO) — senão "3 novas" com 2 visíveis
-    .where(and(isNull(opportunities.deletedAt), COM_CATALOGO));
-  const [al] = standId
-    ? await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(alerts)
-        .where(and(eq(alerts.standId, standId), eq(alerts.active, true)))
-    : [{ n: 0 }];
+    .where(and(isNull(opportunities.deletedAt), isNull(listings.deletedAt)));
   return {
-    newOpportunities: opp.recent,
-    totalPotentialSavings: opp.savings,
-    activeAlerts: al.n,
+    activeOpportunities: row.active,
+    newThisWeek: row.newWeek,
+    medianSavings: row.median,
+    bestSavings: row.best,
   };
 }
 
