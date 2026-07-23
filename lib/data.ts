@@ -15,6 +15,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { cache } from "react";
 import { auth } from "./auth";
 import * as q from "./queries";
 import { checkStandFields } from "./stand-fields";
@@ -36,8 +37,13 @@ const hasDb = () => Boolean(process.env.DATABASE_URL);
  * Stand (organização) ativo da sessão; null sem sessão/organização.
  * A sessão nem sempre traz activeOrganizationId — fallback para a primeira
  * organização do utilizador (um stand por utilizador, por agora).
+ *
+ * ⚠️ Envolto em `cache()` do React: quase todas as funções de dados chamam isto
+ * (14 sítios), e uma única página chama várias — sem a memoização por-pedido, o
+ * `getSession` + `listOrganizations` corria contra a BD 4-6× por render. Com o
+ * `cache()`, corre **uma vez por pedido** e o resultado é partilhado.
  */
-async function activeStandId(): Promise<string | null> {
+const activeStandId = cache(async (): Promise<string | null> => {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user) return null;
@@ -47,7 +53,7 @@ async function activeStandId(): Promise<string | null> {
   } catch {
     return null;
   }
-}
+});
 
 // ── Pesquisa / anúncios ─────────────────────────────────────────
 export interface SearchFilters {
