@@ -15,15 +15,20 @@ type Sort = "savings" | "recent" | "price";
 export function SearchView({
   listings,
   initialCountry,
+  initialOnlyOpps = false,
+  initialSort = "savings",
 }: {
   listings: Listing[];
   initialCountry?: CountryCode;
+  /** Pré-filtros vindos do URL — usados quando se salta de um KPI do painel. */
+  initialOnlyOpps?: boolean;
+  initialSort?: Sort;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [countries, setCountries] = useState<CountryCode[]>(initialCountry ? [initialCountry] : []);
-  const [onlyOpps, setOnlyOpps] = useState(false);
-  const [sort, setSort] = useState<Sort>("savings");
+  const [onlyOpps, setOnlyOpps] = useState(initialOnlyOpps);
+  const [sort, setSort] = useState<Sort>(initialSort);
   const [selected, setSelected] = useState<string[]>([]);
 
   // Filtros avançados ("Mais filtros")

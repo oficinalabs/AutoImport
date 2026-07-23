@@ -32,21 +32,33 @@ export default async function PainelPage() {
         </Button>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — cada um leva à listagem já filtrada que explica o número */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           label="A compensar agora"
           value={String(stats.activeOpportunities)}
           icon={Sparkles}
+          href="/pesquisar?oportunidades=1"
         />
-        <StatCard label="Novas esta semana" value={String(stats.newThisWeek)} icon={TrendingUp} />
+        <StatCard
+          label="Novas esta semana"
+          value={String(stats.newThisWeek)}
+          icon={TrendingUp}
+          href="/pesquisar?oportunidades=1&ordenar=recent"
+        />
         <StatCard
           label="Poupança típica"
           value={formatEuro(stats.medianSavings)}
           icon={PiggyBank}
           accent
+          href="/pesquisar?oportunidades=1&ordenar=savings"
         />
-        <StatCard label="Melhor agora" value={formatEuro(stats.bestSavings)} icon={Award} />
+        <StatCard
+          label="Melhor agora"
+          value={formatEuro(stats.bestSavings)}
+          icon={Award}
+          href="/pesquisar?oportunidades=1&ordenar=savings"
+        />
       </div>
 
       {/* Oportunidades */}
