@@ -7,26 +7,16 @@
  * │  nos RSC as funções correm diretas; nos componentes client as     │
  * │  mutações (toggleFavorite, createAlert…) viram Server Actions.    │
  * │                                                                   │
- * │  Com DATABASE_URL → queries Drizzle reais (lib/queries.ts),       │
- * │  alimentadas pelo pipeline (scripts/pipeline/run-daily.ts).       │
- * │  Sem DATABASE_URL → mock (lib/mock.ts), para previews/dev de UI.  │
- * │  Negociações, compras e stand continuam mock (fora do âmbito do   │
- * │  pipeline — ver docs/07-FRONTEND-HANDOFF.md).                     │
+ * │  Só dados reais: queries Drizzle (lib/queries.ts), alimentadas    │
+ * │  pelo pipeline (scripts/pipeline/run-daily.ts). O mock foi         │
+ * │  removido. Negociações e Compras ainda não têm backend → devolvem  │
+ * │  vazio, e a UI mostra estado vazio honesto (ver docs/06).          │
  * └─────────────────────────────────────────────────────────────────┘
  */
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "./auth";
-import {
-  ALERTS,
-  CONVERSATIONS,
-  COUNTRY_INSIGHTS,
-  DEALS,
-  LISTINGS,
-  STAND,
-  findListing,
-} from "./mock";
 import * as q from "./queries";
 import { checkStandFields } from "./stand-fields";
 import type {
@@ -65,12 +55,6 @@ const activeStandId = cache(async (): Promise<string | null> => {
   }
 });
 
-/** Simula latência de rede em dev para exercitar estados de loading (mock). */
-const DELAY = process.env.NODE_ENV === "development" ? 120 : 0;
-function settle<T>(value: T): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), DELAY));
-}
-
 // ── Pesquisa / anúncios ─────────────────────────────────────────
 export interface SearchFilters {
   query?: string;
@@ -81,121 +65,45 @@ export interface SearchFilters {
 }
 
 export async function searchListings(filters: SearchFilters = {}): Promise<Listing[]> {
-  if (hasDb()) return q.searchListingsQuery(filters, await activeStandId());
-  // Espelha a query real: a pesquisa só mostra anúncios vivos. Os que saíram do
-  // mercado só aparecem nos favoritos, marcados (docs/08).
-  let out = LISTINGS.filter((l) => !l.unavailableSince);
-  if (filters.query) {
-    const query = filters.query.toLowerCase();
-    out = out.filter((l) => l.title.toLowerCase().includes(query));
-  }
-  const wantedCountries = filters.countries;
-  if (wantedCountries?.length) {
-    out = out.filter((l) => wantedCountries.includes(l.country));
-  }
-  if (filters.onlyOpportunities) {
-    out = out.filter((l) => l.verdict === "compensa");
-  }
-  const maxPrice = filters.maxPrice;
-  if (maxPrice) {
-    out = out.filter((l) => l.cost.totalPt <= maxPrice);
-  }
-  switch (filters.sort) {
-    case "price":
-      out.sort((a, b) => a.cost.totalPt - b.cost.totalPt);
-      break;
-    case "recent":
-      out.sort((a, b) => b.seenAt.localeCompare(a.seenAt));
-      break;
-    default:
-      out.sort((a, b) => b.savings - a.savings);
-  }
-  return settle(out);
+  return q.searchListingsQuery(filters, await activeStandId());
 }
 
 export async function getListing(id: string): Promise<Listing | null> {
-  if (hasDb()) return q.getListingQuery(id, await activeStandId());
-  return settle(findListing(id) ?? null);
+  return q.getListingQuery(id, await activeStandId());
 }
 
 export async function getListingsByIds(ids: string[]): Promise<Listing[]> {
-  if (hasDb()) return q.getListingsByIdsQuery(ids, await activeStandId());
-  return settle(ids.map(findListing).filter((l): l is Listing => Boolean(l)));
+  return q.getListingsByIdsQuery(ids, await activeStandId());
 }
 
 // ── Painel ──────────────────────────────────────────────────────
-/** Mediana de uma lista de números — 0 se vazia. Espelha o `percentile_cont(0.5)`
- * usado em dashboardCountsQuery (interpola entre os dois valores centrais quando
- * a contagem é par, tal como o SQL). */
-function median(values: number[]): number {
-  if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid];
-}
-
 export async function getDashboardStats(): Promise<DashboardStats> {
-  if (hasDb()) return q.dashboardCountsQuery();
-  // Espelha a definição real (flag-opportunities.ts): "compensa" e ainda vivo no
-  // mercado. O mock não tem flaggedAt (só seenAt), e comparar essas datas fixas
-  // com o "agora" real fica velho ao fim de poucos dias — por isso "novas esta
-  // semana" aproxima-se com metade das ativas, estável independentemente de
-  // quando o preview corre.
-  const opportunities = LISTINGS.filter((l) => l.verdict === "compensa" && !l.unavailableSince);
-  const savings = opportunities.map((l) => l.savings);
-  return settle({
-    activeOpportunities: opportunities.length,
-    newThisWeek: Math.ceil(opportunities.length / 2),
-    medianSavings: median(savings),
-    bestSavings: savings.length ? Math.max(...savings) : 0,
-  });
+  return q.dashboardCountsQuery();
 }
 
 export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
-  if (hasDb()) return q.topOpportunitiesQuery(limit, await activeStandId());
-  return settle(
-    LISTINGS.filter((l) => l.verdict === "compensa" && !l.unavailableSince)
-      .sort((a, b) => b.savings - a.savings)
-      .slice(0, limit),
-  );
+  return q.topOpportunitiesQuery(limit, await activeStandId());
 }
 
 export async function getCountryInsights(): Promise<CountryInsight[]> {
-  if (hasDb()) return q.countryInsightsQuery();
-  return settle([...COUNTRY_INSIGHTS].sort((a, b) => b.avgSavings - a.avgSavings));
+  return q.countryInsightsQuery();
 }
 
 // ── Favoritos ───────────────────────────────────────────────────
 export async function getFavorites(): Promise<Listing[]> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    return standId ? q.favoritesQuery(standId) : [];
-  }
-  // Como na query real: os favoritos que já saíram do mercado aparecem, mas no
-  // fim da lista — o que ainda dá para comprar é que interessa primeiro.
-  return settle(
-    LISTINGS.filter((l) => l.isFavorite).sort(
-      (a, b) => Number(Boolean(a.unavailableSince)) - Number(Boolean(b.unavailableSince)),
-    ),
-  );
+  const standId = await activeStandId();
+  return standId ? q.favoritesQuery(standId) : [];
 }
 
 export async function toggleFavorite(id: string): Promise<void> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    if (standId) await q.toggleFavoriteMutation(standId, id);
-    return;
-  }
-  return settle(undefined);
+  const standId = await activeStandId();
+  if (standId) await q.toggleFavoriteMutation(standId, id);
 }
 
 // ── Alertas ─────────────────────────────────────────────────────
 export async function getAlerts(): Promise<Alert[]> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    return standId ? q.alertsQuery(standId) : [];
-  }
-  return settle([...ALERTS]);
+  const standId = await activeStandId();
+  return standId ? q.alertsQuery(standId) : [];
 }
 
 export interface AlertDraft {
@@ -211,56 +119,44 @@ export interface AlertDraft {
 }
 
 export async function createAlert(draft: AlertDraft): Promise<void> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    if (standId) await q.createAlertMutation(standId, draft);
-    return;
-  }
-  return settle(undefined);
+  const standId = await activeStandId();
+  if (standId) await q.createAlertMutation(standId, draft);
 }
 
 export async function toggleAlert(id: string, active: boolean): Promise<void> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    if (standId) await q.toggleAlertMutation(standId, id, active);
-    return;
-  }
-  return settle(undefined);
+  const standId = await activeStandId();
+  if (standId) await q.toggleAlertMutation(standId, id, active);
 }
 
-// ── Negociações (mock — aguarda email mascarado, docs/06) ───────
+// ── Negociações ─────────────────────────────────────────────────
+// Ainda sem backend (email mascarado — ver docs/06). Devolvem vazio, e a UI
+// mostra o estado "ainda sem negociações". Nunca inventamos conversas.
 export async function getConversations(): Promise<Conversation[]> {
-  return settle([...CONVERSATIONS].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)));
+  return [];
 }
 
-export async function getConversation(id: string): Promise<Conversation | null> {
-  return settle(CONVERSATIONS.find((c) => c.id === id) ?? null);
+export async function getConversation(_id: string): Promise<Conversation | null> {
+  return null;
 }
 
 // TODO(backend): enviar via email mascarado da plataforma (ver docs/06).
-export async function sendMessage(_conversationId: string, _body: string): Promise<void> {
-  return settle(undefined);
-}
+export async function sendMessage(_conversationId: string, _body: string): Promise<void> {}
 
-// ── Compras (pipeline de negócio — mock) ────────────────────────
+// ── Compras ─────────────────────────────────────────────────────
+// Ainda sem backend (pipeline de compra). Estado vazio honesto na UI.
 export async function getDeals(): Promise<Deal[]> {
-  return settle([...DEALS]);
+  return [];
 }
 
-export async function getDeal(id: string): Promise<Deal | null> {
-  return settle(DEALS.find((d) => d.id === id) ?? null);
+export async function getDeal(_id: string): Promise<Deal | null> {
+  return null;
 }
 
 // ── Stand / conta ───────────────────────────────────────────────
-export async function getStand(): Promise<Stand> {
-  if (hasDb()) {
-    const standId = await activeStandId();
-    if (standId) {
-      const stand = await q.getStandQuery(standId);
-      if (stand) return stand;
-    }
-  }
-  return settle(STAND);
+/** O stand da sessão, ou null se não houver sessão/organização. */
+export async function getStand(): Promise<Stand | null> {
+  const standId = await activeStandId();
+  return standId ? q.getStandQuery(standId) : null;
 }
 
 // ── Notificações ────────────────────────────────────────────────
@@ -270,7 +166,6 @@ export async function getStand(): Promise<Stand> {
  * inventamos notificações.
  */
 export async function getNotifications(): Promise<Notification[]> {
-  if (!hasDb()) return settle([]);
   try {
     const standId = await activeStandId();
     if (!standId) return [];
@@ -281,42 +176,29 @@ export async function getNotifications(): Promise<Notification[]> {
   }
 }
 
-/**
- * Nome e email de quem está com sessão iniciada. Sem sessão (dev/preview sobre
- * mock), devolve o primeiro membro do stand mock — coerente com o getStand().
- */
-export async function getSessionUser(): Promise<{ name: string; email: string }> {
+/** Nome e email de quem está com sessão iniciada; null sem sessão. */
+export async function getSessionUser(): Promise<{ name: string; email: string } | null> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
-    if (session?.user) {
-      return { name: session.user.name, email: session.user.email };
-    }
+    return session?.user ? { name: session.user.name, email: session.user.email } : null;
   } catch {
-    // cai no mock
+    return null;
   }
-  const fallback = STAND.members[0];
-  return { name: fallback.name, email: fallback.email };
 }
 
-/**
- * Papel do utilizador da sessão no stand ativo ("owner" | "member" | null).
- *
- * Sempre que o `getStand()` cai no mock (sem BD, sem sessão, sem organização)
- * devolvemos "owner" — senão a UI ficava incoerente: dados de exemplo que não
- * se conseguem editar. Isto só decide se o botão aparece; quem manda é o
- * servidor, que volta a verificar o papel em `updateStand()` antes de gravar.
- */
+/** Papel do utilizador da sessão no stand ativo ("owner" | "member"); null se
+ * não houver sessão/organização. Decide só se o botão de editar aparece — quem
+ * manda é o servidor, que revalida o papel em `updateStand()` antes de gravar. */
 export async function getStandRole(): Promise<string | null> {
-  if (!hasDb()) return "owner";
   try {
     const [standId, session] = await Promise.all([
       activeStandId(),
       auth.api.getSession({ headers: await headers() }),
     ]);
-    if (!standId || !session?.user) return "owner";
+    if (!standId || !session?.user) return null;
     return q.standRoleQuery(standId, session.user.id);
   } catch {
-    return "owner";
+    return null;
   }
 }
 

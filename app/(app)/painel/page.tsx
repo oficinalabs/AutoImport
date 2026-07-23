@@ -74,6 +74,11 @@ export default async function PainelPage() {
             </Link>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            {deals.length === 0 && (
+              <p className="py-4 text-center text-sm text-ink-soft">
+                Ainda sem compras a decorrer.
+              </p>
+            )}
             {deals.slice(0, 4).map((d) => (
               <Link
                 key={d.id}
