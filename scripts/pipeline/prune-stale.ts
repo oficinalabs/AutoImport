@@ -59,7 +59,13 @@ async function probe(url: string): Promise<"gone" | "alive" | "error"> {
 }
 
 export async function pruneStale(
-  opts: { staleDays?: number; limit?: number; rateMs?: number; apply?: boolean; soft?: boolean } = {},
+  opts: {
+    staleDays?: number;
+    limit?: number;
+    rateMs?: number;
+    apply?: boolean;
+    soft?: boolean;
+  } = {},
 ) {
   const staleDays = opts.staleDays ?? 5;
   const rateMs = opts.rateMs ?? 1000;
