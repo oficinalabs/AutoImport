@@ -7,15 +7,16 @@
 //      escalonado (poucas em paralelo), → NDJSON.
 //
 // A BD é escrita por UM SÓ processo: o pipeline (`pnpm pipeline:daily`), opt-in via --sync-db e
-// com GUARDA DE TAMANHO (pausa acima de DB_LIMIT_MB). Ver o "porquê" no README/relatório: os 280k
-// anúncios em disco NÃO cabem nos 500 MB da Supabase Free — o âmbito (PT completo? amostra UE?
-// upgrade?) é decisão do dono. Por isso o sync está DESLIGADO por defeito.
+// com GUARDA DE DISCO (pausa abaixo de DISK_MIN_MB livres). O destino do ingest é o WAREHOUSE
+// LOCAL, não a Supabase: o corpus medido são 599k anúncios (~1 GB a 1,7 KB/linha) e os 500 MB do
+// plano Free dão para ~290k — nunca coube. A Supabase recebe só a montra publicada, por
+// `scripts/pipeline/publish.ts`. Ver lib/db-url.ts e docs/05-INFRA-E-DEPLOY.md.
 //
 // Uso:
 //   node probe/collector-daemon.mjs                 # frescura + cobertura → disco (seguro)
-//   node probe/collector-daemon.mjs --sync-db       # + ingest na BD (guardado por tamanho)
+//   node probe/collector-daemon.mjs --sync-db       # + ingest no warehouse (guardado por disco)
 //   node probe/collector-daemon.mjs --only pt        # só as fontes PT
-//   flags: --out <dir> --recrawl-days N --db-limit-mb N --sync-every-min N
+//   flags: --out <dir> --recrawl-days N --disk-min-mb N --sync-every-min N
 
 import { spawn, execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -25,9 +26,10 @@ const COLLECTOR_DIR = new URL('..', import.meta.url).pathname;
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : d; };
 const has = (k) => process.argv.includes(k);
 
-const OUT = arg('--out', join(COLLECTOR_DIR, 'out'));
+// Precedência do arquivo: --out > COLLECTOR_OUT_DIR > <collector>/out (ver lib/cli.ts).
+const OUT = arg('--out', process.env.COLLECTOR_OUT_DIR || join(COLLECTOR_DIR, 'out'));
 const RECRAWL_DAYS = Number(arg('--recrawl-days', 3));
-const DB_LIMIT_MB = Number(arg('--db-limit-mb', 450));   // pausa o ingest acima disto (500 é o teto)
+const DISK_MIN_MB = Number(arg('--disk-min-mb', 20_000)); // pausa o ingest abaixo disto de disco livre
 const SYNC_EVERY_MIN = Number(arg('--sync-every-min', 60));
 const SYNC_DB = has('--sync-db');
 const ONLY = arg('--only', null);                         // 'pt' | 'eu' | null (todas)
@@ -136,23 +138,22 @@ async function recrawlTick() {
   }
 }
 
-// ── ingest na BD (opt-in, guardado por tamanho). Único processo a escrever na BD. ──
-function dbSizeMB() {
+// ── ingest no warehouse (opt-in, guardado por espaço em disco). Um só processo a escrever. ──
+// A guarda mede o DISCO, não o tamanho da base: o warehouse é local e não tem tecto de plano —
+// o que o pode matar é encher o volume onde vive o arquivo. (Antes media a Supabase contra os
+// 500 MB do Free; com o corpus local esse tecto deixou de ser o limite relevante.)
+function freeDiskMB(path) {
   try {
-    const out = execFileSync('node', ['-e', `
-      import('postgres').then(async ({default:pg})=>{try{process.loadEnvFile('${join(COLLECTOR_DIR, '../../.env.local')}');}catch{}
-      const sql=pg(process.env.DATABASE_URL,{prepare:false,max:1});
-      const [r]=await sql\`select pg_database_size(current_database()) b\`;console.log(Math.round(r.b/1048576));await sql.end();});
-    `], { cwd: join(COLLECTOR_DIR, '../..'), encoding: 'utf8' });
-    return Number(out.trim());
+    const out = execFileSync('df', ['-Pm', path], { encoding: 'utf8' });
+    return Number(out.trim().split('\n')[1].split(/\s+/)[3]);
   } catch { return null; }
 }
 async function syncTick() {
   if (stopping || !SYNC_DB) return;
-  const mb = dbSizeMB();
-  if (mb == null) { log('⚠ sync: não consegui medir a BD — a saltar'); return; }
-  if (mb >= DB_LIMIT_MB) { log(`⛔ sync PAUSADO: BD ${mb}MB ≥ limite ${DB_LIMIT_MB}MB (teto 500) — âmbito por decidir`); return; }
-  log(`⇪ sync: BD ${mb}MB < ${DB_LIMIT_MB} — a correr pipeline:daily`);
+  const free = freeDiskMB(OUT);
+  if (free == null) { log('⚠ sync: não consegui medir o disco — a saltar'); return; }
+  if (free <= DISK_MIN_MB) { log(`⛔ sync PAUSADO: só ${free}MB livres em ${OUT} (mínimo ${DISK_MIN_MB}MB)`); return; }
+  log(`⇪ sync: ${free}MB livres — a correr pipeline:daily`);
   try {
     execFileSync('pnpm', ['pipeline:daily', '--dir', OUT], { cwd: join(COLLECTOR_DIR, '../..'), stdio: 'inherit' });
   } catch (e) { log(`⚠ sync: pipeline falhou: ${e.message}`); }
@@ -161,7 +162,7 @@ async function syncTick() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ── arranque ──
-log(`daemon: ${sources.length} fontes · re-crawl ${RECRAWL_DAYS}d · sync-db=${SYNC_DB ? `ON (limite ${DB_LIMIT_MB}MB)` : 'OFF'} · out=${OUT}`);
+log(`daemon: ${sources.length} fontes · re-crawl ${RECRAWL_DAYS}d · sync-db=${SYNC_DB ? `ON (mín. ${DISK_MIN_MB}MB livres)` : 'OFF'} · out=${OUT}`);
 sources.forEach((s, i) => startWatch(s, i * 3000));   // frescura, arranque escalonado
 recrawlTick();                                         // cobertura, já
 setInterval(recrawlTick, 3600_000);                    // e de hora a hora

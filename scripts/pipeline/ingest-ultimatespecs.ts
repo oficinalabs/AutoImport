@@ -6,6 +6,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { VersionRecord } from "../../tools/collector/ultimatespecs/schema";
 
 try {
@@ -40,9 +41,7 @@ function modelUrlOf(r: VersionRecord): string {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL em falta — definir no .env.local");
-  }
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { usModels, usVersions } = await import("../../db/schema");
   const { sql } = await import("drizzle-orm");

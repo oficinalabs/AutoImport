@@ -12,6 +12,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { after, test } from "node:test";
+import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
 
 try {
   process.loadEnvFile(".env.local");
@@ -19,23 +20,17 @@ try {
   /* CI: variáveis do ambiente */
 }
 
-const DB_URL = process.env.DATABASE_URL;
+// A mesma base a que o `db` liga (warehouse quando há WAREHOUSE_URL).
+const DB_URL = dbUrl();
 // Guarda anti-produção: este teste ESCREVE (ingest de fixtures, deletes no
-// cleanup) e o .env.local aponta para a Supabase REAL — correr `pnpm test` com
-// ele carregado já deixou resíduos na montra ("Testgen GenModel 1.0"). Só corre
-// contra Postgres LOCAL (docker `pnpm db:up` ou o serviço do CI, ambos em
-// localhost); URL não-local ou ilegível → salta.
-function isLocal(url: string): boolean {
-  try {
-    return ["localhost", "127.0.0.1"].includes(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
+// cleanup) e a DATABASE_URL pode apontar para a Supabase REAL — correr
+// `pnpm test` com ela carregada já deixou resíduos na montra ("Testgen
+// GenModel 1.0"). Só corre contra Postgres LOCAL (warehouse, docker
+// `pnpm db:up` ou o serviço do CI); URL não-local ou ilegível → salta.
 const skip = !DB_URL
-  ? "sem DATABASE_URL — teste de integração saltado"
-  : !isLocal(DB_URL)
-    ? "DATABASE_URL não é local — o teste de integração escreve; só docker/CI"
+  ? "sem base de dados — teste de integração saltado"
+  : !isLocalDbUrl(DB_URL)
+    ? "base de dados não é local — o teste de integração escreve; só warehouse/docker/CI"
     : false;
 
 async function cleanup() {
@@ -521,6 +516,9 @@ test(
       make: "Testmarke",
       model: "T900",
       variant: "T900d (contado ES)",
+      // `title` é um dos dois campos que o raw enxuto guarda (o outro é engine_code)
+      // — é por ele que se prova que o re-crawl refresca o raw. Ver db-sink.ts.
+      title: "T900d (contado ES)",
       year: 2023,
       km: 80000,
       fuel: "Gasolina",
@@ -533,14 +531,14 @@ test(
       source: "Fixture Concesionario",
       seller_type: "Dealer",
     };
-    const sink = new DbSink(DB_URL as string);
+    const sink = new DbSink(DB_URL);
     const state = async () => {
       const [row] = (await db.execute(sql`
         select l.price,
                (l.raw->>'precio_contado')::int as contado,
                (l.raw->>'precio_financiado')::int as financiado,
                (l.raw->>'precio_contado_checked') as checked,
-               l.raw->>'variant' as raw_variant,
+               l.raw->>'title' as raw_title,
                (select count(*) from listing_price_history h where h.listing_id = l.id)::int as n_hist
         from listings l where l.external_id = 'fixture-es-contado'
       `)) as unknown as {
@@ -548,7 +546,7 @@ test(
         contado: number | null;
         financiado: number | null;
         checked: string | null;
-        raw_variant: string;
+        raw_title: string;
         n_hist: number;
       }[];
       return row;
@@ -574,7 +572,7 @@ test(
 
       // 2.º crawl com o MESMO preço de montra: a correção sobrevive.
       await sink.upsertListing(
-        { ...record, variant: "T900d (contado ES, re-crawl)" },
+        { ...record, title: "T900d (contado ES, re-crawl)" },
         "new",
         "autoscout24",
       );
@@ -584,7 +582,7 @@ test(
       assert.equal(depois.financiado, 11900, "o financiado observado sobrevive");
       assert.equal(depois.checked, "true", "a marca de verificado sobrevive");
       assert.equal(
-        depois.raw_variant,
+        depois.raw_title,
         "T900d (contado ES, re-crawl)",
         "o resto do raw é o registo fresco da fonte",
       );

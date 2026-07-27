@@ -3,6 +3,25 @@
 Coletores próprios (sem vendedores) que recolhem anúncios de carros no estrangeiro e
 normalizam para um schema comum, para comparar preços PT vs. UE.
 
+## Onde fica o arquivo — `COLLECTOR_OUT_DIR`
+
+Todos os coletores escrevem NDJSON, `-checkpoint.json` e `-summary.json` em
+`tools/collector/out/` por omissão. **O arquivo cresce ~564 MB por cada passagem `--full`** de
+todas as fontes (o daemon faz uma de 3 em 3 dias), pelo que num disco pequeno enche depressa.
+Para o pôr noutro disco sem passar `--out` em cada comando:
+
+```bash
+export COLLECTOR_OUT_DIR="/Volumes/SSD 500GB/autoimport/collector-out"
+```
+
+**Precedência:** `--out <dir>` (explícito, ganha sempre) > `COLLECTOR_OUT_DIR` >
+`tools/collector/out/`. Vale para todos os `run-*` / `watch-*` (incluindo os Python do
+piscapisca) e para os orquestradores em `probe/`.
+
+> A variável só muda **para onde se escreve a partir de agora** — não move nem lê o que já
+> está em `tools/collector/out/`. Mudar o arquivo de sítio é uma operação manual (e o
+> `pnpm pipeline:ingest --dir <dir>` continua a precisar do caminho certo).
+
 ## theparking.eu (primeiro coletor)
 
 Agregador da rede LeParking/TheParking-cars. Escolhido como primeira fonte por ser o

@@ -34,7 +34,8 @@ def main():
     ap.add_argument("--cycles", type=int, default=0, help="nº de ciclos (0/omisso = contínuo)")
     ap.add_argument("--pages", type=int, default=1, help="nº de páginas da listagem base por ciclo (default 1)")
     ap.add_argument("--rate", type=int, default=4000, help="delay mínimo entre pedidos, ms (default 4000)")
-    ap.add_argument("--out", type=str, default=os.path.join(_DIR, "out"), help="diretório de saída")
+    # --out > COLLECTOR_OUT_DIR > <collector>/out (mesma precedência dos coletores Node, lib/cli.ts)
+    ap.add_argument("--out", type=str, default=os.environ.get("COLLECTOR_OUT_DIR") or os.path.join(_DIR, "out"), help="diretório de saída")
     args = ap.parse_args()
 
     fetcher = Fetcher(min_delay_ms=args.rate)

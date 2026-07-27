@@ -1,11 +1,14 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { dbUrl } from "../lib/db-url";
 import * as schema from "./schema";
 
-// Postgres alojada no Supabase (ver docs/04). `prepare: false` é necessário
-// para o pooler transaction-mode do Supabase. Sem DATABASE_URL o cliente é
-// criado mas só liga no primeiro query (não quebra o build).
-const connectionString = process.env.DATABASE_URL ?? "";
+// Warehouse local quando há WAREHOUSE_URL (corpus — coletores e pipeline);
+// senão a Postgres da app alojada no Supabase (ver docs/04 e lib/db-url.ts).
+// Na Vercel não há WAREHOUSE_URL: é sempre a segunda. `prepare: false` é
+// necessário para o pooler transaction-mode do Supabase. Sem nenhuma das duas
+// o cliente é criado mas só liga no primeiro query (não quebra o build).
+const connectionString = dbUrl();
 
 const client = postgres(connectionString, { prepare: false });
 

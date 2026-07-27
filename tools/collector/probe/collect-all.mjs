@@ -21,7 +21,8 @@ const arg = (k, d) => { const i = process.argv.indexOf(k); return i >= 0 ? proce
 
 const TIER = arg('--tier', 'core');
 const CONCURRENCY = Number(arg('--concurrency', 5));
-const OUT = arg('--out', join(COLLECTOR_DIR, 'out'));
+// Precedência do arquivo: --out > COLLECTOR_OUT_DIR > <collector>/out (ver lib/cli.ts).
+const OUT = arg('--out', process.env.COLLECTOR_OUT_DIR || join(COLLECTOR_DIR, 'out'));
 const MIN_FREE_GB = 5;   // pára de arrancar fontes novas abaixo disto
 
 // Ritmos seguros por defeito (ms) — CONSERVADORES (com margem sobre o limite medido). Um

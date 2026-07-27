@@ -16,6 +16,8 @@
  *   pnpm exec tsx scripts/pipeline/prune-stale.ts --apply --soft  # marca deleted_at (não apaga)
  *   flags: --stale-days N (default 5) · --limit N · --rate-ms N (default 1000)
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -71,6 +73,7 @@ export async function pruneStale(
   const rateMs = opts.rateMs ?? 1000;
   const apply = opts.apply ?? false;
   const soft = opts.soft ?? false;
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
 

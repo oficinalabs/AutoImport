@@ -19,6 +19,7 @@
  *  - resto: só o anúncio.
  * A norma do CO₂ segue sempre o ano de matrícula (isv.ts), sem cross-norma.
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { DesignationFacts } from "../../lib/engine/match-version";
 import type { GenWindow } from "../../lib/engine/pt-market";
 import type { CountryCode } from "../../lib/types";
@@ -33,6 +34,7 @@ const FOREIGN: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
 const ISV_YEAR = 2026;
 
 export async function computeCosts() {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { computeCostBreakdown, co2Norm } = await import("../../lib/cost-engine");

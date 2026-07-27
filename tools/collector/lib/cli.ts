@@ -21,6 +21,16 @@ export function parseArgs(argv: string[]): Record<string, string | true> {
   return args;
 }
 
+// resolveOutDir: onde o coletor escreve NDJSON/checkpoint/summary.
+// Precedência: `--out <dir>` explícito > COLLECTOR_OUT_DIR > <collector>/out.
+// PORQUÊ a env: o arquivo cresce ~564 MB por passagem `--full` de todas as fontes e o disco
+// interno é pequeno; a env deixa apontar o arquivo para outro disco (SSD externo) de uma vez,
+// sem passar `--out` em cada run-*/watch-*/daemon.
+export function resolveOutDir(out: unknown, dir: string): string {
+  if (out) return String(out);
+  return process.env.COLLECTOR_OUT_DIR || join(dir, 'out');
+}
+
 // top-N de um mapa {chave: contagem} como string "chave:n  chave:n" (para os logs de stats).
 export function topN(obj: Record<string, number>, n = 8): string {
   return Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${k}:${v}`).join('  ');
@@ -46,7 +56,7 @@ interface RunCliOptions<A extends Args, H, C, R> {
 export async function defineRunCli<A extends Args, H, C, R>(opts: RunCliOptions<A, H, C, R>): Promise<void> {
   const parse = opts.parseArgs ?? (parseArgs as (argv: string[]) => A);
   const args = parse(process.argv.slice(2));
-  const outDir = args.out ? String(args.out) : join(opts.dir, 'out');
+  const outDir = resolveOutDir(args.out, opts.dir);
   const http = new opts.HttpClient({ minDelayMs: Number(args.rate) || (opts.defaultRate ?? 1500) });
 
   if (opts.banner) console.log(opts.banner(args));
@@ -81,7 +91,7 @@ export async function defineWatchCli<A extends Args, H, W>(opts: WatchCliOptions
     pages: Number(args.pages) || 1,
     intervalMs: (Number(args.interval) || 60) * 1000,
     cycles: Number(args.cycles) || 0,
-    outDir: args.out ? String(args.out) : join(opts.dir, 'out'),
+    outDir: resolveOutDir(args.out, opts.dir),
     ...(opts.buildConfig ? opts.buildConfig(args) : {}),
   } as W);
 }

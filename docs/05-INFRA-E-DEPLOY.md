@@ -42,6 +42,31 @@ a migration e volta a fazer deploy (a Vercel mantém a versão anterior no ar).
 > + deploy.
 - _Workflows extra deste projeto: **cron diário da engine** (ingestão/recálculo) como Action separada, com o seu próprio conjunto de segredos._
 
+### Duas bases de dados: warehouse local vs. base da app
+O corpus deixou de caber na Supabase (500 MB, ~150 000 anúncios — ver
+[Base de Dados](04-BASE-DE-DADOS.md)), por isso passou a haver **duas**:
+
+| | `WAREHOUSE_URL` | `DATABASE_URL` |
+|---|---|---|
+| **O quê** | o corpus completo (todos os anúncios recolhidos) | montra publicada + dados de utilizador (auth, stands, favoritos, alertas) |
+| **Onde** | Postgres **local** (máquina de recolha) | Supabase — é a que a app na Vercel usa |
+| **Quem escreve** | coletores e pipeline | a app, e o passo de publicação do pipeline |
+
+`lib/db-url.ts` faz a resolução e as guardas:
+
+- **`WAREHOUSE_URL` tem de ser local.** Definida e a apontar para fora de
+  `localhost`/`127.0.0.1` ⇒ lança e não liga (falha fechada). O corpus na Supabase enche
+  o disco e a base começa a recusar escritas.
+- **Default invertido.** Com `WAREHOUSE_URL` definida, é ela que o `db/index.ts` usa; sem
+  ela cai na `DATABASE_URL`. Na **Vercel** e no **CI** não existe `WAREHOUSE_URL` — logo o
+  comportamento aí é exatamente o de antes.
+- **Escrever fora da máquina exige confirmação.** Um script de CLI que escreva numa base
+  não-local é recusado com uma mensagem que diz o que fazer; para o forçar,
+  `DB_TARGET=prod pnpm <comando>`. A guarda não se aplica na Vercel (`process.env.VERCEL`),
+  onde escrever na base da app é o esperado. As mensagens nunca imprimem a connection string.
+- **Credenciais de produção fora do carregamento automático:** vivem no
+  `.env.production.local`; o `.env.local` aponta para o warehouse.
+
 ## Variáveis & segredos
 - 🔒 Nunca em commit. Geridos no painel do host + `.env.example` no repo.
 - ✏️ **Onde estão os segredos de produção:**

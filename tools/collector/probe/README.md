@@ -45,3 +45,20 @@ node probe/collect-all.mjs --tier core --rates ratesfile.json
 > **Destino dos dados:** isto escreve NDJSON para disco. O carregamento na BD (`scripts/pipeline/
 > ingest.ts`) é um passo à parte — e a Supabase Free tem **500 MB (~150k linhas)**, pelo que a
 > full collection NÃO cabe na BD sem retenção/seleção. Decisão do dono dos dados.
+
+## Onde fica o arquivo — `COLLECTOR_OUT_DIR`
+
+Ambos os orquestradores (`collect-all.mjs` e `collector-daemon.mjs`) resolvem o diretório de
+saída na mesma ordem que os coletores: `--out <dir>` > `COLLECTOR_OUT_DIR` >
+`tools/collector/out/`. Como cada passagem `--full` de todas as fontes acrescenta ~564 MB ao
+arquivo (o daemon faz uma de 3 em 3 dias), vale a pena apontá-lo para um disco com espaço:
+
+```bash
+export COLLECTOR_OUT_DIR="/Volumes/SSD 500GB/autoimport/collector-out"
+node probe/collector-daemon.mjs
+```
+
+O daemon reencaminha o diretório resolvido para os processos-filho (`--out`), por isso os
+`watch-*`/`run-*` que ele arranca escrevem todos no mesmo sítio — incluindo o
+`daemon-state.json` e a guarda de espaço livre do `collect-all.mjs`, que passa a medir o disco
+de destino. A variável não move o que já está no diretório antigo.

@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { assertWritable, dbUrl } from './db-target.ts';
 
 // País (formato dos coletores, MAIÚSCULAS) → ISO-2. Valores já ISO-2 passam.
 const PAIS_ISO2: Record<string, string> = {
@@ -270,14 +271,16 @@ export class DbSink {
 }
 
 /**
- * Cria o DbSink se houver DATABASE_URL (env ou .env.local da raiz do repo);
- * caso contrário devolve null — os coletores ficam em modo NDJSON puro.
+ * Cria o DbSink se houver base de dados configurada (WAREHOUSE_URL/DATABASE_URL,
+ * do env ou do .env.local da raiz do repo); caso contrário devolve null — os
+ * coletores ficam em modo NDJSON puro. O corpus é do warehouse: escrever numa
+ * base não-local exige DB_TARGET=prod (ver lib/db-url.ts).
  */
 export function createDbSink(): DbSink | null {
   // Escotilha de segurança: o daemon corre os watches em modo NDJSON-only (só disco), para
   // NÃO abrir ligações à BD — a ingestão é centralizada num único processo (ingest.ts).
   if (process.env.COLLECTOR_NDJSON_ONLY === '1') return null;
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.WAREHOUSE_URL && !process.env.DATABASE_URL) {
     try {
       // repo root a partir de tools/collector/lib/
       process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '../../../.env.local'));
@@ -285,6 +288,8 @@ export function createDbSink(): DbSink | null {
       /* sem .env.local — fica NDJSON puro */
     }
   }
-  const url = process.env.DATABASE_URL;
-  return url ? new DbSink(url) : null;
+  const url = dbUrl();
+  if (!url) return null;
+  assertWritable(url);
+  return new DbSink(url);
 }

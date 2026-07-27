@@ -60,12 +60,34 @@ anúncios de preço estável sairiam da amostra e a mediana do mercado PT ficari
 para baixo. Há uma proposta em aberto (08) com a análise e as opções; a decisão é do dono
 da engine.
 
-## ☠️ O `.env.local` aponta para a Supabase de PRODUÇÃO
+## São DUAS bases de dados — e o default é a LOCAL
 
-Não há base de dados de desenvolvimento separada. Qualquer `pnpm db:seed`, `db:migrate` ou
-script com `--env-file=.env.local` **mexe em dados reais de clientes**. Confirma para onde
-aponta a `DATABASE_URL` **antes** de correres o que quer que seja contra a base de dados.
-Em caso de dúvida, pergunta em vez de correr.
+Historicamente o `.env.local` apontava para a Supabase de **produção** e qualquer
+`pnpm db:seed`/`db:migrate` mexia em dados reais de clientes. Já não é assim:
+
+- **`WAREHOUSE_URL`** — o **corpus** (centenas de milhares de anúncios) numa **Postgres
+  local**. É o que os coletores e o pipeline lêem e escrevem. Se estiver definida e não
+  apontar para `localhost`/`127.0.0.1`, o código **lança e não liga** (falha fechada).
+- **`DATABASE_URL`** — a base que **serve a app**: montra publicada + dados de utilizador
+  (auth, stands, favoritos, alertas). Em produção é a Supabase; na Vercel é a única que
+  existe, e lá **nada mudou**.
+
+Quem resolve isto é `lib/db-url.ts`: com `WAREHOUSE_URL` definida, é ela que o
+`db/index.ts` usa; sem ela, cai na `DATABASE_URL` (Vercel/CI, como sempre). As credenciais
+de produção vivem no **`.env.production.local`**, que ninguém carrega por acidente.
+
+**Guarda:** um script de CLI que escreva numa base **não-local** é **recusado** — a menos
+que se confirme comando a comando:
+
+```
+DB_TARGET=prod pnpm <comando>
+```
+
+(A guarda não se aplica na Vercel, onde escrever na base da app é o esperado; o
+`scripts/db/migrate-deploy.ts` continua com a sua própria guarda `VERCEL_ENV=production`.)
+
+Continua a valer: confirma para onde apontam as variáveis **antes** de correres o que quer
+que seja contra a base de dados. Em caso de dúvida, pergunta em vez de correr.
 
 ## Segredos
 

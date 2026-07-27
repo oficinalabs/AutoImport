@@ -1,15 +1,24 @@
-# Batch diário do pipeline (docs/03-BACKEND.md): scrape (recência, com caps)
+# Batch do pipeline (docs/03-BACKEND.md): scrape (recência, com caps)
 # → artefactos NDJSON → ingest+recompute na BD (scripts/pipeline/run-daily.ts).
 #
-# Enquanto o secret DATABASE_URL não existir (Supabase pendente), corre só o
-# scrape e publica os artefactos — já verificável e os NDJSON ficam para replay.
+# ⚠️ JÁ NÃO CORRE SOZINHO — só `workflow_dispatch` (manual). Duas razões:
+#
+#   1. A recolha passou a ser LOCAL: o `tools/collector/probe/collector-daemon.mjs` corre na
+#      máquina do operador (watch contínuo + re-crawl --full em rotação) e alimenta uma
+#      Postgres local; a Supabase de produção passa a receber só a montra publicada. A
+#      recolha aqui ficou redundante.
+#   2. Enquanto correu em cron, MENTIU: o secret DATABASE_URL nunca existiu no repositório,
+#      o passo de ingest fazia `exit 0` com um aviso e o workflow reportava sucesso todos os
+#      dias sem escrever uma linha na base de dados.
+#
+# Fica como ferramenta manual (replay/diagnóstico). Se um run manual chegar ao ingest sem
+# DATABASE_URL, o job FALHA de propósito — vermelho honesto em vez de verde a mentir.
 # Fora deste workflow (manuais): piscapisca (Python/Camoufox, correr local e
 # ingerir o NDJSON), crawls --full profundos e o modo watch contínuo.
 name: Daily batch
 
 on:
-  schedule:
-    - cron: "0 3 * * *" # 03:00 UTC, diário
+  # Sem `schedule:` — ver cabeçalho. A recolha diária vive no daemon local.
   workflow_dispatch:
     inputs:
       source:
@@ -114,7 +123,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "::notice::secret DATABASE_URL ausente — só scrape+artefactos neste run (Supabase pendente)."
-            exit 0
+            echo "::error::secret DATABASE_URL ausente — não há para onde ingerir. Os NDJSON ficam nos artefactos (7 dias); a ingestão é local (pnpm pipeline:ingest --dir <out>). Se este run era mesmo para escrever na BD, define o secret."
+            exit 1
           fi
           pnpm exec tsx scripts/pipeline/run-daily.ts

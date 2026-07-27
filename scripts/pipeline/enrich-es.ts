@@ -9,6 +9,8 @@
  * rate ~1,5 s/pedido. As fontes ES com contado estruturado (flexicar) são
  * corrigidas no ingest (db-sink), não aqui.
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -22,6 +24,7 @@ const UA =
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export async function enrichEs(opts: { limit?: number } = {}) {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { parsePrecioContado } = await import("../../lib/engine/precio-contado");

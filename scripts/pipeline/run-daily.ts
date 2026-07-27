@@ -8,6 +8,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { assertWritable, dbUrl } from "../../lib/db-url";
 
 try {
   process.loadEnvFile(".env.local");
@@ -21,9 +22,8 @@ function arg(flag: string, fallback: string): string {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL em falta — correr `pnpm db:up` e definir no .env.local");
-  }
+  // O pipeline escreve o corpus — warehouse local (ver lib/db-url.ts).
+  assertWritable(dbUrl());
   const dir = arg("--dir", "tools/collector/out");
   const staleDays = Number(arg("--stale-days", "14"));
 

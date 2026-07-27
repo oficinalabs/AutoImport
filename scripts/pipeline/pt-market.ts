@@ -4,6 +4,8 @@
  * mensal do gráfico.
  *   pnpm exec tsx scripts/pipeline/pt-market.ts
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -11,6 +13,7 @@ try {
 }
 
 export async function collectPtObservations() {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
 
