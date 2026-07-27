@@ -1,120 +1,91 @@
-# 🔔 Alertas — o job de matching (para o motor)
+# 🔔 Alertas — como o disparo funciona
 
-> **Divisão:** o frontend do alerta está feito (formulário em
-> `components/listing-actions.tsx`, o sino em `components/notifications-menu.tsx`,
-> o email em `emails/alert-match.tsx`). **Falta o passo do motor** que liga tudo:
-> quando entra um anúncio novo que encaixa num alerta ativo, criar o evento
-> (alimenta o sino) e enviar o email. Isto corre no pipeline diário — território
-> do motor, por isso fica aqui especificado em vez de implementado à mão.
+> **Estado: implementado e testado ponta-a-ponta** (23 jul). O stand cria um
+> alerta a partir de um anúncio; quando aparece um carro que encaixa, recebe uma
+> notificação no sino da topbar **e** um email — ambos com link direto para o
+> anúncio.
 
-## O que já existe (não precisas de fazer)
+## A cadeia completa
 
-- **O alerta guarda tudo o que precisas para o match.** A tabela `alerts` tem
-  `countries` (text[]) e `criteria` (jsonb). O formulário grava em `criteria`:
-  `{ summary, maxPrice?, make?, model? }`. O `make`/`model` vêm do anúncio de
-  origem (exatos, do catálogo — não texto livre do utilizador), por isso dá para
-  comparar com confiança.
-- **O sino já lê os eventos.** `notificationsQuery` (em `lib/queries.ts`) faz
-  `alert_events ⋈ alerts ⋈ listings` e a UI liga cada notificação a
-  `/anuncio/<listingId>`. **Basta criar linhas em `alert_events`** e aparecem no
-  sino, com o clique a levar ao anúncio.
-- **O email está pronto.** `emails/alert-match.tsx` (`AlertMatchEmail`) — o botão
-  "Ver anúncio" leva ao mesmo `/anuncio/<id>`. Enviar via `sendEmail` (`lib/email.ts`),
-  como os outros.
-- **A idempotência já está no schema.** `alert_events` tem
-  `unique(alert_id, listing_id)` — inserir com `on conflict do nothing` garante
-  que o mesmo anúncio nunca notifica duas vezes o mesmo alerta.
+| Peça | Onde |
+|---|---|
+| Criar o alerta (marca/modelo fixos, slider de preço, países) | `components/listing-actions.tsx` → `createAlert` |
+| Guardar | `alerts` — `countries` (text[]) + `criteria` (jsonb: `{summary, maxPrice?, make?, model?}`) |
+| **Disparar** | `scripts/pipeline/match-alerts.ts` — passo 10/10 do `run-daily` |
+| Notificação no sino | `alert_events` → `notificationsQuery` → `components/notifications-menu.tsx` |
+| Email | `emails/alert-match.tsx` via `lib/email.ts` (Resend) |
 
-## O que falta — o passo do matching
+## O job (`match-alerts.ts`)
 
-Correr no `scripts/pipeline/run-daily.ts`, **depois do `flag-opportunities`**
-(precisa dos custos/veredito já calculados). Duas fases: inserir eventos, depois
-enviar email dos eventos novos.
+Corre **depois do `flag-opportunities`** e parte da tabela `opportunities` — que
+já garante veredito `compensa`, confiança `normal` na estimativa PT e dedupe por
+carro físico. **Não repetimos esses filtros**: se a regra do que "compensa"
+mudar, muda num sítio só e o alerta acompanha.
 
-### 1. Inserir os eventos novos (uma query)
+O match exige, além disso:
+- `lower(make_raw) = lower(criteria->>'make')` **e** o mesmo para `model_raw` —
+  o `make`/`model` vêm do catálogo do anúncio de origem (exatos, não texto livre);
+- `country = any(alert.countries)` — os mercados que o stand escolheu;
+- se houver `maxPrice`, `total_pt <= maxPrice`.
 
-```sql
-insert into alert_events (alert_id, listing_id)
-select a.id, l.id
-from alerts a
-join listings l
-  on l.country = any(a.countries)
- and l.deleted_at is null
- and l.match_confidence = 'exato'            -- só matches de catálogo certos (regra da montra)
- and lower(l.make_raw)  = lower(a.criteria->>'make')
- and lower(l.model_raw) = lower(a.criteria->>'model')
-join import_cost_estimates e
-  on e.listing_id = l.id
- and e.verdict = 'compensa'                  -- só o que compensa (não enches de ruído)
- and e.pt_confidence = 'normal'
- and (a.criteria->>'maxPrice' is null
-      or e.total_pt <= (a.criteria->>'maxPrice')::int)
-where a.active = true
-on conflict (alert_id, listing_id) do nothing
-returning id, alert_id, listing_id;
+**Idempotente:** `alert_events` tem `unique(alert_id, listing_id)` e inserimos
+com `on conflict do nothing`. O `returning` só devolve as linhas realmente
+inseridas — é sobre essas, e só essas, que se envia email. Correr o pipeline
+duas vezes no mesmo dia não duplica nada.
+
+**Um email que falhe não trava o resto**: o erro é apanhado por evento, contado
+e registado. O evento no sino já foi criado na primeira fase, portanto a
+notificação nunca se perde por causa do email.
+
+## ⚠️ JSX nos scripts do pipeline — a armadilha
+
+Este é o **único** passo do pipeline que renderiza JSX (o email). O
+`tsconfig.json` principal usa `"jsx": "preserve"` porque o bundler do Next trata
+disso — mas o `tsx`/esbuild que corre os scripts **não**, e o React fica fora de
+escopo dentro dos componentes de email.
+
+O sintoma é traiçoeiro: **o matching funciona, o evento é criado, e só o email
+falha** — em runtime, com `ReferenceError: React is not defined`. Não aparece no
+typecheck nem no build.
+
+Por isso existe o **`tsconfig.scripts.json`** (`jsx: "react-jsx"`), e os scripts
+do `package.json` passam `TSX_TSCONFIG_PATH=tsconfig.scripts.json`:
+
+```bash
+pnpm pipeline:alerts   # só o matching de alertas
+pnpm pipeline:daily    # o pipeline completo (inclui o matching)
 ```
 
-O `returning` dá-te **exatamente os eventos novos** (o `on conflict do nothing`
-não devolve os que já existiam) — é sobre esses que envias email.
+**Nunca correr `tsx scripts/pipeline/match-alerts.ts` à seca** — o matching
+funciona, mas os emails falham em silêncio. (Não dá para forçar a variável de
+dentro do ficheiro: o tsx lê-a no arranque, antes do código correr.)
 
-⚠️ **Decisões de produto a confirmar com o Rui:**
-- **Restringir a `match_confidence = 'exato'` + `verdict = 'compensa'`?** Alinha
-  com a montra (só mostramos matches certos que compensam) e evita spam. Mas um
-  alerta com `maxPrice` alto e sem compensar também pode interessar — se sim,
-  tira o filtro do veredito.
-- **Só anúncios novos, ou também os que já existiam quando o alerta foi criado?**
-  A query acima apanha **todos** os que encaixam e ainda não foram notificados —
-  incluindo os que já cá estavam. Se só quiseres avisar de anúncios que
-  aparecem *depois* de o alerta ser criado, junta `and l.first_seen_at > a.created_at`.
+## Testado (23 jul, contra a base real)
 
-### 2. Enviar o email de cada evento novo
+Com um alerta de teste (BMW iX · ES · até 70 000 €) e 174 oportunidades reais:
 
-Para cada linha do `returning`, com os dados do anúncio + do dono do stand:
+| | |
+|---|---|
+| Match encontrado | 1 — BMW iX (ES) |
+| Evento no sino | 1, com link `/anuncio/<id>` |
+| Email | 1 enviado |
+| 2.ª corrida (idempotência) | **0 matches** — não duplicou |
 
-```ts
-import { AlertMatchEmail } from "@/emails/alert-match";
-import { sendEmail } from "@/lib/email";
-import { formatEuro } from "@/lib/format";
+Dados de teste removidos no fim (`alerts`=0, `alert_events`=0).
 
-// … para cada evento novo, já com o listing (title, country, totalPt, savings),
-//    o alertName e o email do dono do stand:
-await sendEmail({
-  to: ownerEmail,
-  subject: `Apareceu um ${listingTitle} que encaixa no teu alerta`,
-  react: AlertMatchEmail({
-    name: ownerName,
-    alertName,
-    listingTitle,
-    country: countryName,           // "Alemanha", não "DE"
-    totalPt: formatEuro(totalPt),
-    savings: formatEuro(savings),
-    listingUrl: `${process.env.BETTER_AUTH_URL}/anuncio/${listingId}`,
-  }),
-  text: `O teu alerta "${alertName}" encontrou: ${listingTitle} (${countryName}). `
-      + `Custo final ~${formatEuro(totalPt)}, poupa ~${formatEuro(savings)}. `
-      + `Ver: ${process.env.BETTER_AUTH_URL}/anuncio/${listingId}`,
-});
-```
+## Decisões tomadas (e o que ainda é discutível)
 
-- O **destinatário** é o dono do stand: `member` (role owner) → `user.email` da
-  organização do alerta (`alerts.stand_id`).
-- Se o stand tiver equipa, decidir se avisa só o owner ou todos — por agora,
-  owner chega.
-- ⚠️ **Não rebentar o run se um email falhar** — apanha o erro por evento e
-  continua (como o resto do pipeline). O evento no sino já foi criado na fase 1,
-  portanto a notificação não se perde mesmo que o email falhe.
+- **Só notifica o que compensa.** Vem de graça por partir das `opportunities`.
+  Se um dia quiseres avisar de qualquer carro que encaixe (mesmo sem compensar),
+  a query tem de deixar de partir dessa tabela.
+- **Notifica também anúncios que já cá estavam** quando o alerta foi criado —
+  não só os que aparecem depois. É o comportamento útil (crias um alerta e vês
+  logo o que há), mas se preferires só os novos: `and l.first_seen_at > a.created_at`.
+- **Avisa só o dono do stand** (`member.role = 'owner'`). Com equipas, decidir se
+  todos recebem.
 
-### 3. Egress / retenção
+## Retenção
 
-Cada corrida insere no máximo `(nº alertas ativos × nº anúncios novos que
-encaixam)` linhas — pequeno. Mas o `alert_events` cresce; entra na conversa da
-retenção (`docs/08`): eventos com mais de X meses podem ser limpos, já foram
-vistos.
-
-## Como testar
-
-1. Criar um alerta a partir de um anúncio (ex.: BMW iX, DE/NL, até 70 000 €).
-2. Correr o passo de matching (ou o `run-daily` completo).
-3. Confirmar: aparece no sino (com link para o anúncio) **e** chega o email (com
-   o botão para o mesmo anúncio).
-4. Correr outra vez → **não** duplica (o `on conflict` trava).
+O `alert_events` cresce com o tempo — entra na conversa do
+[`docs/08`](08-RETENCAO-DE-DADOS.md). Eventos com meses já foram vistos e podem
+ser limpos; não há query que leia mais do que os últimos.

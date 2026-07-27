@@ -20,7 +20,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/db/seed.ts",
-    "pipeline:daily": "tsx scripts/pipeline/run-daily.ts",
+    "pipeline:daily": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/run-daily.ts",
+    "pipeline:alerts": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/match-alerts.ts",
     "pipeline:ingest": "tsx scripts/pipeline/ingest.ts",
     "db:migrate:deploy": "tsx scripts/db/migrate-deploy.ts"
   },
