@@ -1,8 +1,4 @@
 {
-  // Os scripts do pipeline correm em `tsx` (esbuild), fora do bundler do Next.
-  // O tsconfig principal usa `"jsx": "preserve"` — o Next trata do JSX no build,
-  // mas o tsx não: um script que renderize um email React rebenta com
-  // "React is not defined". Aqui pedimos o runtime automático do JSX.
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx"
