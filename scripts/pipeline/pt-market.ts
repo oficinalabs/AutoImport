@@ -24,7 +24,7 @@ export async function collectPtObservations() {
     where l.country = 'PT'
       and l.deleted_at is null
       and l.model_id is not null
-      and l.price is not null
+      and l.price > 0 -- 0 = "sob consulta"; entrar na amostra puxaria a mediana PT para baixo
       and l.km is not null
       and l.year is not null
       and not exists (
