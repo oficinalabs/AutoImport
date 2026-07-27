@@ -109,12 +109,25 @@ jobs:
           path: tools/collector/out/
           merge-multiple: true
 
-      - name: Pipeline diário (ingest → match → mercado PT → custos → oportunidades)
+      - name: Pipeline diário (ingest → match → mercado PT → custos → oportunidades → alertas)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Emails dos alertas (passo 10/10). Sem a chave, o lib/email.ts avisa
+          # nos logs e segue — o pipeline não falha, mas ninguém recebe nada.
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || 'noreply@arestadigital.pt' }}
+          # Base dos links "Ver anúncio" no email e no sino.
+          BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || 'https://autoimport.arestadigital.pt' }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::notice::secret DATABASE_URL ausente — só scrape+artefactos neste run (Supabase pendente)."
             exit 0
           fi
-          pnpm exec tsx scripts/pipeline/run-daily.ts
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "::warning::secret RESEND_API_KEY ausente — os alertas criam a notificação no sino mas NÃO enviam email."
+          fi
+          # `pnpm pipeline:daily`, não `tsx …/run-daily.ts`: o script do
+          # package.json passa TSX_TSCONFIG_PATH=tsconfig.scripts.json, sem o
+          # qual o email do alerta rebenta com "React is not defined" — só em
+          # runtime, e só no envio (ver docs/09).
+          pnpm pipeline:daily
