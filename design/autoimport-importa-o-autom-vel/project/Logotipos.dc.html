@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html,body{margin:0;padding:0;background:#F3F5F5}
+body{font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+a{color:var(--link,#0E3B4A)}a:hover{color:var(--accent,#E8930C)}
+:focus-visible{outline:2px solid var(--accent,#E8930C);outline-offset:2px}
+[data-ai]{--bg:#F3F5F5;--surf:#FFFFFF;--border:#DBE2E3;--text:#0D1C22;--muted:#5B6B71;--accent:#E8930C;--accent-ink:#FFFFFF;--petrol:#0E3B4A;--link:#0E3B4A;--sombra:0 1px 2px rgba(13,28,34,.05)}
+[data-ai][data-theme="dark"]{--bg:#0B1A20;--surf:#10262E;--border:#21323A;--text:#E7ECEC;--muted:#93A3A8;--accent:#F0A929;--accent-ink:#0B1A20;--petrol:#5FBDD0;--link:#5FBDD0;--sombra:0 1px 2px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+</style>
+</helmet>
+<div data-ai="true" data-theme="{{ tema }}" style="min-height:100vh; background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:14px; line-height:1.5;">
+  <div style="max-width:1280px; margin:0 auto; padding:40px 24px 72px;">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:8px;">
+      <div>
+        <div style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:var(--accent);">Exploração de marca</div>
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:28px; margin:6px 0 0;">Logótipo AutoImport — 12 conceitos</h1>
+      </div>
+      <button aria-label="Alternar tema" onClick="{{ toggleTema }}" style="width:38px; height:38px; border-radius:6px; border:1px solid var(--border); background:var(--surf); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted);" style-hover="border-color:var(--accent)">
+        <sc-if value="{{ escuro }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg></sc-if>
+        <sc-if value="{{ claro }}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+      </button>
+    </div>
+    <p style="color:var(--muted); font-size:14px; max-width:680px; margin:0 0 28px;">Quadro de opções para escolheres a direção — nenhuma é final. Cada conceito mostra o símbolo isolado, o lockup horizontal em fundo claro e escuro, a prova de escala em tamanho favicon e a versão a uma cor. Diz-me o número do que preferes (ou o que combinar).</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(392px, 1fr)); gap:20px;">
+      <sc-for list="{{ conceitos }}" as="c" hint-placeholder-count="6">
+        <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra); display:flex; flex-direction:column; gap:14px;">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <span style="width:30px; height:30px; border-radius:999px; background:var(--petrol); color:var(--surf); font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ c.n }}</span>
+            <div>
+              <div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px;">{{ c.nome }}</div>
+              <div style="font-size:12.5px; color:var(--muted); margin-top:1px;">{{ c.racional }}</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:132px 1fr; gap:10px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; color:var(--muted);">Símbolo</span>
+              <div style="flex:1; min-height:120px; border-radius:6px; background:#FFFFFF; border:1px solid #DBE2E3; display:flex; align-items:center; justify-content:center;">{{ c.g64 }}</div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; color:var(--muted);">Lockup — claro / escuro</span>
+              <div style="flex:1; border-radius:6px 6px 0 0; background:#FFFFFF; border:1px solid #DBE2E3; border-bottom:none; display:flex; align-items:center; gap:10px; padding:14px 16px;">
+                {{ c.l26 }}<span style="font-family:'Archivo',sans-serif; font-size:19px; color:#0D1C22; white-space:nowrap;"><span style="font-weight:500;">Auto</span><span style="font-weight:700;">Import</span></span>
+              </div>
+              <div style="flex:1; border-radius:0 0 6px 6px; background:#0B1A20; border:1px solid #21323A; display:flex; align-items:center; gap:10px; padding:14px 16px; margin-top:-6px;">
+                {{ c.l26d }}<span style="font-family:'Archivo',sans-serif; font-size:19px; color:#E7ECEC; white-space:nowrap;"><span style="font-weight:500;">Auto</span><span style="font-weight:700;">Import</span></span>
+              </div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; color:var(--muted);">Favicon — 24 / 16 px</span>
+              <div style="display:flex; border-radius:6px; overflow:hidden; border:1px solid #DBE2E3;">
+                <div style="flex:1; background:#FFFFFF; display:flex; align-items:center; justify-content:center; gap:10px; padding:12px 8px;">{{ c.f24 }}{{ c.f16 }}</div>
+                <div style="flex:1; background:#0B1A20; display:flex; align-items:center; justify-content:center; gap:10px; padding:12px 8px;">{{ c.f24d }}{{ c.f16d }}</div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; color:var(--muted);">Uma cor</span>
+              <div style="display:flex; border-radius:6px; overflow:hidden; border:1px solid #DBE2E3;">
+                <div style="flex:1; background:#FFFFFF; display:flex; align-items:center; justify-content:center; padding:10px 8px;">{{ c.m36 }}</div>
+                <div style="flex:1; background:#0B1A20; display:flex; align-items:center; justify-content:center; padding:10px 8px;">{{ c.m36i }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;temaEscuro&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Aparência&quot;}}">
+const H = React.createElement;
+
+// Cores da marca
+const PET = '#0E3B4A', AMB = '#E8930C';
+const CLARO = '#FFFFFF', ESCURO = '#0B1A20';
+const PET_D = '#E7ECEC', AMB_D = '#F0A929'; // primário/acento sobre fundo escuro
+
+// Cada conceito desenha com (p = cor primária, a = cor de acento, bg = cor do fundo para knockouts)
+const CONCEITOS = [
+  {
+    nome: 'Rota A',
+    racional: 'Monograma A cujo travessão é uma seta de rota — a marca aponta para a oportunidade.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M24 6 L44 42 H35 L24 17 L13 42 H4 Z', fill: p }),
+      H('path', { key: 2, d: 'M15 26 h15 v-5.5 l13 9.5 -13 9.5 V34 H15 Z', fill: a }),
+    ],
+  },
+  {
+    nome: 'Travessia',
+    racional: 'A seta de importação a atravessar a fronteira — trazer o carro certo para dentro.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('rect', { key: 1, x: 33, y: 5, width: 5.5, height: 14, fill: p }),
+      H('rect', { key: 2, x: 33, y: 29, width: 5.5, height: 14, fill: p }),
+      H('rect', { key: 3, x: 4, y: 21, width: 25, height: 6, fill: p }),
+      H('path', { key: 4, d: 'M29 13.5 L45 24 29 34.5 Z', fill: a }),
+    ],
+  },
+  {
+    nome: 'Etiqueta',
+    racional: 'Etiqueta de preço com seta a descer — o custo final mais baixo é o produto.',
+    acentoInterior: true,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M6 10 c0-2.2 1.8-4 4-4 h15.5 L44 24 25.5 42 H10 c-2.2 0-4-1.8-4-4 Z', fill: p }),
+      H('circle', { key: 2, cx: 14.5, cy: 14.5, r: 3.4, fill: bg }),
+      H('path', { key: 3, d: 'M20.5 19 h7 v8.5 h5.5 L24 38 15 27.5 h5.5 Z', fill: a }),
+    ],
+  },
+  {
+    nome: 'Delta',
+    racional: 'Preço PT em contorno vs. custo final sólido — a seta âmbar é a poupança entre os dois.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('rect', { key: 1, x: 7.5, y: 11.5, width: 11, height: 29, fill: 'none', stroke: p, strokeWidth: 3 }),
+      H('rect', { key: 2, x: 28, y: 25, width: 12, height: 17, fill: p }),
+      H('path', { key: 3, d: 'M31.5 5 h5 v8 h5.5 L34 22.5 26 13 h5.5 Z', fill: a }),
+    ],
+  },
+  {
+    nome: 'Selo',
+    racional: 'Escudo com visto — a confiança da quilometragem verificada como identidade.',
+    acentoInterior: true,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M24 4 L40 10 v13 c0 10-6.5 16.5-16 21 C14.5 39.5 8 33 8 23 V10 Z', fill: p }),
+      H('path', { key: 2, d: 'M16 24.5 l6 6 L33 18.5', stroke: a, strokeWidth: 4.5, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }),
+    ],
+  },
+  {
+    nome: 'Pico AI',
+    racional: 'Geometria abstrata A + I; o topo âmbar do I é o ponto de dados que destaca o valor.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M17 6 L31 42 H23.5 L17 24.5 10.5 42 H3 Z', fill: p }),
+      H('rect', { key: 2, x: 37, y: 15.5, width: 7.5, height: 26.5, fill: p }),
+      H('rect', { key: 3, x: 37, y: 5.5, width: 7.5, height: 7.5, fill: a }),
+    ],
+  },
+  {
+    nome: 'Horizonte',
+    racional: 'Espaço negativo: a estrada em perspetiva aberta no bloco sólido, com o destino âmbar no horizonte.',
+    acentoInterior: true,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M4 12 c0-4.4 3.6-8 8-8 h24 c4.4 0 8 3.6 8 8 v24 c0 4.4-3.6 8-8 8 H12 c-4.4 0-8-3.6-8-8 Z', fill: p }),
+      H('path', { key: 2, d: 'M24 15 L35.5 44 H12.5 Z', fill: bg }),
+      H('circle', { key: 3, cx: 24, cy: 10.5, r: 3.4, fill: a }),
+    ],
+  },
+  {
+    nome: 'Odómetro',
+    racional: 'O mostrador da quilometragem verificada — o ponteiro âmbar aponta ao número certo.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M7 36 A17 17 0 1 1 41 36', stroke: p, strokeWidth: 5.5, strokeLinecap: 'round', fill: 'none' }),
+      H('path', { key: 2, d: 'M24 6.5 v5.5', stroke: p, strokeWidth: 2.8, strokeLinecap: 'round', fill: 'none' }),
+      H('path', { key: 3, d: 'M24 36 L34.5 19', stroke: a, strokeWidth: 4.5, strokeLinecap: 'round', fill: 'none' }),
+      H('circle', { key: 4, cx: 24, cy: 36, r: 4.2, fill: p }),
+    ],
+  },
+  {
+    nome: 'Caminho',
+    racional: 'Marca monoline de um só traço contínuo — a rota com curvas até ao destino âmbar.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('path', { key: 1, d: 'M7 41 h22 c7 0 7-10 0-10 H17 c-7 0-7-10 0-10 h16', stroke: p, strokeWidth: 4.5, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }),
+      H('circle', { key: 2, cx: 39.5, cy: 21, r: 4, fill: a }),
+    ],
+  },
+  {
+    nome: 'Farol',
+    racional: 'O farol do carro a iluminar o caminho — a plataforma que revela a oportunidade escondida.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('circle', { key: 1, cx: 14, cy: 24, r: 9.5, fill: p }),
+      H('path', { key: 2, d: 'M26 17.5 L45 11.5 V36.5 L26 30.5 Z', fill: a }),
+    ],
+  },
+  {
+    nome: 'Chave',
+    racional: 'A chave do carro importado — o momento de entrega, reduzido à geometria essencial.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('circle', { key: 1, cx: 13, cy: 24, r: 8, stroke: p, strokeWidth: 4.5, fill: 'none' }),
+      H('path', { key: 2, d: 'M21 24 H41', stroke: p, strokeWidth: 4.5, strokeLinecap: 'round', fill: 'none' }),
+      H('path', { key: 3, d: 'M33 24 v6.5 M40 24 v6.5', stroke: p, strokeWidth: 4.5, strokeLinecap: 'round', fill: 'none' }),
+      H('circle', { key: 4, cx: 13, cy: 24, r: 3.2, fill: a }),
+    ],
+  },
+  {
+    nome: 'Matrícula',
+    racional: 'A chapa de matrícula com a banda âmbar — o fim da viagem: o carro legalizado em Portugal.',
+    acentoInterior: false,
+    draw: (p, a, bg) => [
+      H('rect', { key: 1, x: 4, y: 14, width: 40, height: 20, rx: 3.5, stroke: p, strokeWidth: 3.5, fill: 'none' }),
+      H('path', { key: 2, d: 'M7.5 14 H14 v20 H7.5 c-1.9 0-3.5-1.6-3.5-3.5 v-13 c0-1.9 1.6-3.5 3.5-3.5 Z', fill: a }),
+      H('rect', { key: 3, x: 19, y: 21.5, width: 5, height: 5, fill: p }),
+      H('rect', { key: 4, x: 27, y: 21.5, width: 5, height: 5, fill: p }),
+      H('rect', { key: 5, x: 35, y: 21.5, width: 5, height: 5, fill: p }),
+    ],
+  },
+];
+
+const SVG = (size, kids) => H('svg', { width: size, height: size, viewBox: '0 0 48 48', fill: 'none', 'aria-hidden': true }, kids);
+
+class Component extends DCLogic {
+  state = { dark: null };
+
+  renderVals() {
+    const dark = this.state.dark ?? (this.props.temaEscuro ?? false);
+    const conceitos = CONCEITOS.map((c, i) => {
+      const monoClaro = c.draw(PET, c.acentoInterior ? CLARO : PET, CLARO);
+      const monoEscuro = c.draw(PET_D, c.acentoInterior ? ESCURO : PET_D, ESCURO);
+      return {
+        n: String(i + 1),
+        nome: c.nome,
+        racional: c.racional,
+        g64: SVG(72, c.draw(PET, AMB, CLARO)),
+        l26: SVG(26, c.draw(PET, AMB, CLARO)),
+        l26d: SVG(26, c.draw(PET_D, AMB_D, ESCURO)),
+        f24: SVG(24, c.draw(PET, AMB, CLARO)),
+        f16: SVG(16, c.draw(PET, AMB, CLARO)),
+        f24d: SVG(24, c.draw(PET_D, AMB_D, ESCURO)),
+        f16d: SVG(16, c.draw(PET_D, AMB_D, ESCURO)),
+        m36: SVG(36, monoClaro),
+        m36i: SVG(36, monoEscuro),
+      };
+    });
+    return {
+      tema: dark ? 'dark' : 'light', escuro: dark, claro: !dark,
+      toggleTema: () => this.setState({ dark: !dark }),
+      conceitos,
+    };
+  }
+}
+</script>
+</body>
+</html>

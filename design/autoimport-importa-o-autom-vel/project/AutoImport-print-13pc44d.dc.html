@@ -1,0 +1,1475 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style data-omelette-print-defaults>
+@media print {
+  @page { margin: 0.5in; }
+  h1, h2, h3, h4, h5, h6 { break-after: avoid; }
+  figure, table, pre, blockquote, img, svg, tr, [class~="card" i] { break-inside: avoid; }
+  img, svg { max-width: 100%; }
+  p { orphans: 3; widows: 3; }
+}
+</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+html,body{margin:0;padding:0;background:#F3F5F5}
+body{font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit}
+a{color:var(--link,#0E3B4A)}a:hover{color:var(--accent,#E8930C)}
+:focus-visible{outline:2px solid var(--accent,#E8930C);outline-offset:2px}
+select{appearance:auto}
+[data-ai]{--bg:#F3F5F5;--surf:#FFFFFF;--border:#DBE2E3;--text:#0D1C22;--muted:#5B6B71;--accent:#E8930C;--accent-ink:#FFFFFF;--petrol:#0E3B4A;--steel:#3E6B79;--link:#0E3B4A;--ok:#1E9E57;--ok-bg:#E4F3EA;--mid:#3E6B79;--mid-bg:#E7ECED;--bad:#D1403A;--bad-bg:#F7E3E1;--ph1:#E9EEEF;--ph2:#E3E9EA;--sombra:0 1px 2px rgba(13,28,34,.05)}
+[data-ai][data-theme="dark"]{--bg:#0B1A20;--surf:#10262E;--border:#21323A;--text:#E7ECEC;--muted:#93A3A8;--accent:#F0A929;--accent-ink:#0B1A20;--petrol:#5FBDD0;--steel:#93A3A8;--link:#5FBDD0;--ok:#4CC98A;--ok-bg:rgba(30,158,87,.16);--mid:#A9BDC4;--mid-bg:rgba(62,107,121,.28);--bad:#E4766F;--bad-bg:rgba(209,64,58,.16);--ph1:#132B34;--ph2:#0F2530;--sombra:0 1px 2px rgba(0,0,0,.3)}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+</style>
+</helmet>
+<div data-ai="true" data-theme="{{ tema }}" style="min-height:100vh; background:var(--bg); color:var(--text); font-family:'IBM Plex Sans',sans-serif; font-size:14px; line-height:1.5;">
+
+  <header style="position:fixed; top:0; left:0; right:0; z-index:50; background:var(--surf); border-bottom:1px solid var(--border); box-shadow:var(--sombra);">
+    <div style="max-width:1240px; margin:0 auto; padding:0 24px; height:60px; display:flex; align-items:center; gap:20px;">
+      <button onClick="{{ irPainel }}" style="display:flex; align-items:center; gap:9px; background:none; border:none; cursor:pointer; padding:0; color:var(--text);">
+        <span style="width:30px; height:30px; border-radius:6px; background:var(--petrol); display:flex; align-items:center; justify-content:center;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><path d="M9 17h6"></path><circle cx="17" cy="17" r="2"></circle></svg>
+        </span>
+        <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:17px; letter-spacing:-.01em;">AutoImport</span>
+      </button>
+      <nav aria-label="Principal" style="display:flex; align-items:center; gap:4px; height:60px; flex-wrap:wrap;">
+        <sc-for list="{{ navItens }}" as="it" hint-placeholder-count="5">
+          <button onClick="{{ it.ir }}" style="height:60px; padding:0 13px; background:none; border:none; cursor:pointer; font-size:14px; font-weight:{{ it.peso }}; color:{{ it.cor }}; box-shadow:inset 0 -2px 0 {{ it.risco }}; transition:color .15s ease-out;" style-hover="color:var(--accent)">{{ it.nome }}</button>
+        </sc-for>
+      </nav>
+      <div style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <button aria-label="Selecionar mercado" onClick="{{ togglePais }}" style="height:36px; padding:0 11px; border-radius:6px; border:1px solid var(--border); background:var(--surf); cursor:pointer; display:flex; align-items:center; gap:7px; font-size:13px; color:var(--text);" style-hover="border-color:var(--steel)">
+          <span style="font-size:15px;">{{ paisSelFlag }}</span><span>{{ paisSelNome }}</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <button aria-label="Alternar tema" onClick="{{ toggleTema }}" style="width:36px; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--surf); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted);" style-hover="border-color:var(--steel)">
+          <sc-if value="{{ escuro }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg></sc-if>
+          <sc-if value="{{ claro }}" hint-placeholder-val="{{ true }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></sc-if>
+        </button>
+        <button aria-label="Notificações" onClick="{{ toggleNotif }}" style="position:relative; width:36px; height:36px; border-radius:6px; border:1px solid var(--border); background:var(--surf); cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--muted);" style-hover="border-color:var(--steel)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+          <sc-if value="{{ temNotifs }}" hint-placeholder-val="{{ true }}"><span style="position:absolute; top:7px; right:8px; width:8px; height:8px; border-radius:999px; background:var(--accent); border:2px solid var(--surf);"></span></sc-if>
+        </button>
+        <button aria-label="Menu do stand" onClick="{{ toggleMenu }}" style="width:36px; height:36px; border-radius:999px; border:none; background:var(--petrol); color:#FFFFFF; font-family:'Archivo',sans-serif; font-weight:600; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center;" style-hover="opacity:.88">{{ iniciais }}</button>
+      </div>
+    </div>
+  </header>
+
+  <sc-if value="{{ algumMenu }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ fecharMenus }}" style="position:fixed; inset:0; z-index:55;"></div>
+  </sc-if>
+  <sc-if value="{{ notifAberto }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; top:66px; right:max(16px, calc(50% - 608px)); z-index:60; width:340px; background:var(--surf); border:1px solid var(--border); border-radius:6px; box-shadow:0 12px 32px rgba(13,28,34,.14); overflow:hidden; max-width:calc(100vw - 32px);">
+      <div style="padding:12px 16px; font-family:'Archivo',sans-serif; font-weight:600; font-size:14px; border-bottom:1px solid var(--border);">Notificações</div>
+      <sc-for list="{{ notifs }}" as="n" hint-placeholder-count="3">
+        <button onClick="{{ n.abrir }}" style="display:block; width:100%; text-align:left; padding:12px 16px; background:none; border:none; border-bottom:1px solid var(--border); cursor:pointer; color:var(--text);" style-hover="background:var(--bg)">
+          <div style="font-weight:600; font-size:13.5px; color:{{ n.cor }};">{{ n.titulo }}</div>
+          <div style="font-size:13px; color:var(--text); margin-top:2px;">{{ n.texto }}</div>
+          <div style="font-size:11.5px; color:var(--muted); margin-top:3px;">{{ n.quando }}</div>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+  <sc-if value="{{ menuAberto }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; top:66px; right:max(16px, calc(50% - 608px)); z-index:60; width:230px; background:var(--surf); border:1px solid var(--border); border-radius:6px; box-shadow:0 12px 32px rgba(13,28,34,.14); overflow:hidden; padding:6px; max-width:calc(100vw - 32px);">
+      <div style="padding:9px 12px 10px; border-bottom:1px solid var(--border); margin-bottom:6px;">
+        <div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:14px;">{{ nomeStand }}</div>
+        <div style="font-size:12px; color:var(--muted);">Plano Profissional</div>
+      </div>
+      <button onClick="{{ irAlertas }}" style="display:block; width:100%; text-align:left; padding:9px 12px; border-radius:6px; background:none; border:none; cursor:pointer; font-size:13.5px; color:var(--text);" style-hover="background:var(--bg)">Alertas</button>
+      <button onClick="{{ irPerfil }}" style="display:block; width:100%; text-align:left; padding:9px 12px; border-radius:6px; background:none; border:none; cursor:pointer; font-size:13.5px; color:var(--text);" style-hover="background:var(--bg)">Stand / Perfil</button>
+      <button onClick="{{ fecharMenus }}" style="display:block; width:100%; text-align:left; padding:9px 12px; border-radius:6px; background:none; border:none; cursor:pointer; font-size:13.5px; color:var(--text);" style-hover="background:var(--bg)">Definições</button>
+      <div style="height:1px; background:var(--border); margin:6px 0;"></div>
+      <button onClick="{{ fecharMenus }}" style="display:block; width:100%; text-align:left; padding:9px 12px; border-radius:6px; background:none; border:none; cursor:pointer; font-size:13.5px; color:var(--bad);" style-hover="background:var(--bad-bg)">Terminar sessão</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{ paisAberto }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; top:66px; right:max(16px, calc(50% - 608px)); z-index:60; width:240px; background:var(--surf); border:1px solid var(--border); border-radius:6px; box-shadow:0 12px 32px rgba(13,28,34,.14); overflow:hidden; padding:6px; max-width:calc(100vw - 32px);">
+      <div style="padding:8px 12px; font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; color:var(--muted);">Mercados de origem</div>
+      <sc-for list="{{ paisOpcoes }}" as="p" hint-placeholder-count="6">
+        <button onClick="{{ p.escolher }}" style="display:flex; align-items:center; gap:9px; width:100%; text-align:left; padding:9px 12px; border-radius:6px; background:{{ p.bg }}; border:none; cursor:pointer; font-size:13.5px; color:var(--text);" style-hover="background:var(--bg)">
+          <span style="font-size:15px;">{{ p.flag }}</span><span style="flex:1;">{{ p.nome }}</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);">{{ p.count }}</span>
+        </button>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <main style="max-width:1240px; margin:0 auto; padding:88px 24px 64px;">
+
+    <sc-if value="{{ isPainel }}" hint-placeholder-val="{{ true }}">
+      <div data-screen-label="Painel">
+        <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+          <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0;">Bom dia, António</h1>
+          <span style="font-size:13px; color:var(--muted);">quinta-feira, 10 de julho de 2026</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:20px;">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="3">
+            <button onClick="{{ k.ir }}" style="text-align:left; background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:18px 20px; box-shadow:var(--sombra); cursor:pointer; color:var(--text); transition:transform .2s ease-out;" style-hover="transform:translateY(-2px)">
+              <div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:600; color:var(--muted);">{{ k.nome }}</div>
+              <div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:32px; margin-top:6px; font-variant-numeric:tabular-nums; color:{{ k.cor }};">{{ k.valor }}</div>
+              <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">{{ k.sub }}</div>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin:36px 0 14px;">
+          <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:19px; margin:0;">Novas oportunidades</h2>
+          <button onClick="{{ irPesquisar }}" style="background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--link); padding:0;" style-hover="color:var(--accent)">Ver todas →</button>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(266px, 1fr)); gap:16px;">
+          <sc-for list="{{ novas }}" as="item" hint-placeholder-count="4">
+            <dc-import name="CarCard" item="{{ item }}" hint-size="100%,470px"></dc-import>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:baseline; justify-content:space-between; margin:36px 0 14px;">
+          <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:19px; margin:0;">As tuas compras</h2>
+          <button onClick="{{ irCompras }}" style="background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--link); padding:0;" style-hover="color:var(--accent)">Ver pipeline →</button>
+        </div>
+        <div style="display:grid; gap:10px;">
+          <sc-for list="{{ comprasResumo }}" as="c" hint-placeholder-count="4">
+            <button onClick="{{ c.abrir }}" style="display:flex; align-items:center; gap:16px; text-align:left; background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:14px 18px; box-shadow:var(--sombra); cursor:pointer; color:var(--text); flex-wrap:wrap;" style-hover="border-color:var(--steel)">
+              <span style="font-size:16px;">{{ c.flag }}</span>
+              <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:14.5px; min-width:190px;">{{ c.titulo }}</span>
+              <span style="font-size:12px; font-weight:600; padding:3px 10px; border-radius:999px; background:var(--mid-bg); color:var(--mid);">{{ c.fase }}</span>
+              <span style="flex:1; min-width:140px; height:5px; border-radius:999px; background:var(--mid-bg); position:relative; overflow:hidden;"><span style="position:absolute; inset:0; width:{{ c.pct }}; background:var(--steel); border-radius:999px;"></span></span>
+              <span style="font-size:12.5px; color:var(--muted); max-width:280px;">{{ c.proxima }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPesquisar }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Pesquisar">
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 18px;">Pesquisar anúncios</h1>
+        <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:16px; box-shadow:var(--sombra); display:flex; flex-direction:column; gap:12px;">
+          <div style="position:relative;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute; left:14px; top:50%; transform:translateY(-50%);"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            <input value="{{ q }}" onChange="{{ setQ }}" placeholder="Procura por marca, modelo ou versão — ex.: BMW 320d Touring" style="width:100%; box-sizing:border-box; height:44px; padding:0 14px 0 40px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:14.5px;">
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <select aria-label="Marca" value="{{ fMarca }}" onChange="{{ setMarca }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+              <option value="todas">Marca: todas</option><option value="Volkswagen">Volkswagen</option><option value="BMW">BMW</option><option value="Audi">Audi</option><option value="Mercedes-Benz">Mercedes-Benz</option><option value="Renault">Renault</option><option value="Peugeot">Peugeot</option><option value="Tesla">Tesla</option><option value="Cupra">Cupra</option>
+            </select>
+            <select aria-label="País" value="{{ fPais }}" onChange="{{ setPais }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+              <option value="todos">País: todos</option><option value="DE">Alemanha</option><option value="FR">França</option><option value="BE">Bélgica</option><option value="NL">Holanda</option><option value="ES">Espanha</option>
+            </select>
+            <select aria-label="Preço máximo" value="{{ fPreco }}" onChange="{{ setPreco }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+              <option value="todos">Custo final: sem limite</option><option value="20000">Até 20 000 €</option><option value="25000">Até 25 000 €</option><option value="30000">Até 30 000 €</option><option value="35000">Até 35 000 €</option>
+            </select>
+            <button onClick="{{ toggleMaisFiltros }}" style="height:36px; padding:0 12px; border-radius:6px; border:1px dashed var(--border); background:none; color:var(--muted); font-size:13.5px; cursor:pointer;" style-hover="color:var(--text); border-color:var(--steel)">{{ maisFiltrosLabel }}</button>
+            <button role="switch" aria-checked="{{ soOp }}" onClick="{{ toggleSoOp }}" style="margin-left:auto; display:flex; align-items:center; gap:9px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text); padding:0;">
+              <span style="width:38px; height:21px; border-radius:999px; background:{{ soOpBg }}; position:relative; transition:background .2s ease-out; flex-shrink:0;"><span style="position:absolute; top:2.5px; left:{{ soOpKnob }}; width:16px; height:16px; border-radius:999px; background:#FFFFFF; transition:left .2s ease-out; box-shadow:0 1px 3px rgba(0,0,0,.25);"></span></span>
+              Só oportunidades (Compensa)
+            </button>
+          </div>
+          <sc-if value="{{ maisFiltros }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:12px; border-top:1px solid var(--border);">
+              <select aria-label="Ano mínimo" value="{{ fAno }}" onChange="{{ setAno }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todos">Ano: todos</option><option value="2020">2020 ou mais recente</option><option value="2021">2021 ou mais recente</option><option value="2022">2022 ou mais recente</option><option value="2023">2023 ou mais recente</option>
+              </select>
+              <select aria-label="Quilómetros máximos" value="{{ fKm }}" onChange="{{ setKm }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todos">Km: sem limite</option><option value="50000">Até 50 000 km</option><option value="80000">Até 80 000 km</option><option value="100000">Até 100 000 km</option>
+              </select>
+              <select aria-label="Combustível" value="{{ fComb }}" onChange="{{ setComb }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todos">Combustível: todos</option><option value="Diesel">Diesel</option><option value="Gasolina">Gasolina</option><option value="Híbrido plug-in">Híbrido plug-in</option><option value="Elétrico">Elétrico</option>
+              </select>
+              <select aria-label="Km verificado" value="{{ fSelo }}" onChange="{{ setSelo }}" style="height:36px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todos">Verificação de km: todas</option><option value="ok">Só km verificado</option>
+              </select>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;">
+          <sc-for list="{{ chipsPais }}" as="p" hint-placeholder-count="6">
+            <button onClick="{{ p.escolher }}" style="height:34px; padding:0 13px; border-radius:999px; border:1px solid {{ p.borda }}; background:{{ p.bg }}; color:{{ p.cor }}; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:7px; transition:border-color .15s ease-out;" style-hover="border-color:var(--steel)">
+              <span style="font-size:14px;">{{ p.flag }}</span>{{ p.nome }}
+              <span style="font-family:'IBM Plex Mono',monospace; font-weight:400; font-size:12px; opacity:.75;">{{ p.count }}</span>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin:20px 0 14px; flex-wrap:wrap;">
+          <span style="font-size:13.5px; color:var(--muted);"><strong style="color:var(--text); font-family:'IBM Plex Mono',monospace;">{{ nResultados }}</strong> anúncios encontrados</span>
+          <select aria-label="Ordenar" value="{{ ordenar }}" onChange="{{ setOrdenar }}" style="height:34px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13px; cursor:pointer;">
+            <option value="poupanca">Ordenar: maior poupança</option><option value="preco">Ordenar: custo final mais baixo</option><option value="km">Ordenar: menos km</option>
+          </select>
+        </div>
+        <sc-if value="{{ semResultados }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:56px 24px; background:var(--surf); border:1px dashed var(--border); border-radius:6px; color:var(--muted);">Nenhum anúncio corresponde aos filtros. Experimenta alargar o preço ou limpar o país.</div>
+        </sc-if>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(266px, 1fr)); gap:16px;">
+          <sc-for list="{{ resultados }}" as="item" hint-placeholder-count="6">
+            <dc-import name="CarCard" item="{{ item }}" hint-size="100%,510px"></dc-import>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isComparar }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Comparar">
+        <button onClick="{{ irPesquisar }}" style="display:flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--link); padding:0; margin-bottom:12px;" style-hover="color:var(--accent)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Voltar à pesquisa
+        </button>
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 18px;">Comparar anúncios</h1>
+        <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; box-shadow:var(--sombra); padding:20px; overflow-x:auto;">
+          <div style="min-width:{{ compareMin }};">
+            <div style="display:grid; grid-template-columns:{{ compareCols }}; gap:14px; align-items:end;">
+              <span></span>
+              <sc-for list="{{ compareCars }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  <div style="height:26px; display:flex; align-items:center; justify-content:space-between;">
+                    <sc-if value="{{ c.vencedor }}" hint-placeholder-val="{{ false }}"><span style="font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:3px 10px; border-radius:999px; background:var(--accent); color:var(--accent-ink);">Melhor negócio</span></sc-if>
+                    <sc-if value="{{ c.naoVencedor }}" hint-placeholder-val="{{ true }}"><span></span></sc-if>
+                    <button aria-label="Remover da comparação" onClick="{{ c.removerComp }}" style="background:none; border:none; cursor:pointer; color:var(--muted); font-size:16px; padding:2px 6px;" style-hover="color:var(--bad)">×</button>
+                  </div>
+                  <div style="aspect-ratio:4/3; border-radius:6px; border:2px solid {{ c.anel }}; background:repeating-linear-gradient(45deg, var(--ph1) 0 14px, var(--ph2) 14px 28px); display:flex; align-items:center; justify-content:center;">
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);">{{ c.nomeFoto }}</span>
+                  </div>
+                  <div><div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:15px;">{{ c.titulo }}</div><div style="font-size:12.5px; color:var(--muted);">{{ c.versao }}</div></div>
+                </div>
+              </sc-for>
+            </div>
+            <sc-for list="{{ compareLinhas }}" as="l" hint-placeholder-count="9">
+              <div style="display:grid; grid-template-columns:{{ compareCols }}; gap:14px; align-items:center; padding:11px 0; border-top:1px solid var(--border);">
+                <span style="font-size:12.5px; color:var(--muted); font-weight:500;">{{ l.nome }}</span>
+                <sc-for list="{{ l.celulas }}" as="cel" hint-placeholder-count="3">
+                  <span style="font-family:{{ cel.fonte }}; font-variant-numeric:tabular-nums; font-size:{{ cel.tam }}; font-weight:{{ cel.peso }}; color:{{ cel.cor }};">{{ cel.pre }}{{ cel.valor }}</span>
+                </sc-for>
+              </div>
+            </sc-for>
+            <div style="display:grid; grid-template-columns:{{ compareCols }}; gap:14px; align-items:center; padding:12px 0 2px; border-top:1px solid var(--border);">
+              <span style="font-size:12.5px; color:var(--muted); font-weight:500;">Poupança</span>
+              <sc-for list="{{ compareCars }}" as="c" hint-placeholder-count="3">
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  <span style="display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:6px; background:{{ c.vBg }}; color:{{ c.vCor }}; align-self:flex-start;">
+                    <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:16px; font-variant-numeric:tabular-nums;">{{ c.poupFmt }}</span>
+                    <span style="font-size:12px; font-weight:600;">{{ c.veredito }}</span>
+                  </span>
+                  <button onClick="{{ c.abrir }}" style="height:36px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">Ver detalhe</button>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isDetalhe }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Detalhe do anúncio">
+        <button onClick="{{ voltar }}" style="display:flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--link); padding:0; margin-bottom:12px;" style-hover="color:var(--accent)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Voltar
+        </button>
+        <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:6px;">
+          <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0;">{{ det.titulo }} <span style="font-weight:500; color:var(--muted); font-size:19px;">{{ det.versao }}</span></h1>
+          <span style="font-size:13px; font-weight:600; padding:4px 12px; border-radius:999px; background:{{ det.vBg }}; color:{{ det.vCor }};">{{ det.veredito }}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--muted); margin-bottom:20px; flex-wrap:wrap;">
+          <span style="white-space:nowrap;">{{ det.flag }} {{ det.paisNome }}</span><span style="opacity:.4">·</span><span>anúncio em {{ det.fonte }}</span><span style="opacity:.4">·</span>
+          <span style="display:flex; align-items:center; gap:5px; color:{{ det.seloCor }}; font-weight:500;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ det.seloIcone }}"></path></svg>{{ det.selo }}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:24px; align-items:start;">
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="aspect-ratio:16/10; border-radius:6px; background:repeating-linear-gradient(45deg, var(--ph1) 0 16px, var(--ph2) 16px 32px); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px;">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.7"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><path d="M9 17h6"></path><circle cx="17" cy="17" r="2"></circle></svg>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--muted);">{{ det.fotoAtual }}</span>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:10px;">
+              <sc-for list="{{ det.fotos }}" as="f" hint-placeholder-count="5">
+                <button onClick="{{ f.abrir }}" aria-label="{{ f.nome }}" style="aspect-ratio:4/3; border-radius:6px; border:2px solid {{ f.borda }}; background:repeating-linear-gradient(45deg, var(--ph1) 0 10px, var(--ph2) 10px 20px); cursor:pointer; font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--muted);">{{ f.n }}</button>
+              </sc-for>
+            </div>
+            <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+              <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 14px;">Ficha técnica</h2>
+              <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:14px 20px;">
+                <sc-for list="{{ det.ficha }}" as="fi" hint-placeholder-count="8">
+                  <div><div style="font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:600;">{{ fi.nome }}</div><div style="font-family:{{ fi.fonte }}; font-variant-numeric:tabular-nums; font-size:14.5px; margin-top:3px;">{{ fi.valor }}</div></div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+              <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 6px;">Custo final em Portugal</h2>
+              <div style="display:flex; justify-content:space-between; padding:9px 0; font-size:13.5px;"><span style="color:var(--muted); white-space:nowrap;">Preço na origem ({{ det.flag }} {{ det.paisNome }})</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.origemFmt }}</span></div>
+              <div style="display:flex; justify-content:space-between; padding:9px 0; border-top:1px solid var(--border); font-size:13.5px;"><span style="color:var(--muted);">Transporte até PT</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.transporteFmt }}</span></div>
+              <button onClick="{{ toggleIsv }}" style="display:flex; justify-content:space-between; align-items:center; width:100%; padding:9px 0; border:none; border-top:1px solid var(--border); background:none; cursor:pointer; font-size:13.5px; color:var(--text); text-align:left;">
+                <span style="color:var(--muted); display:flex; align-items:center; gap:6px;">ISV <span style="font-size:11.5px; color:var(--link); font-weight:600;">como calculámos</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({{ isvSeta }}); transition:transform .2s ease-out;"><path d="m6 9 6 6 6-6"></path></svg></span>
+                <span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.isvFmt }}</span>
+              </button>
+              <sc-if value="{{ isvAberto }}" hint-placeholder-val="{{ false }}">
+                <div style="background:var(--bg); border-radius:6px; padding:12px 14px; margin-bottom:6px; font-size:12.5px;">
+                  <div style="display:flex; justify-content:space-between; padding:4px 0;"><span style="color:var(--muted);">Componente cilindrada ({{ det.cilFmt }})</span><span style="font-family:'IBM Plex Mono',monospace;">{{ det.isvCil }}</span></div>
+                  <div style="display:flex; justify-content:space-between; padding:4px 0;"><span style="color:var(--muted);">Componente ambiental ({{ det.co2 }} g CO₂/km)</span><span style="font-family:'IBM Plex Mono',monospace;">{{ det.isvAmb }}</span></div>
+                  <div style="display:flex; justify-content:space-between; padding:4px 0;"><span style="color:var(--muted);">Redução por anos de uso ({{ det.idade }})</span><span style="font-family:'IBM Plex Mono',monospace;">−{{ det.isvRed }}</span></div>
+                  <div style="color:var(--muted); margin-top:6px; line-height:1.45;">Cálculo pela tabela em vigor (usados UE, art.º 11.º CISV). Valor estimado — o definitivo é fixado pela Alfândega na DAV.</div>
+                </div>
+              </sc-if>
+              <div style="display:flex; justify-content:space-between; padding:9px 0; border-top:1px solid var(--border); font-size:13.5px;"><span style="color:var(--muted);">IUC (1.º ano)</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.iucFmt }}</span></div>
+              <div style="display:flex; justify-content:space-between; padding:9px 0; border-top:1px solid var(--border); font-size:13.5px;"><span style="color:var(--muted);">Legalização, inspeção e matrícula</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.legalFmt }}</span></div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; padding:12px 0 4px; border-top:2px solid var(--text); margin-top:2px;"><span style="font-weight:600; font-size:14px;">Total em Portugal</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; font-weight:600; font-size:21px;">{{ det.totalFmt }}</span></div>
+              <div style="display:flex; justify-content:space-between; padding:6px 0; font-size:13px; color:var(--muted);"><span>Preço de mercado em PT (média de {{ det.anunciosPT }} anúncios)</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ det.mercadoFmt }}</span></div>
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; padding:16px 18px; border-radius:6px; background:{{ det.vBg }}; color:{{ det.vCor }}; flex-wrap:wrap;">
+                <div><div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:700;">Poupança estimada</div><div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:30px; font-variant-numeric:tabular-nums; line-height:1.15;">{{ det.poupFmt }}</div></div>
+                <div style="text-align:right;"><div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:19px;">{{ det.pctFmt }}</div><div style="font-size:12.5px; font-weight:600;">{{ det.veredito }}</div></div>
+              </div>
+              <button onClick="{{ det.negociar }}" style="width:100%; height:46px; margin-top:14px; border:none; border-radius:6px; background:var(--accent); color:var(--accent-ink); font-family:'Archivo',sans-serif; font-weight:600; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:9px; transition:transform .15s ease-out;" style-hover="transform:translateY(-1px)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>Iniciar negociação
+              </button>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;">
+                <button onClick="{{ det.toggleFavSimples }}" style="height:40px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">{{ det.favLabel }}</button>
+                <button onClick="{{ irAlertasForm }}" style="height:40px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">Criar alerta</button>
+              </div>
+            </div>
+            <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+              <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 12px;">Confiança e verificação</h2>
+              <div style="display:grid; gap:10px;">
+                <sc-for list="{{ det.confianca }}" as="cf" hint-placeholder-count="3">
+                  <div style="display:flex; align-items:center; gap:10px; font-size:13.5px;">
+                    <span style="width:22px; height:22px; border-radius:999px; background:{{ cf.bg }}; color:{{ cf.cor }}; display:flex; align-items:center; justify-content:center; flex-shrink:0;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{ cf.icone }}"></path></svg></span>
+                    <span style="flex:1;">{{ cf.nome }}</span>
+                    <span style="font-size:12.5px; font-weight:600; color:{{ cf.cor }};">{{ cf.estado }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isNegociacoes }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Negociações">
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 14px;">Negociações</h1>
+        <div style="display:flex; align-items:center; gap:10px; padding:11px 16px; border-radius:6px; background:var(--mid-bg); color:var(--mid); font-size:13px; margin-bottom:18px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>
+          <span><strong>Comunicação protegida</strong> — as mensagens seguem por email mascarado da plataforma. O teu email e o do fornecedor nunca são partilhados; toda a conversa fica registada no AutoImport.</span>
+        </div>
+        <div style="display:grid; grid-template-columns:minmax(260px, 320px) 1fr; gap:18px; align-items:start;">
+          <div style="display:grid; gap:8px;">
+            <sc-for list="{{ convsVm }}" as="cv" hint-placeholder-count="3">
+              <button onClick="{{ cv.abrir }}" style="text-align:left; background:var(--surf); border:1px solid {{ cv.borda }}; border-left:3px solid {{ cv.bordaEsq }}; border-radius:6px; padding:12px 14px; cursor:pointer; color:var(--text); box-shadow:var(--sombra);" style-hover="border-color:var(--steel)">
+                <div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline;"><span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px;">{{ cv.titulo }}</span><span style="font-size:11px; color:var(--muted); white-space:nowrap;">{{ cv.quando }}</span></div>
+                <div style="font-size:12.5px; color:var(--muted); margin-top:2px;">{{ cv.fornecedor }}</div>
+                <span style="display:inline-block; margin-top:8px; font-size:11.5px; font-weight:600; padding:2px 9px; border-radius:999px; background:{{ cv.eBg }}; color:{{ cv.eCor }};">{{ cv.estado }}</span>
+              </button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ temConv }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:12px; min-width:0;">
+              <div style="display:flex; align-items:center; gap:14px; background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:12px 16px; box-shadow:var(--sombra); flex-wrap:wrap;">
+                <span style="width:68px; height:51px; border-radius:6px; background:repeating-linear-gradient(45deg, var(--ph1) 0 8px, var(--ph2) 8px 16px); border:1px solid var(--border); flex-shrink:0;"></span>
+                <div style="min-width:150px;"><div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:14.5px;">{{ convAtiva.titulo }}</div><div style="font-size:12.5px; color:var(--muted);">{{ convAtiva.flag }} {{ convAtiva.fornecedor }}</div></div>
+                <div style="margin-left:auto; text-align:right;"><div style="font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); font-weight:600;">Preço na origem</div><div style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:16px; font-variant-numeric:tabular-nums;">{{ convAtiva.origemFmt }}</div></div>
+                <span style="padding:6px 12px; border-radius:6px; background:{{ convAtiva.vBg }}; color:{{ convAtiva.vCor }}; font-family:'Archivo',sans-serif; font-weight:700; font-size:14px; font-variant-numeric:tabular-nums;">{{ convAtiva.poupFmt }}</span>
+                <button onClick="{{ convAtiva.verAnuncio }}" style="height:34px; padding:0 12px; border-radius:6px; border:1px solid var(--border); background:none; color:var(--link); font-size:13px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">Ver anúncio</button>
+              </div>
+              <sc-if value="{{ convVazia }}" hint-placeholder-val="{{ false }}">
+                <div style="text-align:center; padding:28px; border:1px dashed var(--border); border-radius:6px; color:var(--muted); font-size:13px;">Ainda sem mensagens — usa um atalho de template abaixo para começar.</div>
+              </sc-if>
+              <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="2">
+                <div style="background:var(--surf); border:1px solid var(--border); border-left:3px solid {{ m.risco }}; border-radius:6px; padding:14px 16px; box-shadow:var(--sombra);">
+                  <div style="display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;">
+                    <span style="font-weight:600; font-size:13.5px;">{{ m.autor }}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted);">via {{ m.mascara }}</span>
+                    <span style="margin-left:auto; font-size:11.5px; color:var(--muted);">{{ m.quando }}</span>
+                  </div>
+                  <div style="font-size:13.5px; margin-top:8px; white-space:pre-line; line-height:1.55;">{{ m.texto }}</div>
+                </div>
+              </sc-for>
+              <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:16px; box-shadow:var(--sombra);">
+                <div style="font-weight:600; font-size:13.5px; margin-bottom:10px;">Responder a {{ convAtiva.fornecedor }}</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                  <sc-for list="{{ atalhos }}" as="a" hint-placeholder-count="3">
+                    <button onClick="{{ a.usar }}" style="height:30px; padding:0 12px; border-radius:999px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:12.5px; cursor:pointer;" style-hover="border-color:var(--accent); color:var(--accent)">{{ a.nome }}</button>
+                  </sc-for>
+                </div>
+                <textarea value="{{ rascunho }}" onChange="{{ setRascunho }}" rows="5" placeholder="Escreve a tua mensagem em português — traduzimos automaticamente para o idioma do fornecedor." style="width:100%; box-sizing:border-box; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13.5px; padding:12px; resize:vertical; line-height:1.5;"></textarea>
+                <div style="display:flex; align-items:center; gap:12px; margin-top:10px; flex-wrap:wrap;">
+                  <span style="font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path></svg>Enviado de {{ convAtiva.mascaraStand }}</span>
+                  <button onClick="{{ enviarMsg }}" style="margin-left:auto; height:40px; padding:0 18px; border:none; border-radius:6px; background:var(--accent); color:var(--accent-ink); font-family:'Archivo',sans-serif; font-weight:600; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:8px; opacity:{{ enviarOp }};" style-hover="transform:translateY(-1px)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"></path><path d="M22 2 11 13"></path></svg>Enviar email
+                  </button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isCompras }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Compras">
+        <sc-if value="{{ semCompraSel }}" hint-placeholder-val="{{ true }}">
+          <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 4px;">Compras</h1>
+          <p style="color:var(--muted); font-size:13.5px; margin:0 0 20px;">O estado de cada importação, do interesse à matrícula portuguesa.</p>
+          <div style="display:grid; gap:14px;">
+            <sc-for list="{{ comprasVm }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.abrir }}" style="text-align:left; background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:18px 20px; box-shadow:var(--sombra); cursor:pointer; color:var(--text);" style-hover="border-color:var(--steel)">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                  <span style="font-size:16px;">{{ c.flag }}</span>
+                  <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:15.5px;">{{ c.titulo }}</span>
+                  <span style="font-size:12.5px; color:var(--muted);">{{ c.fornecedor }}</span>
+                  <span style="margin-left:auto; font-family:'IBM Plex Mono',monospace; font-size:13px; font-variant-numeric:tabular-nums; color:var(--muted);">total {{ c.totalFmt }}</span>
+                  <span style="padding:4px 10px; border-radius:6px; background:{{ c.vBg }}; color:{{ c.vCor }}; font-family:'Archivo',sans-serif; font-weight:700; font-size:13px; font-variant-numeric:tabular-nums;">{{ c.poupFmt }}</span>
+                </div>
+                <div style="display:flex; gap:0; margin-top:16px; align-items:flex-start;">
+                  <sc-for list="{{ c.fases }}" as="f" hint-placeholder-count="8">
+                    <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; position:relative; min-width:0;">
+                      <span style="position:absolute; top:7px; left:{{ f.linhaEsq }}; right:{{ f.linhaDir }}; height:2px; background:{{ f.linhaCor }};"></span>
+                      <span style="width:16px; height:16px; border-radius:999px; background:{{ f.bg }}; border:2px solid {{ f.borda }}; box-sizing:border-box; position:relative; z-index:1; display:flex; align-items:center; justify-content:center;">
+                        <sc-if value="{{ f.done }}" hint-placeholder-val="{{ false }}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                      </span>
+                      <span style="font-size:10.5px; text-align:center; color:{{ f.cor }}; font-weight:{{ f.peso }}; line-height:1.25; padding:0 2px;">{{ f.nome }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:14px; display:flex; align-items:center; gap:8px; font-size:13px;">
+                  <span style="width:7px; height:7px; border-radius:999px; background:var(--accent); flex-shrink:0;"></span>
+                  <span style="color:var(--muted);">Próxima ação:</span><span style="font-weight:600;">{{ c.proxima }}</span>
+                </div>
+              </button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ temCompraSel }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ fecharCompra }}" style="display:flex; align-items:center; gap:7px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--link); padding:0; margin-bottom:12px;" style-hover="color:var(--accent)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>Todas as compras
+          </button>
+          <div style="display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; margin-bottom:18px;">
+            <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0;">{{ compraSel.titulo }}</h1>
+            <span style="font-size:13px; font-weight:600; padding:4px 12px; border-radius:999px; background:var(--mid-bg); color:var(--mid);">{{ compraSel.fase }}</span>
+            <span style="font-size:13px; color:var(--muted); white-space:nowrap;">{{ compraSel.flag }} {{ compraSel.fornecedor }}</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; align-items:start;">
+            <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+              <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 14px;">Linha temporal</h2>
+              <div style="display:grid; gap:0;">
+                <sc-for list="{{ compraSel.eventos }}" as="ev" hint-placeholder-count="8">
+                  <div style="display:flex; gap:12px;">
+                    <div style="display:flex; flex-direction:column; align-items:center;">
+                      <span style="width:14px; height:14px; border-radius:999px; background:{{ ev.bg }}; border:2px solid {{ ev.borda }}; box-sizing:border-box; flex-shrink:0; margin-top:2px;"></span>
+                      <sc-if value="{{ ev.naoUltimo }}" hint-placeholder-val="{{ true }}"><span style="width:2px; flex:1; background:{{ ev.linha }}; min-height:22px;"></span></sc-if>
+                    </div>
+                    <div style="padding-bottom:14px;">
+                      <div style="font-size:13.5px; font-weight:{{ ev.peso }}; color:{{ ev.cor }};">{{ ev.nome }} <sc-if value="{{ ev.atual }}" hint-placeholder-val="{{ false }}"><span style="font-size:10.5px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--accent); margin-left:6px;">fase atual</span></sc-if></div>
+                      <div style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted); margin-top:1px;">{{ ev.data }}</div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:18px;">
+              <div style="background:var(--surf); border:1px solid var(--accent); border-radius:6px; padding:16px 18px; box-shadow:var(--sombra); display:flex; gap:10px; align-items:flex-start;">
+                <span style="width:8px; height:8px; border-radius:999px; background:var(--accent); margin-top:6px; flex-shrink:0;"></span>
+                <div><div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:700; color:var(--muted);">Próxima ação</div><div style="font-size:14px; font-weight:600; margin-top:3px;">{{ compraSel.proxima }}</div></div>
+              </div>
+              <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+                <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 12px;">Documentos</h2>
+                <div style="display:grid; gap:6px;">
+                  <sc-for list="{{ compraSel.docs }}" as="d" hint-placeholder-count="5">
+                    <button onClick="{{ d.alternar }}" style="display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:6px; border:none; background:none; cursor:pointer; font-size:13.5px; color:var(--text); text-align:left;" style-hover="background:var(--bg)">
+                      <span style="width:18px; height:18px; border-radius:4px; border:1.5px solid {{ d.borda }}; background:{{ d.bg }}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <sc-if value="{{ d.ok }}" hint-placeholder-val="{{ false }}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                      </span>
+                      <span style="text-decoration:{{ d.risco }}; color:{{ d.cor }};">{{ d.nome }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+                <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 10px;">Resumo de custo</h2>
+                <div style="display:flex; justify-content:space-between; padding:7px 0; font-size:13.5px;"><span style="color:var(--muted);">Preço acordado na origem</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ compraSel.origemFmt }}</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 0; border-top:1px solid var(--border); font-size:13.5px;"><span style="color:var(--muted);">Transporte + ISV + IUC + legalização</span><span style="font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums;">{{ compraSel.custosFmt }}</span></div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; padding:10px 0 4px; border-top:2px solid var(--text);"><span style="font-weight:600;">Total em Portugal</span><span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:18px; font-variant-numeric:tabular-nums;">{{ compraSel.totalFmt }}</span></div>
+                <div style="margin-top:10px; padding:12px 14px; border-radius:6px; background:{{ compraSel.vBg }}; color:{{ compraSel.vCor }}; display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:12.5px; font-weight:600;">Poupança vs. mercado PT</span>
+                  <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:19px; font-variant-numeric:tabular-nums;">{{ compraSel.poupFmt }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isFavoritos }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Favoritos">
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 4px;">Favoritos</h1>
+        <p style="color:var(--muted); font-size:13.5px; margin:0 0 20px;">Acompanhamos a disponibilidade e o preço de cada anúncio guardado.</p>
+        <sc-if value="{{ semFavoritos }}" hint-placeholder-val="{{ false }}">
+          <div style="text-align:center; padding:56px 24px; background:var(--surf); border:1px dashed var(--border); border-radius:6px; color:var(--muted);">Ainda não guardaste anúncios. Toca no coração de um anúncio na pesquisa para o acompanhar aqui.</div>
+        </sc-if>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(266px, 1fr)); gap:16px;">
+          <sc-for list="{{ favoritosVm }}" as="item" hint-placeholder-count="3">
+            <dc-import name="CarCard" item="{{ item }}" hint-size="100%,500px"></dc-import>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isAlertas }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Alertas">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:4px;">
+          <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0;">Alertas</h1>
+          <button onClick="{{ toggleFormAlerta }}" style="height:38px; padding:0 16px; border:none; border-radius:6px; background:var(--accent); color:var(--accent-ink); font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px; cursor:pointer; display:flex; align-items:center; gap:7px;" style-hover="transform:translateY(-1px)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Criar alerta
+          </button>
+        </div>
+        <p style="color:var(--muted); font-size:13.5px; margin:0 0 20px;">Avisamos-te quando aparecer um anúncio que corresponda a uma pesquisa guardada.</p>
+        <sc-if value="{{ formAlertaAberto }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--surf); border:1px solid var(--accent); border-radius:6px; padding:18px; box-shadow:var(--sombra); margin-bottom:18px; display:flex; flex-direction:column; gap:12px;">
+            <div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:15px;">Novo alerta</div>
+            <input value="{{ aNome }}" onChange="{{ setANome }}" placeholder="Nome do alerta — ex.: Carrinhas diesel até 30 000 €" style="height:40px; padding:0 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13.5px;">
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <select aria-label="Marca do alerta" value="{{ aMarca }}" onChange="{{ setAMarca }}" style="height:38px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todas">Marca: todas</option><option value="Volkswagen">Volkswagen</option><option value="BMW">BMW</option><option value="Audi">Audi</option><option value="Mercedes-Benz">Mercedes-Benz</option><option value="Renault">Renault</option><option value="Peugeot">Peugeot</option><option value="Tesla">Tesla</option><option value="Cupra">Cupra</option>
+              </select>
+              <select aria-label="País do alerta" value="{{ aPais }}" onChange="{{ setAPais }}" style="height:38px; padding:0 10px; border-radius:6px; border:1px solid var(--border); background:var(--surf); color:var(--text); font-size:13.5px; cursor:pointer;">
+                <option value="todos">País: todos</option><option value="DE">Alemanha</option><option value="FR">França</option><option value="BE">Bélgica</option><option value="NL">Holanda</option><option value="ES">Espanha</option>
+              </select>
+              <input value="{{ aPreco }}" onChange="{{ setAPreco }}" placeholder="Custo final máx. (€)" inputMode="numeric" style="height:38px; width:170px; padding:0 12px; border-radius:6px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-size:13.5px; font-family:'IBM Plex Mono',monospace; box-sizing:border-box;">
+              <button role="switch" aria-checked="{{ aSoOp }}" onClick="{{ toggleASoOp }}" style="display:flex; align-items:center; gap:9px; background:none; border:none; cursor:pointer; font-size:13.5px; font-weight:600; color:var(--text); padding:0;">
+                <span style="width:38px; height:21px; border-radius:999px; background:{{ aSoOpBg }}; position:relative; transition:background .2s ease-out;"><span style="position:absolute; top:2.5px; left:{{ aSoOpKnob }}; width:16px; height:16px; border-radius:999px; background:#FFFFFF; transition:left .2s ease-out; box-shadow:0 1px 3px rgba(0,0,0,.25);"></span></span>
+                Só oportunidades
+              </button>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+              <button onClick="{{ toggleFormAlerta }}" style="height:38px; padding:0 14px; border-radius:6px; border:1px solid var(--border); background:none; color:var(--muted); font-size:13.5px; font-weight:600; cursor:pointer;">Cancelar</button>
+              <button onClick="{{ guardarAlerta }}" style="height:38px; padding:0 18px; border:none; border-radius:6px; background:var(--petrol); color:#FFFFFF; font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px; cursor:pointer;" style-hover="opacity:.9">Guardar alerta</button>
+            </div>
+          </div>
+        </sc-if>
+        <div style="display:grid; gap:10px;">
+          <sc-for list="{{ alertasVm }}" as="al" hint-placeholder-count="3">
+            <div style="display:flex; align-items:center; gap:16px; background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:14px 18px; box-shadow:var(--sombra); flex-wrap:wrap; opacity:{{ al.op }};">
+              <span style="font-size:16px;">{{ al.flag }}</span>
+              <div style="flex:1; min-width:200px;">
+                <div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:14.5px;">{{ al.nome }}</div>
+                <div style="font-size:12.5px; color:var(--muted); font-family:'IBM Plex Mono',monospace; margin-top:2px;">{{ al.criterios }}</div>
+              </div>
+              <span style="font-size:12px; font-weight:600; padding:3px 11px; border-radius:999px; background:{{ al.mBg }}; color:{{ al.mCor }};">{{ al.matches }}</span>
+              <button role="switch" aria-checked="{{ al.ativo }}" aria-label="Ativar alerta" onClick="{{ al.alternar }}" style="background:none; border:none; cursor:pointer; padding:0;">
+                <span style="display:block; width:38px; height:21px; border-radius:999px; background:{{ al.tBg }}; position:relative; transition:background .2s ease-out;"><span style="position:absolute; top:2.5px; left:{{ al.tKnob }}; width:16px; height:16px; border-radius:999px; background:#FFFFFF; transition:left .2s ease-out; box-shadow:0 1px 3px rgba(0,0,0,.25);"></span></span>
+              </button>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ isPerfil }}" hint-placeholder-val="{{ false }}">
+      <div data-screen-label="Stand / Perfil">
+        <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:26px; margin:0 0 20px;">Stand / Perfil</h1>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:18px; align-items:start;">
+          <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+            <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+              <span style="width:56px; height:56px; border-radius:6px; background:var(--petrol); color:#FFFFFF; font-family:'Archivo',sans-serif; font-weight:700; font-size:20px; display:flex; align-items:center; justify-content:center;">{{ iniciais }}</span>
+              <div><div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:17px;">{{ nomeStand }}</div><div style="font-size:12.5px; color:var(--muted);">Membro desde março de 2026</div></div>
+            </div>
+            <div style="display:grid; gap:10px; font-size:13.5px;">
+              <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:var(--muted);">NIF</span><span style="font-family:'IBM Plex Mono',monospace;">501 742 386</span></div>
+              <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:var(--muted);">Morada</span><span style="text-align:right;">Rua do Progresso 214, 4470-605 Maia</span></div>
+              <div style="display:flex; justify-content:space-between; gap:12px;"><span style="color:var(--muted);">Contacto</span><span style="font-family:'IBM Plex Mono',monospace;">+351 229 480 312</span></div>
+            </div>
+            <button style="margin-top:16px; height:38px; width:100%; border-radius:6px; border:1px solid var(--border); background:none; color:var(--text); font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">Editar dados do stand</button>
+          </div>
+          <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+            <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0 0 14px;">Equipa</h2>
+            <div style="display:grid; gap:12px;">
+              <sc-for list="{{ equipa }}" as="mb" hint-placeholder-count="3">
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <span style="width:36px; height:36px; border-radius:999px; background:var(--mid-bg); color:var(--mid); font-family:'Archivo',sans-serif; font-weight:600; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">{{ mb.iniciais }}</span>
+                  <div style="flex:1;"><div style="font-weight:600; font-size:13.5px;">{{ mb.nome }}</div><div style="font-size:12px; color:var(--muted); font-family:'IBM Plex Mono',monospace;">{{ mb.email }}</div></div>
+                  <span style="font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; background:{{ mb.pBg }}; color:{{ mb.pCor }};">{{ mb.papel }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <button style="margin-top:16px; height:38px; width:100%; border-radius:6px; border:1px dashed var(--border); background:none; color:var(--muted); font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel); color:var(--text)">+ Convidar membro</button>
+          </div>
+          <div style="background:var(--surf); border:1px solid var(--border); border-radius:6px; padding:20px; box-shadow:var(--sombra);">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <h2 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px; margin:0;">Subscrição</h2>
+              <span style="font-size:11.5px; font-weight:600; padding:3px 10px; border-radius:999px; background:var(--ok-bg); color:var(--ok);">Ativa</span>
+            </div>
+            <div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:28px; font-variant-numeric:tabular-nums;">100 €<span style="font-size:14px; font-weight:500; color:var(--muted);"> /mês</span></div>
+            <div style="font-size:12.5px; color:var(--ok); font-weight:600; margin-top:2px;">1.º mês grátis aplicado em março</div>
+            <div style="display:grid; gap:8px; font-size:13.5px; margin-top:14px;">
+              <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">Plano</span><span>Profissional</span></div>
+              <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">Utilizadores incluídos</span><span style="font-family:'IBM Plex Mono',monospace;">3 de 5</span></div>
+              <div style="display:flex; justify-content:space-between;"><span style="color:var(--muted);">Próxima faturação</span><span style="font-family:'IBM Plex Mono',monospace;">1 ago 2026</span></div>
+            </div>
+            <button style="margin-top:16px; height:38px; width:100%; border-radius:6px; border:1px solid var(--border); background:none; color:var(--text); font-size:13.5px; font-weight:600; cursor:pointer;" style-hover="border-color:var(--steel)">Gerir subscrição</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+  </main>
+
+  <sc-if value="{{ temSelecao }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:45; background:var(--petrol); color:#FFFFFF; border-radius:999px; padding:8px 10px 8px 20px; display:flex; align-items:center; gap:14px; box-shadow:0 12px 32px rgba(13,28,34,.28);">
+      <span style="font-size:13.5px; font-weight:500;">{{ selecaoLabel }}</span>
+      <button onClick="{{ limparSelecao }}" style="background:none; border:none; color:rgba(255,255,255,.75); font-size:13px; cursor:pointer; padding:0;" style-hover="color:#FFFFFF">Limpar</button>
+      <button onClick="{{ abrirComparar }}" style="height:38px; padding:0 18px; border:none; border-radius:999px; background:var(--accent); color:var(--accent-ink); font-family:'Archivo',sans-serif; font-weight:600; font-size:13.5px; cursor:pointer; opacity:{{ compararOp }};">Comparar</button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;temaEscuro&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Aparência&quot;},&quot;limiarCompensa&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:2500,&quot;min&quot;:500,&quot;max&quot;:6000,&quot;step&quot;:250,&quot;unit&quot;:&quot;€&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Regras de veredito&quot;},&quot;nomeStand&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Stand Silva &amp; Filhos&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Stand&quot;}}">
+const PAISES = {
+  DE: { nome: 'Alemanha', flag: '🇩🇪', reg: 'Relatório de historial (TÜV / DEKRA)' },
+  FR: { nome: 'França', flag: '🇫🇷', reg: 'Histovec (registo oficial francês)' },
+  BE: { nome: 'Bélgica', flag: '🇧🇪', reg: 'Car-Pass (registo oficial belga)' },
+  NL: { nome: 'Holanda', flag: '🇳🇱', reg: 'NAP (registo oficial holandês)' },
+  ES: { nome: 'Espanha', flag: '🇪🇸', reg: 'Informe DGT (registo espanhol)' },
+};
+
+const CARROS = [
+  { id: 1, marca: 'Volkswagen', modelo: 'Golf', versao: '2.0 TDI Style DSG', ano: 2022, km: 45300, kmOk: true, vinOk: true, regOk: true, pais: 'DE', fonte: 'mobile.de', origem: 22400, transporte: 750, isv: 4318, iuc: 152, legal: 640, mercado: 33900, anunciosPT: 27, cilindrada: 1968, co2: 122, potencia: 150, combustivel: 'Diesel', caixa: 'Automática', cor: 'Cinzento Pedra', novo: true },
+  { id: 2, marca: 'BMW', modelo: 'Série 3', versao: '320d Touring Sport', ano: 2021, km: 78500, kmOk: true, vinOk: true, regOk: true, pais: 'DE', fonte: 'AutoScout24', origem: 27900, transporte: 750, isv: 6142, iuc: 188, legal: 640, mercado: 42400, anunciosPT: 19, cilindrada: 1995, co2: 131, potencia: 190, combustivel: 'Diesel', caixa: 'Automática', cor: 'Preto Safira', novo: true },
+  { id: 3, marca: 'Audi', modelo: 'A4', versao: 'Avant 35 TDI S tronic', ano: 2022, km: 51900, kmOk: false, vinOk: true, regOk: true, pais: 'BE', fonte: 'AutoScout24', origem: 26500, transporte: 820, isv: 5230, iuc: 164, legal: 640, mercado: 38600, anunciosPT: 14, cilindrada: 1968, co2: 126, potencia: 163, combustivel: 'Diesel', caixa: 'Automática', cor: 'Branco Glaciar' },
+  { id: 4, marca: 'Mercedes-Benz', modelo: 'Classe C', versao: 'C 220 d AMG Line', ano: 2021, km: 64200, kmOk: true, vinOk: false, regOk: true, pais: 'FR', fonte: 'AutoScout24', origem: 31200, transporte: 680, isv: 5890, iuc: 176, legal: 640, mercado: 44500, anunciosPT: 11, cilindrada: 1993, co2: 138, potencia: 200, combustivel: 'Diesel', caixa: 'Automática', cor: 'Prata Iridium' },
+  { id: 5, marca: 'Renault', modelo: 'Clio', versao: '1.0 TCe 90 Techno', ano: 2023, km: 18700, kmOk: true, vinOk: true, regOk: true, pais: 'FR', fonte: 'AutoScout24', origem: 13900, transporte: 680, isv: 1240, iuc: 118, legal: 640, mercado: 17400, anunciosPT: 42, cilindrada: 999, co2: 118, potencia: 90, combustivel: 'Gasolina', caixa: 'Manual', cor: 'Laranja Valencia' },
+  { id: 6, marca: 'Peugeot', modelo: '3008', versao: '1.5 BlueHDi Allure Pack', ano: 2022, km: 59800, kmOk: false, vinOk: false, regOk: true, pais: 'FR', fonte: 'AutoScout24', origem: 23800, transporte: 680, isv: 4110, iuc: 158, legal: 640, mercado: 33200, anunciosPT: 23, cilindrada: 1499, co2: 130, potencia: 131, combustivel: 'Diesel', caixa: 'Automática', cor: 'Azul Celebes' },
+  { id: 7, marca: 'Tesla', modelo: 'Model 3', versao: 'Long Range AWD', ano: 2022, km: 41200, kmOk: true, vinOk: true, regOk: true, pais: 'NL', fonte: 'Marktplaats', origem: 29900, transporte: 890, isv: 0, iuc: 0, legal: 640, mercado: 38900, anunciosPT: 16, cilindrada: 0, co2: 0, potencia: 351, combustivel: 'Elétrico', caixa: 'Automática', cor: 'Branco Pérola', novo: true },
+  { id: 8, marca: 'Cupra', modelo: 'Formentor', versao: '1.5 TSI 150 DSG', ano: 2022, km: 38400, kmOk: true, vinOk: true, regOk: false, pais: 'ES', fonte: 'Coches.net', origem: 24900, transporte: 520, isv: 3980, iuc: 148, legal: 640, mercado: 34100, anunciosPT: 13, cilindrada: 1498, co2: 134, potencia: 150, combustivel: 'Gasolina', caixa: 'Automática', cor: 'Cinzento Magnético' },
+  { id: 9, marca: 'Volkswagen', modelo: 'Golf', versao: 'GTE 1.4 eHybrid', ano: 2021, km: 55600, kmOk: true, vinOk: true, regOk: true, pais: 'BE', fonte: 'AutoScout24', origem: 21700, transporte: 820, isv: 890, iuc: 92, legal: 640, mercado: 26100, anunciosPT: 9, cilindrada: 1395, co2: 26, potencia: 245, combustivel: 'Híbrido plug-in', caixa: 'Automática', cor: 'Azul Atlântico' },
+  { id: 10, marca: 'BMW', modelo: 'Série 3', versao: '330e Touring M Sport', ano: 2021, km: 68900, kmOk: true, vinOk: true, regOk: true, pais: 'NL', fonte: 'Marktplaats', origem: 33400, transporte: 890, isv: 1120, iuc: 104, legal: 640, mercado: 41800, anunciosPT: 8, cilindrada: 1998, co2: 32, potencia: 292, combustivel: 'Híbrido plug-in', caixa: 'Automática', cor: 'Cinzento Mineral', novo: true },
+  { id: 11, marca: 'Audi', modelo: 'A4', versao: '40 TFSI Advanced', ano: 2020, km: 47200, kmOk: false, vinOk: false, regOk: true, pais: 'DE', fonte: 'mobile.de', origem: 25800, transporte: 750, isv: 6890, iuc: 212, legal: 640, mercado: 33800, anunciosPT: 21, cilindrada: 1984, co2: 152, potencia: 190, combustivel: 'Gasolina', caixa: 'Automática', cor: 'Preto Mito' },
+  { id: 12, marca: 'Mercedes-Benz', modelo: 'Classe C', versao: 'C 200 EQ Boost Avantgarde', ano: 2021, km: 61500, kmOk: true, vinOk: true, regOk: false, pais: 'ES', fonte: 'Coches.net', origem: 29800, transporte: 520, isv: 5240, iuc: 182, legal: 640, mercado: 37100, anunciosPT: 12, cilindrada: 1497, co2: 142, potencia: 184, combustivel: 'Gasolina', caixa: 'Automática', cor: 'Branco Polar' },
+];
+
+const FASES = ['Interessado', 'Em negociação', 'Acordo', 'Sinal / Pagamento', 'Transporte', 'Legalização & ISV', 'Matrícula PT', 'Concluído'];
+
+const FMT = (n) => {
+  const neg = n < 0;
+  const s = Math.abs(Math.round(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+  return (neg ? '\u2212' : '') + s;
+};
+const EUR = (n) => FMT(n) + '\u00A0€';
+const ICON_OK = 'M20 6 9 17l-5-5';
+const ICON_WARN = 'M12 7v6m0 4h.01';
+
+class Component extends DCLogic {
+  state = {
+    dark: null, screen: 'painel', prevScreen: 'painel',
+    detalheId: null, isvAberto: false, foto: 1,
+    favIds: [2, 7, 5], compareIds: [],
+    q: '', fMarca: 'todas', fPais: 'todos', fPreco: 'todos', fAno: 'todos', fKm: 'todos', fComb: 'todos', fSelo: 'todos',
+    soOp: false, maisFiltros: false, ordenar: 'poupanca',
+    menuAberto: false, notifAberto: false, paisAberto: false, notifsVistas: false,
+    convId: 1, rascunho: '',
+    convs: [
+      { id: 1, carId: 2, fornecedor: 'Autohaus Weber GmbH · Munique', mascara: 'weber-4271@negocios.autoimport.pt', estado: 'Respondido', quando: 'há 1 h', msgs: [
+        { eu: true, quando: '8 jul, 10:12', texto: 'Bom dia,\n\nSomos um stand em Portugal e temos interesse no BMW 320d Touring (ref. AS-88213). O veículo continua disponível? Podem enviar fotografias do interior e do livro de revisões?\n\nCumprimentos,\nAntónio Silva' },
+        { eu: false, quando: '9 jul, 14:37', texto: 'Bom dia Sr. Silva,\n\nSim, o veículo está disponível. Seguem em anexo 12 fotografias adicionais e o histórico de manutenção BMW completo. Se o levantamento for até ao fim do mês, aceitamos 27 400 € (pagamento por transferência).\n\nMit freundlichen Grüßen,\nJonas Weber' },
+      ] },
+      { id: 2, carId: 7, fornecedor: "Van Dijk Auto's · Utreque", mascara: 'vandijk-9034@negocios.autoimport.pt', estado: 'Aguarda resposta', quando: 'há 22 h', msgs: [
+        { eu: true, quando: '9 jul, 09:05', texto: 'Bom dia,\n\nInteressa-nos o Tesla Model 3 Long Range de 2022. Propomos 28 900 € com pagamento imediato e recolha na próxima semana. Podem confirmar o estado da bateria (relatório SoH)?\n\nCumprimentos,\nAntónio Silva' },
+      ] },
+      { id: 3, carId: 8, fornecedor: 'AutoVenta Madrid SL · Madrid', mascara: 'autoventa-1187@negocios.autoimport.pt', estado: 'Acordo', quando: '4 jul', msgs: [
+        { eu: true, quando: '1 jul, 11:20', texto: 'Buenos días,\n\nTemos interesse no Cupra Formentor 1.5 TSI. Propomos 24 400 € com sinal imediato de 10%.\n\nCumprimentos,\nAntónio Silva' },
+        { eu: false, quando: '2 jul, 16:02', texto: 'Buenas tardes,\n\nGracias por su interés. Podemos aceptar 24 700 € con señal del 10% esta semana. El coche queda reservado 5 días.\n\nSaludos,\nCarlos Ortega' },
+        { eu: true, quando: '4 jul, 09:41', texto: 'Bom dia Carlos,\n\nAcordado: 24 700 €. Enviamos hoje o sinal de 2 470 € e a nossa transportadora contacta-vos para agendar a recolha.\n\nObrigado,\nAntónio Silva' },
+      ] },
+    ],
+    compraId: null,
+    compras: [
+      { id: 1, carId: 8, fornecedor: 'AutoVenta Madrid SL', fase: 4, origemAcordado: 24700, datas: ['12 jun', '14 jun', '21 jun', '26 jun', '4 jul'], proxima: 'Confirmar chegada ao porto de Leixões (previsto 15 jul)', docs: [ { nome: 'COC — Certificado de Conformidade', ok: true }, { nome: 'Fatura de compra', ok: true }, { nome: 'DAV — Declaração Aduaneira de Veículo', ok: false }, { nome: 'Pedido de ISV (Portal das Finanças)', ok: false }, { nome: 'Inspeção modelo B', ok: false } ] },
+      { id: 2, carId: 6, fornecedor: 'Garage Lemaire SARL', fase: 1, origemAcordado: 23800, datas: ['6 jul', '9 jul'], proxima: 'Aguardar contraproposta do fornecedor', docs: [ { nome: 'COC — Certificado de Conformidade', ok: false }, { nome: 'Fatura de compra', ok: false }, { nome: 'DAV — Declaração Aduaneira de Veículo', ok: false }, { nome: 'Pedido de ISV (Portal das Finanças)', ok: false }, { nome: 'Inspeção modelo B', ok: false } ] },
+      { id: 3, carId: 4, fornecedor: 'Autos Prestige Lyon', fase: 2, origemAcordado: 30600, datas: ['18 jun', '24 jun', '8 jul'], proxima: 'Enviar sinal de 10% (3 060 €) para reservar o veículo', docs: [ { nome: 'COC — Certificado de Conformidade', ok: true }, { nome: 'Fatura de compra', ok: false }, { nome: 'DAV — Declaração Aduaneira de Veículo', ok: false }, { nome: 'Pedido de ISV (Portal das Finanças)', ok: false }, { nome: 'Inspeção modelo B', ok: false } ] },
+      { id: 4, carId: 10, fornecedor: 'Broekhuis Occasions', fase: 6, origemAcordado: 32900, datas: ['2 jun', '4 jun', '10 jun', '13 jun', '20 jun', '28 jun', '7 jul'], proxima: 'Levantar a matrícula portuguesa no IMT (processo aprovado)', docs: [ { nome: 'COC — Certificado de Conformidade', ok: true }, { nome: 'Fatura de compra', ok: true }, { nome: 'DAV — Declaração Aduaneira de Veículo', ok: true }, { nome: 'Pedido de ISV (Portal das Finanças)', ok: true }, { nome: 'Inspeção modelo B', ok: true } ] },
+    ],
+    alertas: [
+      { id: 1, nome: 'BMW Série 3 Touring diesel', criterios: '2020+ · até 30 000 € · ≤ 90 000 km · só Compensa', pais: 'DE', ativo: true, matches: 6 },
+      { id: 2, nome: 'SUV compacto até 30 000 €', criterios: 'Peugeot 3008 / Formentor · 2021+ · qualquer km', pais: 'todos', ativo: true, matches: 11 },
+      { id: 3, nome: 'Elétricos com poupança > 5 000 €', criterios: 'Tesla / VW · 2021+ · só Compensa', pais: 'NL', ativo: false, matches: 3 },
+    ],
+    formAlerta: false, aNome: '', aMarca: 'todas', aPais: 'todos', aPreco: '', aSoOp: true,
+  };
+
+  carro(id) { return CARROS.find((c) => c.id === id); }
+
+  vm(car, ctx = {}) {
+    const total = car.origem + car.transporte + car.isv + car.iuc + car.legal;
+    const poup = car.mercado - total;
+    const pct = Math.round((poup / car.mercado) * 100);
+    const limiar = this.props.limiarCompensa ?? 2500;
+    let veredito = 'Não compensa', vCor = 'var(--bad)', vBg = 'var(--bad-bg)';
+    if (poup >= limiar) { veredito = 'Compensa'; vCor = 'var(--ok)'; vBg = 'var(--ok-bg)'; }
+    else if (poup >= 500) { veredito = 'Marginal'; vCor = 'var(--mid)'; vBg = 'var(--mid-bg)'; }
+    const fav = this.state.favIds.includes(car.id);
+    const sel = this.state.compareIds.includes(car.id);
+    return {
+      ...car,
+      titulo: car.marca + ' ' + car.modelo, nomeFoto: car.marca + ' ' + car.modelo,
+      kmFmt: FMT(car.km) + '\u00A0km', flag: PAISES[car.pais].flag, paisNome: PAISES[car.pais].nome,
+      total, poup, pct,
+      totalFmt: EUR(total), mercadoFmt: EUR(car.mercado), origemFmt: EUR(car.origem),
+      transporteFmt: EUR(car.transporte), isvFmt: EUR(car.isv), iucFmt: EUR(car.iuc), legalFmt: EUR(car.legal),
+      poupFmt: (poup >= 0 ? '+' : '') + EUR(poup),
+      poupSub: poup >= 0 ? 'poupança · ' + pct + '%' : 'vs. mercado PT',
+      pctFmt: pct + '%',
+      veredito, vCor, vBg,
+      selo: car.kmOk ? 'Km verificado' : 'Km por verificar',
+      seloCor: car.kmOk ? 'var(--ok)' : 'var(--muted)',
+      seloIcone: car.kmOk ? ICON_OK : ICON_WARN,
+      favorito: fav, naoFavorito: !fav, selecionado: sel,
+      compBg: sel ? 'var(--mid-bg)' : 'transparent',
+      compBorda: sel ? 'var(--accent)' : 'var(--muted)',
+      compCaixa: sel ? 'var(--accent)' : 'transparent',
+      compLabel: sel ? 'Selecionado para comparar' : 'Comparar',
+      comparavel: !!ctx.comparavel, estadoFav: ctx.estadoFav || false, estadoFavCor: ctx.estadoFavCor || 'var(--muted)',
+      abrir: () => this.abrirDetalhe(car.id),
+      toggleFav: (e) => { e.stopPropagation(); this.alternarFav(car.id); },
+      toggleComp: (e) => { e.stopPropagation(); this.alternarComp(car.id); },
+    };
+  }
+
+  ir(screen) { this.setState({ screen, prevScreen: this.state.screen, menuAberto: false, notifAberto: false, paisAberto: false }); window.scrollTo(0, 0); }
+  abrirDetalhe(id) { this.setState({ screen: 'detalhe', prevScreen: this.state.screen === 'detalhe' ? this.state.prevScreen : this.state.screen, detalheId: id, isvAberto: false, foto: 1, menuAberto: false, notifAberto: false, paisAberto: false }); window.scrollTo(0, 0); }
+  alternarFav(id) { const f = this.state.favIds; this.setState({ favIds: f.includes(id) ? f.filter((x) => x !== id) : [...f, id] }); }
+  alternarComp(id) {
+    const c = this.state.compareIds;
+    if (c.includes(id)) this.setState({ compareIds: c.filter((x) => x !== id) });
+    else if (c.length < 4) this.setState({ compareIds: [...c, id] });
+  }
+
+  filtrados() {
+    const s = this.state;
+    let lista = CARROS.map((c) => this.vm(c, { comparavel: true }));
+    const q = s.q.trim().toLowerCase();
+    if (q) lista = lista.filter((c) => (c.marca + ' ' + c.modelo + ' ' + c.versao).toLowerCase().includes(q));
+    if (s.fMarca !== 'todas') lista = lista.filter((c) => c.marca === s.fMarca);
+    if (s.fPais !== 'todos') lista = lista.filter((c) => c.pais === s.fPais);
+    if (s.fPreco !== 'todos') lista = lista.filter((c) => c.total <= Number(s.fPreco));
+    if (s.fAno !== 'todos') lista = lista.filter((c) => c.ano >= Number(s.fAno));
+    if (s.fKm !== 'todos') lista = lista.filter((c) => c.km <= Number(s.fKm));
+    if (s.fComb !== 'todos') lista = lista.filter((c) => c.combustivel === s.fComb);
+    if (s.fSelo === 'ok') lista = lista.filter((c) => c.kmOk);
+    if (s.soOp) lista = lista.filter((c) => c.veredito === 'Compensa');
+    if (s.ordenar === 'poupanca') lista.sort((a, b) => b.poup - a.poup);
+    if (s.ordenar === 'preco') lista.sort((a, b) => a.total - b.total);
+    if (s.ordenar === 'km') lista.sort((a, b) => a.km - b.km);
+    return lista;
+  }
+
+  iniciarNegociacao(carId) {
+    const car = this.carro(carId);
+    let conv = this.state.convs.find((c) => c.carId === carId);
+    let convs = this.state.convs;
+    if (!conv) {
+      conv = { id: Date.now(), carId, fornecedor: 'Fornecedor · ' + PAISES[car.pais].nome, mascara: 'forn-' + String(1000 + carId * 37) + '@negocios.autoimport.pt', estado: 'Rascunho', quando: 'agora', msgs: [] };
+      convs = [conv, ...convs];
+    }
+    this.setState({ convs, convId: conv.id, screen: 'negociacoes', prevScreen: this.state.screen, rascunho: conv.msgs.length ? '' : 'Bom dia,\n\nSomos um stand automóvel em Portugal e temos interesse no ' + car.marca + ' ' + car.modelo + ' ' + car.versao + ' (' + car.ano + ', ' + FMT(car.km) + ' km) anunciado em ' + car.fonte + '. O veículo continua disponível?\n\nCumprimentos,\nAntónio Silva' });
+    window.scrollTo(0, 0);
+  }
+
+  enviarMsg() {
+    const texto = this.state.rascunho.trim();
+    if (!texto) return;
+    const id = this.state.convId;
+    const convs = this.state.convs.map((c) => c.id === id ? { ...c, estado: 'Aguarda resposta', quando: 'agora', msgs: [...c.msgs, { eu: true, quando: 'agora', texto }] } : c);
+    this.setState({ convs, rascunho: '' });
+    const conv = convs.find((c) => c.id === id);
+    if (!conv.msgs.some((m) => !m.eu)) {
+      setTimeout(() => {
+        const convs2 = this.state.convs.map((c) => c.id === id ? { ...c, estado: 'Respondido', quando: 'agora', msgs: [...c.msgs, { eu: false, quando: 'agora', texto: 'Bom dia,\n\nObrigado pelo contacto. O veículo continua disponível — posso enviar mais fotografias e o relatório de manutenção ainda hoje. Em relação ao preço, temos alguma margem para pagamento rápido.\n\nCumprimentos' }] } : c);
+        this.setState({ convs: convs2 });
+      }, 2600);
+    }
+  }
+
+  guardarAlerta() {
+    const s = this.state;
+    const partes = [];
+    if (s.aMarca !== 'todas') partes.push(s.aMarca);
+    if (s.aPreco) partes.push('até ' + FMT(Number(s.aPreco) || 0) + ' €');
+    if (s.aSoOp) partes.push('só Compensa');
+    const novo = { id: Date.now(), nome: s.aNome.trim() || 'Novo alerta', criterios: partes.join(' · ') || 'Todos os anúncios', pais: s.aPais, ativo: true, matches: 0 };
+    this.setState({ alertas: [novo, ...s.alertas], formAlerta: false, aNome: '', aMarca: 'todas', aPais: 'todos', aPreco: '', aSoOp: true });
+  }
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark ?? (this.props.temaEscuro ?? false);
+    const nomeStand = this.props.nomeStand ?? 'Stand Silva & Filhos';
+    const iniciais = nomeStand.split(' ').filter((w) => /^[A-ZÀ-Ü]/.test(w)).slice(0, 2).map((w) => w[0]).join('') || 'SF';
+
+    const navDef = [ ['painel', 'Painel'], ['pesquisar', 'Pesquisar'], ['favoritos', 'Favoritos'], ['negociacoes', 'Negociações'], ['compras', 'Compras'] ];
+    const navAtivo = { comparar: 'pesquisar', detalhe: 'pesquisar' }[s.screen] || s.screen;
+    const navItens = navDef.map(([id, nome]) => ({
+      id, nome, ir: () => this.ir(id),
+      cor: navAtivo === id ? 'var(--text)' : 'var(--muted)',
+      peso: navAtivo === id ? 600 : 500,
+      risco: navAtivo === id ? 'var(--accent)' : 'transparent',
+    }));
+
+    const todosVm = CARROS.map((c) => this.vm(c));
+    const somaPoup = todosVm.filter((c) => c.poup > 0).reduce((a, c) => a + c.poup, 0);
+    const novas = CARROS.filter((c) => c.novo).map((c) => this.vm(c));
+
+    const kpis = [
+      { nome: 'Oportunidades novas', valor: String(novas.length), sub: 'desde ontem, nos teus alertas', cor: 'var(--accent)', ir: () => this.ir('pesquisar') },
+      { nome: 'Poupança potencial', valor: EUR(somaPoup), sub: 'em ' + todosVm.filter((c) => c.poup > 0).length + ' anúncios ativos', cor: 'var(--ok)', ir: () => this.ir('pesquisar') },
+      { nome: 'Negociações a decorrer', valor: String(s.convs.filter((c) => c.estado !== 'Acordo').length), sub: s.convs.filter((c) => c.estado === 'Respondido').length + ' com resposta nova', cor: 'var(--text)', ir: () => this.ir('negociacoes') },
+    ];
+
+    const comprasVm = s.compras.map((c) => {
+      const car = this.vm(this.carro(c.carId));
+      const pct = Math.round((c.fase / (FASES.length - 1)) * 100) + '%';
+      return {
+        ...car, compraId: c.id, fornecedor: c.fornecedor, fase: FASES[c.fase], pct, proxima: c.proxima,
+        abrir: () => { this.setState({ screen: 'compras', prevScreen: s.screen, compraId: c.id }); window.scrollTo(0, 0); },
+        fases: FASES.map((nome, i) => ({
+          nome, done: i < c.fase, atual: i === c.fase,
+          bg: i < c.fase ? 'var(--ok)' : i === c.fase ? 'var(--accent)' : 'var(--surf)',
+          borda: i < c.fase ? 'var(--ok)' : i === c.fase ? 'var(--accent)' : 'var(--border)',
+          cor: i === c.fase ? 'var(--text)' : 'var(--muted)',
+          peso: i === c.fase ? 700 : 400,
+          linhaEsq: i === 0 ? '50%' : '-50%',
+          linhaDir: i === FASES.length - 1 ? '50%' : '-50%',
+          linhaCor: i === 0 ? 'transparent' : (i <= c.fase ? 'var(--ok)' : 'var(--border)'),
+        })),
+      };
+    });
+
+    const compraRaw = s.compras.find((c) => c.id === s.compraId);
+    let compraSel = null;
+    if (compraRaw) {
+      const car = this.vm(this.carro(compraRaw.carId));
+      const custos = car.transporte + car.isv + car.iuc + car.legal;
+      compraSel = {
+        titulo: car.titulo + ' ' + car.versao, flag: car.flag, fornecedor: compraRaw.fornecedor,
+        fase: FASES[compraRaw.fase], proxima: compraRaw.proxima,
+        origemFmt: EUR(compraRaw.origemAcordado), custosFmt: EUR(custos), totalFmt: EUR(compraRaw.origemAcordado + custos),
+        poupFmt: '+' + EUR(car.mercado - compraRaw.origemAcordado - custos), vBg: 'var(--ok-bg)', vCor: 'var(--ok)',
+        eventos: FASES.map((nome, i) => ({
+          nome, data: compraRaw.datas[i] || 'por agendar', atual: i === compraRaw.fase,
+          naoUltimo: i < FASES.length - 1,
+          bg: i < compraRaw.fase ? 'var(--ok)' : i === compraRaw.fase ? 'var(--accent)' : 'var(--surf)',
+          borda: i < compraRaw.fase ? 'var(--ok)' : i === compraRaw.fase ? 'var(--accent)' : 'var(--border)',
+          linha: i < compraRaw.fase ? 'var(--ok)' : 'var(--border)',
+          cor: i <= compraRaw.fase ? 'var(--text)' : 'var(--muted)',
+          peso: i === compraRaw.fase ? 700 : 500,
+        })),
+        docs: compraRaw.docs.map((d, i) => ({
+          nome: d.nome, ok: d.ok,
+          borda: d.ok ? 'var(--ok)' : 'var(--muted)', bg: d.ok ? 'var(--ok)' : 'transparent',
+          risco: d.ok ? 'line-through' : 'none', cor: d.ok ? 'var(--muted)' : 'var(--text)',
+          alternar: () => {
+            const compras = this.state.compras.map((c) => c.id === compraRaw.id ? { ...c, docs: c.docs.map((dd, j) => j === i ? { ...dd, ok: !dd.ok } : dd) } : c);
+            this.setState({ compras });
+          },
+        })),
+      };
+    }
+
+    const resultados = this.filtrados();
+    const chipsPais = [{ code: 'todos', nome: 'Todos', flag: '🇪🇺' }, ...Object.keys(PAISES).map((k) => ({ code: k, nome: PAISES[k].nome, flag: PAISES[k].flag }))].map((p) => {
+      const ativo = s.fPais === p.code;
+      const count = p.code === 'todos' ? CARROS.length : CARROS.filter((c) => c.pais === p.code).length;
+      return { ...p, count: String(count), ativo, escolher: () => this.setState({ fPais: p.code }),
+        bg: ativo ? 'var(--petrol)' : 'var(--surf)', cor: ativo ? (dark ? '#0B1A20' : '#FFFFFF') : 'var(--text)', borda: ativo ? 'var(--petrol)' : 'var(--border)' };
+    });
+
+    const compareCars0 = s.compareIds.map((id) => this.vm(this.carro(id)));
+    const melhor = compareCars0.reduce((m, c) => (c.poup > (m ? m.poup : -Infinity) ? c : m), null);
+    const compareCars = compareCars0.map((c) => ({
+      ...c, vencedor: melhor && c.id === melhor.id && compareCars0.length > 1, naoVencedor: !(melhor && c.id === melhor.id && compareCars0.length > 1),
+      anel: melhor && c.id === melhor.id && compareCars0.length > 1 ? 'var(--accent)' : 'transparent',
+      removerComp: () => this.alternarComp(c.id),
+    }));
+    const cel = (v, o = {}) => ({ valor: v, pre: '', fonte: o.sans ? "'IBM Plex Sans',sans-serif" : "'IBM Plex Mono',monospace", tam: o.tam || '13.5px', peso: o.peso || 400, cor: o.cor || 'var(--text)' });
+    const compareLinhas = [
+      { nome: 'País', celulas: compareCars.map((c) => cel(c.flag + ' ' + c.paisNome, { sans: true })) },
+      { nome: 'Ano', celulas: compareCars.map((c) => cel(String(c.ano))) },
+      { nome: 'Quilómetros', celulas: compareCars.map((c) => cel(c.kmFmt + (c.kmOk ? ' ✓' : ''), { cor: c.kmOk ? 'var(--text)' : 'var(--muted)' })) },
+      { nome: 'Preço na origem', celulas: compareCars.map((c) => cel(c.origemFmt)) },
+      { nome: 'Transporte', celulas: compareCars.map((c) => cel(c.transporteFmt)) },
+      { nome: 'ISV', celulas: compareCars.map((c) => cel(c.isvFmt)) },
+      { nome: 'IUC + legalização', celulas: compareCars.map((c) => cel(EUR(c.iuc + c.legal))) },
+      { nome: 'Custo final em PT', celulas: compareCars.map((c) => cel(c.totalFmt, { tam: '16px', peso: 600 })) },
+      { nome: 'Preço mercado PT', celulas: compareCars.map((c) => cel(c.mercadoFmt, { cor: 'var(--muted)' })) },
+    ];
+
+    const carDet = this.carro(s.detalheId) || CARROS[0];
+    const detBase = this.vm(carDet);
+    const isvCil = Math.round(carDet.isv * 0.92);
+    const isvAmb = Math.round(carDet.isv * 0.55);
+    const idadeAnos = 2026 - carDet.ano;
+    const det = {
+      ...detBase,
+      cilFmt: carDet.cilindrada ? FMT(carDet.cilindrada) + ' cm³' : 'elétrico',
+      idade: idadeAnos + (idadeAnos === 1 ? ' ano' : ' anos'),
+      isvCil: EUR(isvCil), isvAmb: EUR(isvAmb), isvRed: EUR(Math.max(isvCil + isvAmb - carDet.isv, 0)),
+      fotoAtual: detBase.titulo + ' — foto ' + s.foto + ' de 5',
+      fotos: [1, 2, 3, 4, 5].map((n) => ({ n: String(n), nome: 'Foto ' + n, borda: s.foto === n ? 'var(--accent)' : 'var(--border)', abrir: () => this.setState({ foto: n }) })),
+      ficha: [
+        { nome: 'Cilindrada', valor: carDet.cilindrada ? FMT(carDet.cilindrada) + ' cm³' : '—', mono: true },
+        { nome: 'CO₂ (WLTP)', valor: carDet.co2 + ' g/km', mono: true },
+        { nome: 'Potência', valor: carDet.potencia + ' cv', mono: true },
+        { nome: 'Combustível', valor: carDet.combustivel },
+        { nome: 'Caixa', valor: carDet.caixa },
+        { nome: 'Quilómetros', valor: FMT(carDet.km) + ' km', mono: true },
+        { nome: 'Ano', valor: String(carDet.ano), mono: true },
+        { nome: 'Cor', valor: carDet.cor },
+      ].map((f) => ({ ...f, fonte: f.mono ? "'IBM Plex Mono',monospace" : "'IBM Plex Sans',sans-serif" })),
+      confianca: [
+        { nome: 'Quilometragem', ok: carDet.kmOk, estado: carDet.kmOk ? 'Verificada' : 'Por verificar' },
+        { nome: 'VIN cruzado com bases europeias', ok: carDet.vinOk, estado: carDet.vinOk ? 'Verificado' : 'Pendente' },
+        { nome: PAISES[carDet.pais].reg, ok: carDet.regOk, estado: carDet.regOk ? 'Disponível' : 'Indisponível' },
+      ].map((c) => ({ ...c, cor: c.ok ? 'var(--ok)' : 'var(--muted)', bg: c.ok ? 'var(--ok-bg)' : 'var(--mid-bg)', icone: c.ok ? ICON_OK : ICON_WARN })),
+      negociar: () => this.iniciarNegociacao(carDet.id),
+      favLabel: this.state.favIds.includes(carDet.id) ? '♥ Guardado' : 'Favoritar',
+      toggleFavSimples: () => this.alternarFav(carDet.id),
+    };
+
+    const estadoConv = (e) => e === 'Acordo' ? { eBg: 'var(--ok-bg)', eCor: 'var(--ok)' } : e === 'Respondido' ? { eBg: 'var(--mid-bg)', eCor: 'var(--petrol)' } : { eBg: 'var(--mid-bg)', eCor: 'var(--muted)' };
+    const convsVm = s.convs.map((c) => {
+      const car = this.vm(this.carro(c.carId));
+      return { ...estadoConv(c.estado), id: c.id, titulo: car.titulo + ' ' + car.versao, fornecedor: c.fornecedor, estado: c.estado, quando: c.quando,
+        borda: c.id === s.convId ? 'var(--petrol)' : 'var(--border)', bordaEsq: c.id === s.convId ? 'var(--accent)' : 'transparent',
+        abrir: () => this.setState({ convId: c.id }) };
+    });
+    const convRaw = s.convs.find((c) => c.id === s.convId);
+    let convAtiva = null, msgs = [];
+    if (convRaw) {
+      const car = this.vm(this.carro(convRaw.carId));
+      convAtiva = { ...car, fornecedor: convRaw.fornecedor, mascaraStand: 'silva-2201@negocios.autoimport.pt', verAnuncio: () => this.abrirDetalhe(convRaw.carId) };
+      msgs = convRaw.msgs.map((m) => ({ autor: m.eu ? 'Tu · ' + nomeStand : convRaw.fornecedor.split(' · ')[0], mascara: m.eu ? 'silva-2201@negocios.autoimport.pt' : convRaw.mascara, quando: m.quando, texto: m.texto, risco: m.eu ? 'var(--steel)' : 'var(--accent)' }));
+    }
+    const carConv = convRaw ? this.carro(convRaw.carId) : CARROS[0];
+    const atalhos = [
+      { nome: 'Pedir mais fotos', t: 'Bom dia,\n\nPodem enviar mais fotografias do ' + carConv.marca + ' ' + carConv.modelo + '? Interessa-nos ver o interior, os pneus, eventuais danos e o livro de revisões.\n\nCumprimentos,\nAntónio Silva' },
+      { nome: 'Confirmar disponibilidade', t: 'Bom dia,\n\nO ' + carConv.marca + ' ' + carConv.modelo + ' continua disponível? Qual seria o prazo possível para levantamento por transportadora?\n\nCumprimentos,\nAntónio Silva' },
+      { nome: 'Propor preço', t: 'Bom dia,\n\nApós análise, propomos ' + FMT(carConv.origem - 800) + ' € com pagamento imediato por transferência e recolha esta semana. Aguardamos a vossa resposta.\n\nCumprimentos,\nAntónio Silva' },
+    ].map((a) => ({ nome: a.nome, usar: () => this.setState({ rascunho: a.t }) }));
+
+    const estadosFav = { 2: { t: 'Ainda disponível', c: 'var(--ok)' }, 7: { t: 'Preço desceu 400 € esta semana', c: 'var(--ok)' }, 5: { t: 'Preço subiu 250 €', c: 'var(--bad)' } };
+    const favoritosVm = s.favIds.map((id) => {
+      const ef = estadosFav[id] || { t: 'Ainda disponível', c: 'var(--ok)' };
+      return this.vm(this.carro(id), { estadoFav: ef.t, estadoFavCor: ef.c });
+    });
+
+    const alertasVm = s.alertas.map((a) => ({
+      ...a, flag: a.pais === 'todos' ? '🇪🇺' : PAISES[a.pais].flag,
+      criterios: a.criterios, matches: a.matches + (a.matches === 1 ? ' correspondência' : ' correspondências'),
+      mBg: a.matches > 0 && a.ativo ? 'var(--ok-bg)' : 'var(--mid-bg)', mCor: a.matches > 0 && a.ativo ? 'var(--ok)' : 'var(--muted)',
+      op: a.ativo ? 1 : 0.55, tBg: a.ativo ? 'var(--ok)' : 'var(--border)', tKnob: a.ativo ? '19.5px' : '2.5px',
+      alternar: () => this.setState({ alertas: this.state.alertas.map((x) => x.id === a.id ? { ...x, ativo: !x.ativo } : x) }),
+    }));
+
+    const notifs = [
+      { titulo: 'Nova oportunidade', texto: 'BMW 330e Touring (🇳🇱) — poupança estimada de 5 646 €', quando: 'há 2 horas', cor: 'var(--accent)', carId: 10 },
+      { titulo: 'Fornecedor respondeu', texto: 'Autohaus Weber aceitou 27 400 € no BMW 320d', quando: 'há 1 hora', cor: 'var(--petrol)', convId: 1 },
+      { titulo: 'Preço desceu', texto: 'Tesla Model 3 Long Range (🇳🇱) baixou 400 €', quando: 'ontem', cor: 'var(--ok)', carId: 7 },
+    ].map((n) => ({ ...n, abrir: () => { this.setState({ notifAberto: false, notifsVistas: true }); if (n.convId) { this.setState({ convId: n.convId }); this.ir('negociacoes'); } else this.abrirDetalhe(n.carId); } }));
+
+    const paisOpcoes = chipsPais.map((p) => ({ ...p, bg: p.ativo ? 'var(--mid-bg)' : 'transparent', cor: 'var(--text)', escolher: () => { this.setState({ fPais: p.code, paisAberto: false }); this.ir('pesquisar'); } }));
+    const paisSel = s.fPais === 'todos' ? { flag: '🇪🇺', nome: 'Mercados' } : { flag: PAISES[s.fPais].flag, nome: PAISES[s.fPais].nome };
+
+    const nComp = s.compareIds.length;
+    const equipa = [
+      { nome: 'António Silva', email: 'antonio@standsilva.pt', papel: 'Dono', pBg: 'var(--ok-bg)', pCor: 'var(--ok)' },
+      { nome: 'Marta Costa', email: 'marta@standsilva.pt', papel: 'Compradora', pBg: 'var(--mid-bg)', pCor: 'var(--mid)' },
+      { nome: 'Rui Ferreira', email: 'rui@standsilva.pt', papel: 'Colaborador', pBg: 'var(--mid-bg)', pCor: 'var(--mid)' },
+    ].map((m) => ({ ...m, iniciais: m.nome.split(' ').map((w) => w[0]).slice(0, 2).join('') }));
+
+    return {
+      tema: dark ? 'dark' : 'light', escuro: dark, claro: !dark,
+      toggleTema: () => this.setState({ dark: !dark }),
+      nomeStand, iniciais,
+      navItens,
+      irPainel: () => this.ir('painel'), irPesquisar: () => this.ir('pesquisar'), irCompras: () => this.ir('compras'),
+      irAlertas: () => this.ir('alertas'), irPerfil: () => this.ir('perfil'),
+      irAlertasForm: () => { this.setState({ formAlerta: true }); this.ir('alertas'); },
+      isPainel: s.screen === 'painel', isPesquisar: s.screen === 'pesquisar', isComparar: s.screen === 'comparar',
+      isDetalhe: s.screen === 'detalhe', isNegociacoes: s.screen === 'negociacoes', isCompras: s.screen === 'compras',
+      isFavoritos: s.screen === 'favoritos', isAlertas: s.screen === 'alertas', isPerfil: s.screen === 'perfil',
+      voltar: () => this.ir(s.prevScreen === 'detalhe' ? 'pesquisar' : s.prevScreen),
+      menuAberto: s.menuAberto, notifAberto: s.notifAberto, paisAberto: s.paisAberto,
+      algumMenu: s.menuAberto || s.notifAberto || s.paisAberto,
+      toggleMenu: () => this.setState({ menuAberto: !s.menuAberto, notifAberto: false, paisAberto: false }),
+      toggleNotif: () => this.setState({ notifAberto: !s.notifAberto, menuAberto: false, paisAberto: false, notifsVistas: true }),
+      togglePais: () => this.setState({ paisAberto: !s.paisAberto, menuAberto: false, notifAberto: false }),
+      fecharMenus: () => this.setState({ menuAberto: false, notifAberto: false, paisAberto: false }),
+      temNotifs: !s.notifsVistas, notifs, paisOpcoes, paisSelFlag: paisSel.flag, paisSelNome: paisSel.nome,
+      kpis, novas, comprasResumo: comprasVm,
+      q: s.q, setQ: (e) => this.setState({ q: e.target.value }),
+      fMarca: s.fMarca, setMarca: (e) => this.setState({ fMarca: e.target.value }),
+      fPais: s.fPais, setPais: (e) => this.setState({ fPais: e.target.value }),
+      fPreco: s.fPreco, setPreco: (e) => this.setState({ fPreco: e.target.value }),
+      fAno: s.fAno, setAno: (e) => this.setState({ fAno: e.target.value }),
+      fKm: s.fKm, setKm: (e) => this.setState({ fKm: e.target.value }),
+      fComb: s.fComb, setComb: (e) => this.setState({ fComb: e.target.value }),
+      fSelo: s.fSelo, setSelo: (e) => this.setState({ fSelo: e.target.value }),
+      ordenar: s.ordenar, setOrdenar: (e) => this.setState({ ordenar: e.target.value }),
+      soOp: s.soOp, toggleSoOp: () => this.setState({ soOp: !s.soOp }),
+      soOpBg: s.soOp ? 'var(--accent)' : 'var(--border)', soOpKnob: s.soOp ? '19.5px' : '2.5px',
+      maisFiltros: s.maisFiltros, toggleMaisFiltros: () => this.setState({ maisFiltros: !s.maisFiltros }),
+      maisFiltrosLabel: s.maisFiltros ? 'Menos filtros' : 'Mais filtros',
+      chipsPais, resultados, nResultados: String(resultados.length), semResultados: resultados.length === 0,
+      temSelecao: nComp > 0 && (s.screen === 'pesquisar' || s.screen === 'detalhe'),
+      selecaoLabel: nComp + (nComp === 1 ? ' anúncio selecionado' : ' anúncios selecionados') + (nComp < 2 ? ' — escolhe pelo menos 2' : ''),
+      limparSelecao: () => this.setState({ compareIds: [] }),
+      compararOp: nComp >= 2 ? 1 : 0.5,
+      abrirComparar: () => { if (nComp >= 2) this.ir('comparar'); },
+      compareCars, compareLinhas,
+      compareCols: '130px repeat(' + Math.max(nComp, 1) + ', 1fr)',
+      compareMin: (nComp * 220 + 130) + 'px',
+      det, isvAberto: s.isvAberto, toggleIsv: () => this.setState({ isvAberto: !s.isvAberto }),
+      isvSeta: s.isvAberto ? '180deg' : '0deg',
+      convsVm, convAtiva, msgs, temConv: !!convAtiva, convVazia: convRaw ? convRaw.msgs.length === 0 : false,
+      atalhos, rascunho: s.rascunho, setRascunho: (e) => this.setState({ rascunho: e.target.value }),
+      enviarMsg: () => this.enviarMsg(), enviarOp: s.rascunho.trim() ? 1 : 0.55,
+      comprasVm, compraSel, temCompraSel: !!compraSel, semCompraSel: !compraSel,
+      fecharCompra: () => this.setState({ compraId: null }),
+      favoritosVm, semFavoritos: favoritosVm.length === 0,
+      alertasVm, formAlertaAberto: s.formAlerta,
+      toggleFormAlerta: () => this.setState({ formAlerta: !s.formAlerta }),
+      aNome: s.aNome, setANome: (e) => this.setState({ aNome: e.target.value }),
+      aMarca: s.aMarca, setAMarca: (e) => this.setState({ aMarca: e.target.value }),
+      aPais: s.aPais, setAPais: (e) => this.setState({ aPais: e.target.value }),
+      aPreco: s.aPreco, setAPreco: (e) => this.setState({ aPreco: e.target.value }),
+      aSoOp: s.aSoOp, toggleASoOp: () => this.setState({ aSoOp: !s.aSoOp }),
+      aSoOpBg: s.aSoOp ? 'var(--accent)' : 'var(--border)', aSoOpKnob: s.aSoOp ? '19.5px' : '2.5px',
+      guardarAlerta: () => this.guardarAlerta(),
+      equipa,
+    };
+  }
+}
+</script>
+<script>
+(async () => {
+  if (!document.title || !document.title.trim()) document.title = "AutoImport";
+  // Prepend so page-supplied @page / break rules (deck-stage's margin:0,
+  // author CSS) keep source-order precedence over the baseline.
+  const baseCss = document.createElement('style');
+  baseCss.textContent = "@media print {\n  figure, table { break-inside: avoid; }\n  *, *::before, *::after {\n    print-color-adjust: exact; -webkit-print-color-adjust: exact;\n    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;\n    animation-delay: -99s !important; animation-duration: .001s !important;\n    animation-iteration-count: 1 !important; animation-fill-mode: both !important;\n    animation-play-state: running !important; transition-duration: 0s !important;\n  }\n}";
+  document.head.prepend(baseCss);
+  if (document.readyState === 'loading') {
+    await new Promise((r) => document.addEventListener('DOMContentLoaded', r, { once: true }));
+  }
+  let ds = document.querySelector('deck-stage');
+  // whenDefined never resolves when nothing registers the element, so only
+  // await it when a <deck-stage> tag exists (and race a timeout regardless).
+  if (ds && !customElements.get('deck-stage')) {
+    try {
+      await Promise.race([
+        customElements.whenDefined('deck-stage'),
+        new Promise((r) => setTimeout(r, 3000)),
+      ]);
+    } catch (e) {}
+    ds = document.querySelector('deck-stage');
+  }
+  // dc-runtime assigns window.DCLogic at init and mounts into #dc-root on
+  // DOMContentLoaded; settle on that subtree so React has rendered before
+  // print(). Non-DC pages fall through to weighing body.
+  const isDc = !ds && 'DCLogic' in window;
+  const settleRoot = ds || (isDc ? document.getElementById('dc-root') : null) || document.body;
+  if (settleRoot) {
+    // Weigh only content children — skip script/style/template so inline
+    // Babel/CSS doesn't register as stable "content" before the framework
+    // has mounted anything.
+    const MEDIA = 'img,svg,canvas,video,picture,iframe,embed,object';
+    const weigh = () => {
+      let text = 0, media = 0;
+      for (const c of settleRoot.children) {
+        const t = c.tagName;
+        if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+        text += (c.textContent || '').trim().length;
+        media += c.querySelectorAll(MEDIA).length + (c.matches(MEDIA) ? 1 : 0);
+      }
+      return text + media * 100;
+    };
+    // "Non-zero and stable" alone is not sufficient to mean rendered: generic
+    // body can carry a static shell while async main content is pending, and
+    // #dc-root can carry the root DC's static text while child refs are still
+    // .sc-placeholder boxes. Gate generic on readyState 'complete', and never
+    // accept stability while a dc-runtime placeholder is present.
+    const isGeneric = settleRoot === document.body;
+    const deadline = Date.now() + 15000;
+    let last = -1, stable = 0;
+    while (Date.now() < deadline) {
+      const n = weigh();
+      const ready =
+        (!isGeneric || document.readyState === 'complete') &&
+        !settleRoot.querySelector('.sc-placeholder');
+      if (n > 0 && n === last && ready) { if (++stable >= 2) break; } else { stable = 0; }
+      last = n;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  // Project support.js may predate runtime default-seeding; push via bridge.
+  if (isDc && window.__dcSetProps && window.__dcRootName) {
+    try {
+      const dpEl = document.querySelector('script[data-dc-script]');
+      const meta = JSON.parse((dpEl && dpEl.getAttribute('data-props')) || '{}');
+      const bag = {};
+      for (const k in meta)
+        if (k[0] !== '$' && meta[k] && meta[k].default !== undefined)
+          bag[k] = meta[k].default;
+      if (Object.keys(bag).length) {
+        window.__dcSetProps(window.__dcRootName(), bag);
+        await new Promise((r) => setTimeout(r, 50));
+      }
+    } catch (e) {}
+  }
+  // Reveal content gated on scroll or visibility before printing. Lazy <img>,
+  // IntersectionObserver fade-ins, and collapsed <details> don't render while
+  // off-screen, so a long page would print with them blank or closed. Open
+  // every <details>, force native-lazy images eager, and scroll the document
+  // through its full height to trip lazy-load + IO; then wait (bounded) for the
+  // newly-triggered images. Inert for deck-stage (slides aren't scroll-gated).
+  try {
+    for (const d of document.querySelectorAll('details')) d.open = true;
+    for (const img of document.querySelectorAll('img[loading="lazy"]'))
+      img.loading = 'eager';
+    const scroller = document.scrollingElement || document.documentElement;
+    const full = Math.max(scroller.scrollHeight, document.body.scrollHeight);
+    const step = window.innerHeight || 800;
+    for (let y = 0; y <= full; y += step) {
+      window.scrollTo(0, y);
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    window.scrollTo(0, 0);
+    await Promise.race([
+      Promise.all(
+        [...document.images].map((img) =>
+          img.complete
+            ? null
+            : new Promise((res) => {
+                img.addEventListener('load', res, { once: true });
+                img.addEventListener('error', res, { once: true });
+              })
+        )
+      ),
+      new Promise((r) => setTimeout(r, 4000)),
+    ]);
+  } catch (e) {}
+  try { await document.fonts.ready; } catch (e) {}
+  // Jump every animation to its end state so print() never captures a slide
+  // mid-entrance. Ordering matters: the 0s-transition style must be live
+  // BEFORE data-deck-active is set so attribute-keyed transitions don't
+  // start a (now-0s) run from the pre-active base.
+  const st = document.createElement('style');
+  st.textContent = '*,*::before,*::after{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}';
+  document.head.appendChild(st);
+  for (const d of document.querySelectorAll('deck-stage')) {
+    for (const c of d.children) {
+      const t = c.tagName;
+      if (t === 'SCRIPT' || t === 'STYLE' || t === 'TEMPLATE') continue;
+      c.setAttribute('data-deck-active', '');
+    }
+  }
+  // Re-append deck-stage's @page last so no author @page can add a margin and
+  // spill each full-bleed slide onto two sheets. Backstop for old copies.
+  if (ds) {
+    let pg = document.getElementById('deck-stage-print-page');
+    if (!pg) {
+      pg = document.createElement('style');
+      pg.textContent = '@page{size:' + (+ds.getAttribute('width') || 1920) +
+        'px ' + (+ds.getAttribute('height') || 1080) + 'px;margin:0}';
+    }
+    document.body.appendChild(pg);
+  }
+  try {
+    const sweep = () => {
+      for (const a of document.getAnimations()) {
+        try { a.finish(); } catch (e) {
+          try { a.currentTime = (a.effect && a.effect.getComputedTiming().duration) || 0; a.pause(); } catch (e2) {}
+        }
+      }
+    };
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+    sweep();
+    await new Promise((r) => requestAnimationFrame(r));
+  } catch (e) {}
+  // A document that owns its print CSS (the doc-page starter injects the
+  // meta at runtime; hand-rolled print designs author it) gets no automatic
+  // page geometry and keeps its forced breaks: strip the injected default
+  // @page — write time cannot see a runtime-injected meta — skip the frame
+  // override below, and skip the fakepage-flattening further down. What
+  // still applies: the print baseline and break-hygiene defaults (no @page
+  // in either; low specificity, so the document's own print CSS wins) and
+  // the break-inside relaxation on >page elements (avoid on those cannot
+  // be honored whoever authored it).
+  var ownsPrint = !!document.querySelector('meta[name="omelette-owns-print" i]');
+  if (ownsPrint) {
+    var dst = document.querySelector('style[data-omelette-print-defaults]');
+    if (dst && dst.textContent) {
+      dst.textContent = dst.textContent.replace(/@page\b[^{}]*\{[^}]*\}/, '');
+    }
+  }
+  // Size the PDF page to the rendered design unless the file opted into
+  // standard paper via @page{size:letter|A4|…} or declared print ownership
+  // via the meta above. Decks own their own @page.
+  // Wrappers (body, …) lose padding+margin so the frame sits at (0,0); the
+  // frame itself loses only margin — its padding is INSIDE the measured
+  // rect and must stay, or content shifts and leaves a gap at bottom/right.
+  var __m = null;
+  try { __m = (() => {
+  var STAMP = true;
+  var docEl = document.documentElement;
+  var doc = { width: docEl.scrollWidth, height: docEl.scrollHeight };
+
+  var ds = document.querySelector('deck-stage');
+  if (ds) {
+    var dw = Number(ds.getAttribute('width')) || 1920;
+    var dh = Number(ds.getAttribute('height')) || 1080;
+    var n = typeof ds.length === 'number' ? ds.length : ds.children.length;
+    var idx = typeof ds.index === 'number' ? ds.index : 0;
+    var frames = [];
+    for (var i = 0; i < n; i++) frames.push({ left: 0, top: 0, width: dw, height: dh });
+    return { kind: 'deck', source: 'declared', doc: doc, frames: frames,
+      authored: frames.map(function(){return{width:true,height:true}}),
+      deck: { width: dw, height: dh, slideCount: n, index: idx },
+      signals: { paperPage: false, pxPage: false } };
+  }
+
+  // Declared kind: a doc-page tag names the kind outright, so no signal
+  // heuristics run (like the deck branch above, signals report false —
+  // they describe inferred classifications only). The tag alone is not
+  // trusted: the element must have upgraded (shadowRoot present), so a
+  // leftover tag whose script was deleted falls through to the heuristics
+  // that handle plain markup.
+  var stageSx = window.scrollX || 0, stageSy = window.scrollY || 0;
+  var dp = document.querySelector('doc-page');
+  if (dp && dp.shadowRoot) {
+    // Crop to the sheet, not the host — the desk around it is screen-only
+    // chrome that must not land in PNG exports.
+    var sheet = dp.shadowRoot.querySelector('.sheet');
+    var sr = (sheet || dp).getBoundingClientRect();
+    return { kind: 'paper-doc', source: 'declared', doc: doc,
+      frames: [{ left: sr.left + stageSx, top: sr.top + stageSy,
+        width: sr.width, height: sr.height }],
+      authored: [{ width: false, height: false }],
+      signals: { paperPage: false, pxPage: false } };
+  }
+  var paperPage = false, pxPage = false;
+  var eachRule = function (fn) {
+    for (var s = 0; s < document.styleSheets.length; s++) {
+      var rs; try { rs = document.styleSheets[s].cssRules; } catch (e) { continue; }
+      for (var r = 0; r < rs.length; r++) {
+        fn(rs[r]);
+        if (rs[r].cssRules) for (var n = 0; n < rs[r].cssRules.length; n++) fn(rs[r].cssRules[n]);
+      }
+    }
+  };
+  eachRule(function (r) {
+    if (r.type !== 6) return;
+    var m = /\bsize\s*:\s*([^;}]+)/i.exec(r.cssText || '');
+    if (!m) return;
+    if (/\b(letter|a[3-5]|legal|ledger)\b/i.test(m[1])) paperPage = true;
+    if (/\d+(?:\.\d+)?px\b/i.test(m[1])) pxPage = true;
+  });
+  var signals = { paperPage: paperPage, pxPage: pxPage };
+
+  var pxVal = function (v) {
+    var m = /^(\d+(?:\.\d+)?)px$/.exec(v || ''); return m ? +m[1] : 0;
+  };
+  var authoredPx = function (el, prop) {
+    if (pxVal(el.style[prop])) return true;
+    var attr = el.getAttribute(prop);
+    if (attr && /^\d+$/.test(attr)) return true;
+    var hit = false;
+    eachRule(function (r) {
+      if (hit || r.type !== 1 || !r.style) return;
+      try { if (el.matches(r.selectorText) && pxVal(r.style[prop])) hit = true; } catch (e) {}
+    });
+    return hit;
+  };
+
+  var el = document.body, rootPxW = false;
+  for (;;) {
+    var kids = [];
+    for (var c = 0; c < el.children.length; c++) {
+      var t = el.children[c].tagName;
+      if (t !== 'SCRIPT' && t !== 'STYLE' && t !== 'TEMPLATE') kids.push(el.children[c]);
+    }
+    if (kids.length !== 1 || !(kids[0] instanceof HTMLElement)) break;
+    if (STAMP) el.setAttribute('data-om-frame-wrap', '');
+    el = kids[0];
+    rootPxW = authoredPx(el, 'width');
+    if (rootPxW) break;
+  }
+  if (!rootPxW) rootPxW = authoredPx(el, 'width');
+
+  // @page{size:letter} alone is a flowing doc; with a px-width root it's a
+  // fixed sheet pretending to be paper — fall through and size to render.
+  if (paperPage && !rootPxW) {
+    return { kind: 'paper-doc', source: 'inferred', doc: doc, signals: signals,
+      frames: [{ left: 0, top: 0, width: doc.width, height: doc.height }],
+      authored: [{ width: false, height: false }] };
+  }
+
+  var sx = window.scrollX || 0, sy = window.scrollY || 0;
+  var rectOf = function (e) {
+    var r = e.getBoundingClientRect();
+    var oy; try { oy = getComputedStyle(e).overflowY; } catch (err) {}
+    var h = oy === 'visible' ? Math.max(r.height, e.scrollHeight || 0) : r.height;
+    return { left: r.left + sx, top: r.top + sy, width: r.width, height: h };
+  };
+
+  // Multi-frame: off unless the page opts in via data-om-multi-frame on the
+  // stop element — the explicit opt-in is what guards against card grids
+  // and pricing tables that match the geometry but aren't separate
+  // canvases. Two ways to name the frames, explicit first:
+  // 1. Descendants marked data-om-frame-export (the social-frames starter
+  //    marks each asset frame; shells/panels around them are presentation,
+  //    so nesting is expected). Document order.
+  // 2. Fallback, no marked descendants: direct children with an authored px
+  //    width AND height (the original geometry heuristic).
+  // Frames may be different sizes (a gallery mixes 1080×1920 stories with
+  // 728×90 banners); data-om-frame-label rides along for export filenames.
+  if (el.hasAttribute('data-om-multi-frame')) {
+    var visOk = function (e) {
+      var cs; try { cs = getComputedStyle(e); } catch (err) { return false; }
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && cs.position !== 'fixed';
+    };
+    // A frame's crop is its VISUAL box — never the scrollHeight-inflated
+    // rect that rectOf computes for page roots. Shadow-DOM hover controls
+    // (image-slot's Replace bar parks 29px below its host) and similar
+    // escaping UI contribute scrollable overflow to the frame, and the
+    // inflated height both squashes the nominal-size resize and drags
+    // content below the frame into the crop. Zoom-independent; bit every
+    // slot-bearing frame.
+    var frameRectOf = function (e) {
+      var r = e.getBoundingClientRect();
+      return { left: r.left + sx, top: r.top + sy, width: r.width, height: r.height };
+    };
+    var pushCand = function (list, e) {
+      if (!visOk(e)) return;
+      var rc = frameRectOf(e);
+      if (rc.width < 2 || rc.height < 2) return;
+      var lbl = e.getAttribute('data-om-frame-label');
+      if (lbl) rc.label = lbl;
+      list.push(rc);
+    };
+    var cands = [];
+    var marked = el.querySelectorAll('[data-om-frame-export]');
+    if (marked.length) {
+      for (var mk = 0; mk < marked.length; mk++) pushCand(cands, marked[mk]);
+    } else {
+      for (var k = 0; k < el.children.length; k++) {
+        var ch = el.children[k];
+        if (!authoredPx(ch, 'width') || !authoredPx(ch, 'height')) continue;
+        pushCand(cands, ch);
+      }
+    }
+    if (cands.length >= 2) {
+      return { kind: 'multi-frame', source: 'inferred', doc: doc, signals: signals,
+        frames: cands, authored: cands.map(function(){return{width:true,height:true}}) };
+    }
+  }
+
+  if (STAMP) el.setAttribute('data-om-frame', '');
+  return { kind: 'single-canvas', source: 'inferred', doc: doc, signals: signals,
+    frames: [rectOf(el)],
+    authored: [{ width: rootPxW, height: authoredPx(el, 'height') }] };
+})(); } catch (e) {}
+  var frame = null;
+  if (!ownsPrint && __m && __m.kind === 'single-canvas') {
+    var f = __m.frames && __m.frames[0];
+    if (f && f.width >= 200 && f.height >= 200) {
+      frame = f;
+      var fst = document.createElement('style');
+      fst.textContent = '@media print{@page{size:' + Math.ceil(f.width) + 'px ' +
+        Math.ceil(f.height) + 'px;margin:0}' +
+        'html,body,[data-om-frame-wrap]{padding:0!important;margin:0!important;background:none!important}' +
+        '[data-om-frame]{margin:0!important}}';
+      document.body.appendChild(fst);
+    }
+  }
+  // Relax break-inside on oversized elements. An element taller than a
+  // printable page can't honor break-inside: avoid — browsers either overflow
+  // it or push it whole to the next page, leaving a blank gap, then break it
+  // anyway at an arbitrary point. After the final layout (content revealed,
+  // animations jumped), find elements taller than a page that still compute
+  // break-inside: avoid and reset them to auto, so the browser breaks them at
+  // their children's boundaries instead (children keep their own avoid). PAGE_PX
+  // is a conservative portrait estimate at 96 CSS px/in — Letter/A4 usable
+  // height minus our 0.5in margins — so only clearly-oversized elements are
+  // touched and under-page elements still stay whole. Skipped for decks (slides
+  // are sized to the page) and for fixed-size canvases (frame set, or an author
+  // px-based @page) — runs as before for flowing docs on letter/A4.
+  try {
+    if (!ds && !frame && !(__m && __m.signals && __m.signals.pxPage)) {
+      const PAGE_PX = 1024;
+      // Our print defaults add a real @page margin only when the source has
+      // no @page of its own; computed style can't tell us (it reports screen
+      // media), so read the injected rule directly.
+      const defaults = document.querySelector('style[data-omelette-print-defaults]');
+      const pageInset = /@page\s*\{[^}]*margin/.test(defaults ? defaults.textContent || '' : '');
+      const SEL = 'section,article,figure,table,pre,blockquote,[class~="card" i],[class~="page" i],[class~="sheet" i]';
+      for (const el of document.body.querySelectorAll(SEL)) {
+        if (el instanceof HTMLElement && el.offsetHeight > PAGE_PX) {
+          el.setAttribute('data-om-oversized', '');
+          // Fake-paged docs simulate sheets with over-tall break-after:page
+          // boxes; honoring the break spills half-blank pages and ends a
+          // colored box mid-sheet. Flow them, and (only when we own the page
+          // inset) drop the redundant padding/background via the rule below.
+          const cs = getComputedStyle(el);
+          // An owns-print doc's forced breaks are intentional sheet
+          // boundaries, never fake-paged simulation — don't strip them.
+          // The break-inside relaxation above still applies: avoid on a
+          // >page element is impossible to honor whoever authored it.
+          if (
+            !ownsPrint &&
+            (cs.breakAfter === 'page' || cs.pageBreakAfter === 'always')
+          ) {
+            el.setAttribute('data-om-fakepage', '');
+          }
+        }
+      }
+      const ost = document.createElement('style');
+      ost.textContent = '@media print{' +
+        '[data-om-oversized]{break-inside:auto !important;page-break-inside:auto !important}' +
+        '[data-om-fakepage]{break-after:auto !important;page-break-after:auto !important}' +
+        (pageInset ? '[data-om-fakepage]{padding:0 !important;background:none !important}' : '') +
+        '}';
+      document.head.appendChild(ost);
+    }
+  } catch (e) {}
+  // macOS Preview renders Skia-PDF Luminosity soft-masks as opaque grey boxes;
+  // swap the CSS that triggers them for Preview-safe forms.
+  try {
+    for (const el of document.body.querySelectorAll('*')) {
+      const cs = getComputedStyle(el);
+
+      if (cs.boxShadow !== 'none' && cs.filter === 'none') {
+        const outs = [], kept = [];
+        for (const s of cs.boxShadow.split(/,(?![^(]*[)])/)) {
+          const t = s.trim();
+          const m = t.match(/^(rgba?[(][^)]+[)]) (-?[0-9.]+px) (-?[0-9.]+px) ([0-9.]+px) -?[0-9.]+px$/);
+          if (m && parseFloat(m[4]) > 0) outs.push('drop-shadow(' + m[2] + ' ' + m[3] + ' ' + m[4] + ' ' + m[1] + ')');
+          else kept.push(t);
+        }
+        if (outs.length) {
+          el.style.setProperty('filter', outs.join(' '), 'important');
+          el.style.setProperty('box-shadow', kept.join(', ') || 'none', 'important');
+        }
+      }
+
+      const mask = cs.maskImage && cs.maskImage !== 'none' ? cs.maskImage : cs.webkitMaskImage;
+      if (mask && mask !== 'none' && cs.filter === 'none') el.style.setProperty('filter', 'opacity(1)', 'important');
+    }
+  } catch (e) {}
+  setTimeout(() => { try { window.print(); } catch (e) {} }, 200);
+})();
+</script>
+</body>
+</html>

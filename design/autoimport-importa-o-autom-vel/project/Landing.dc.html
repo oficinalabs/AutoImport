@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+html,body{margin:0;padding:0}
+body{font-family:'IBM Plex Sans',sans-serif;-webkit-font-smoothing:antialiased}
+button{font-family:inherit}
+a{color:var(--link,#0E3B4A);text-decoration:none}a:hover{color:var(--amber,#E8930C)}
+:focus-visible{outline:2px solid var(--amber,#E8930C);outline-offset:2px}
+[data-t="dark"]{--surface:#0B1417;--paper:#111E23;--ink:#E9EFF0;--soft:#9BADB4;--steel:#7C8B91;--line:#22333A;--strong:#374B53;--petrol:#0E3B4A;--cta:#12657E;--amber:#E8930C;--good:#4FBE87;--bad:#F08A80;--goodsoft:#12332A;--badsoft:#341F1E;--link:#7FD3C4;--sh:none}
+[data-t="light"]{--surface:#F3F5F5;--paper:#FFFFFF;--ink:#12262E;--soft:#5A6B72;--steel:#7C8B91;--line:#DFE4E5;--strong:#C4CDCF;--petrol:#0E3B4A;--cta:#0E3B4A;--amber:#E8930C;--good:#1E7A4B;--bad:#B3261E;--goodsoft:#E8F3EC;--badsoft:#FBEAE8;--link:#0E3B4A;--sh:0 1px 2px rgba(16,40,48,.06)}
+</style>
+</helmet>
+<div data-t="{{ tema }}" style="background:var(--surface); color:var(--ink); min-height:100vh; font-family:'IBM Plex Sans',sans-serif; font-size:15px; line-height:1.55; font-variant-numeric:tabular-nums;">
+
+  <header style="position:sticky; top:0; z-index:40; background:var(--surface); border-bottom:1px solid var(--line);">
+    <div style="max-width:1120px; margin:0 auto; padding:0 clamp(16px,4vw,32px); height:60px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+      <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:18px; letter-spacing:-.015em;">AutoImport</span>
+      <div style="display:flex; align-items:center; gap:clamp(8px,2vw,18px);">
+        <button onClick="{{ trocarTema }}" aria-label="Trocar tema" style="width:34px; height:34px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--soft); cursor:pointer; display:grid; place-items:center;" style-hover="color:var(--ink); border-color:var(--strong)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"></path></svg>
+        </button>
+        <a href="#entrar" style="font-size:14px; font-weight:500; color:var(--soft);">Entrar</a>
+        <a href="#comecar" style="display:inline-flex; align-items:center; height:38px; padding:0 16px; border-radius:6px; background:var(--cta); color:#FFFFFF; font-family:'Archivo',sans-serif; font-weight:600; font-size:14px; white-space:nowrap;" style-hover="color:#FFFFFF; filter:brightness(1.1)">Começar</a>
+      </div>
+    </div>
+  </header>
+
+  <section style="max-width:1120px; margin:0 auto; padding:clamp(36px,7vw,72px) clamp(16px,4vw,32px) clamp(28px,5vw,48px);">
+    <div style="display:inline-flex; align-items:center; gap:8px; padding:5px 11px; border:1px solid var(--line); border-radius:999px; background:var(--paper); font-size:12.5px; color:var(--soft); margin-bottom:20px;">
+      <span style="width:7px; height:7px; border-radius:999px; background:var(--good); box-shadow:0 0 0 3px var(--goodsoft);"></span>
+      Atualizado hoje às 07:40 · 27 000 anúncios lidos
+    </div>
+    <h1 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(34px,7vw,60px); line-height:1.03; letter-spacing:-.03em; margin:0; text-wrap:balance;">
+      <span style="color:var(--amber);">174 carros</span> compensam importar hoje.
+    </h1>
+    <p style="font-size:clamp(16px,2.4vw,19px); color:var(--soft); max-width:52ch; margin:18px 0 0; text-wrap:pretty;">
+      Comparamos anúncios da Alemanha, França, Bélgica, Holanda e Espanha com o preço de mercado em Portugal — já com ISV, transporte e legalização na conta. Poupança mediana <strong style="color:var(--ink); font-weight:600;">2 850 €</strong> por carro; a melhor de hoje são <strong style="color:var(--ink); font-weight:600;">11 745 €</strong>.
+    </p>
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:14px; margin-top:28px;">
+      <a href="#comecar" style="display:inline-flex; align-items:center; height:50px; padding:0 24px; border-radius:6px; background:var(--cta); color:#FFFFFF; font-family:'Archivo',sans-serif; font-weight:600; font-size:16.5px;" style-hover="color:#FFFFFF; filter:brightness(1.1)">Começar — 1.º mês grátis</a>
+      <span style="font-size:13.5px; color:var(--steel);">Sem cartão. Sem fidelização.</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:6px; overflow:hidden; margin-top:clamp(28px,5vw,44px);">
+      <sc-for list="{{ metricas }}" as="m" hint-placeholder-count="4">
+        <div style="background:var(--paper); padding:16px 18px;">
+          <div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:24px; letter-spacing:-.01em;">{{ m.valor }}</div>
+          <div style="font-size:12.5px; color:var(--soft); margin-top:2px;">{{ m.rot }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1120px; margin:0 auto; padding:clamp(28px,5vw,44px) clamp(16px,4vw,32px);">
+    <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:6px;">
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(22px,3.6vw,30px); letter-spacing:-.02em; margin:0;">A conta que ninguém quer fazer</h2>
+    </div>
+    <p style="color:var(--soft); margin:0 0 22px; max-width:60ch; font-size:15.5px;">Este é um carro que está à venda agora. Carrega em cada linha do ISV para veres de onde vem o valor.</p>
+
+    <div style="background:var(--paper); border:1px solid var(--line); border-radius:6px; box-shadow:var(--sh); overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:16px 20px; border-bottom:1px solid var(--line);">
+        <span style="font-size:18px;">🇩🇪</span>
+        <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16.5px;">BMW 320d Touring</span>
+        <span style="color:var(--soft); font-size:14px;">2021 · 78 400 km · 190 cv</span>
+        <span style="margin-left:auto; font-size:12.5px; color:var(--steel);">Anúncio em Munique</span>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));">
+        <div style="padding:8px 20px 18px; border-right:1px solid var(--line);">
+          <sc-for list="{{ linhas }}" as="l" hint-placeholder-count="5">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; padding:12px 0; border-bottom:1px solid var(--line);">
+              <span style="color:var(--soft); font-size:14.5px;">{{ l.nome }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-weight:500; font-size:15px;">{{ l.valor }}</span>
+            </div>
+          </sc-for>
+
+          <button onClick="{{ toggleIsv }}" aria-expanded="{{ isvAberto }}" style="display:flex; justify-content:space-between; align-items:center; gap:16px; width:100%; text-align:left; padding:14px 12px; margin:8px -12px 0; border:none; border-radius:6px; background:{{ isvBg }}; cursor:pointer; color:var(--ink);">
+            <span style="display:flex; flex-direction:column; gap:2px;">
+              <span style="display:flex; align-items:center; gap:7px; font-family:'Archivo',sans-serif; font-weight:600; font-size:15.5px;">
+                ISV
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="transform:rotate({{ setaIsv }}deg); transition:transform .18s;"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+              <span style="font-size:12.5px; color:var(--soft);">21% do custo total. Cobrado à chegada.</span>
+            </span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:19px; color:var(--amber);">6 210 €</span>
+          </button>
+
+          <sc-if value="{{ isvAberto }}" hint-placeholder-val="{{ false }}">
+            <div style="margin:2px -12px 0; padding:12px; border-radius:6px; background:var(--surface);">
+              <sc-for list="{{ isvLinhas }}" as="i" hint-placeholder-count="4">
+                <div style="display:flex; justify-content:space-between; gap:12px; padding:6px 0; font-size:13.5px;">
+                  <span style="color:var(--soft);">{{ i.nome }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; color:{{ i.cor }};">{{ i.valor }}</span>
+                </div>
+              </sc-for>
+              <p style="margin:8px 0 0; font-size:12.5px; color:var(--steel); line-height:1.45;">Tabela do ISV de 2026, componente cilindrada + componente ambiental, com redução por anos de uso. Estimativa — quem fixa o valor é a Alfândega.</p>
+            </div>
+          </sc-if>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 0 4px; margin-top:8px; border-top:2px solid var(--strong);">
+            <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:16px;">Custo final em Portugal</span>
+            <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:24px;">29 159 €</span>
+          </div>
+        </div>
+
+        <div style="padding:20px; display:flex; flex-direction:column; gap:18px; background:var(--surface);">
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            <sc-for list="{{ barras }}" as="b" hint-placeholder-count="2">
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:6px;">
+                  <span style="font-size:13.5px; color:var(--soft);">{{ b.nome }}</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:16px; color:{{ b.cor }};">{{ b.valor }}</span>
+                </div>
+                <div style="height:12px; border-radius:2px; background:var(--line); overflow:hidden;">
+                  <div style="height:100%; width:{{ b.larg }}; background:{{ b.fundo }};"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="padding:16px; border-radius:6px; background:var(--goodsoft);">
+            <div style="font-size:12.5px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; color:var(--good);">Poupança estimada</div>
+            <div style="font-family:'Archivo',sans-serif; font-weight:700; font-size:34px; color:var(--good); line-height:1.1; margin-top:2px;">5 741 €</div>
+            <div style="font-size:13px; color:var(--soft); margin-top:4px;">contra a mediana de 41 anúncios PT do mesmo modelo e ano.</div>
+          </div>
+          <p style="margin:0; font-size:13px; color:var(--steel); line-height:1.5;">Fazemos esta conta a 27 000 anúncios, todos os dias, antes de te mostrarmos qualquer carro.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section style="max-width:1120px; margin:0 auto; padding:clamp(28px,5vw,44px) clamp(16px,4vw,32px);">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:18px;">
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(22px,3.6vw,30px); letter-spacing:-.02em; margin:0;">Quatro dos 174 de hoje</h2>
+      <span style="font-size:13.5px; color:var(--steel);">Preços verificados às 07:40 · podem já ter sido vendidos</span>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px;">
+      <sc-for list="{{ carros }}" as="c" hint-placeholder-count="4">
+        <div style="background:var(--paper); border:1px solid var(--line); border-radius:6px; box-shadow:var(--sh); overflow:hidden; display:flex; flex-direction:column;">
+          <div style="aspect-ratio:16/10; background:repeating-linear-gradient(45deg, var(--surface) 0 14px, var(--line) 14px 28px); display:grid; place-items:center; border-bottom:1px solid var(--line);">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--steel);">{{ c.foto }}</span>
+          </div>
+          <div style="padding:14px 16px 16px; display:flex; flex-direction:column; gap:10px; flex:1;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:15px;">{{ c.flag }}</span>
+              <span style="font-family:'Archivo',sans-serif; font-weight:600; font-size:15px;">{{ c.titulo }}</span>
+            </div>
+            <div style="font-size:13px; color:var(--soft);">{{ c.sub }}</div>
+            <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:auto; padding-top:10px; border-top:1px solid var(--line);">
+              <span style="font-size:12.5px; color:var(--soft);">Custo final</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:16px;">{{ c.final }}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+              <span style="font-size:12.5px; font-weight:600; padding:3px 9px; border-radius:999px; background:{{ c.vBg }}; color:{{ c.vCor }};">{{ c.veredito }}</span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:16px; color:{{ c.vCor }};">{{ c.poup }}</span>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1120px; margin:0 auto; padding:clamp(28px,5vw,44px) clamp(16px,4vw,32px);">
+    <h2 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(22px,3.6vw,30px); letter-spacing:-.02em; margin:0 0 20px;">Como funciona</h2>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px;">
+      <sc-for list="{{ passos }}" as="p" hint-placeholder-count="3">
+        <div style="background:var(--paper); border:1px solid var(--line); border-radius:6px; padding:20px; box-shadow:var(--sh);">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:600; color:var(--amber);">{{ p.n }}</div>
+          <h3 style="font-family:'Archivo',sans-serif; font-weight:600; font-size:17px; margin:8px 0 6px;">{{ p.titulo }}</h3>
+          <p style="margin:0; font-size:14.5px; color:var(--soft); line-height:1.5;">{{ p.texto }}</p>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="max-width:1120px; margin:0 auto; padding:clamp(28px,5vw,44px) clamp(16px,4vw,32px);">
+    <div style="border:1px solid var(--strong); border-radius:6px; padding:clamp(20px,4vw,32px); background:var(--paper);">
+      <h2 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(20px,3.2vw,26px); letter-spacing:-.02em; margin:0 0 6px;">O que isto <span style="color:var(--amber);">não</span> faz</h2>
+      <p style="margin:0 0 20px; color:var(--soft); font-size:15px; max-width:60ch;">Preferimos dizer-te já do que no dia em que fores levantar o carro.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:6px; overflow:hidden;">
+        <sc-for list="{{ limites }}" as="l" hint-placeholder-count="3">
+          <div style="background:var(--paper); padding:18px;">
+            <div style="font-family:'Archivo',sans-serif; font-weight:600; font-size:15px; margin-bottom:6px;">{{ l.titulo }}</div>
+            <p style="margin:0; font-size:14px; color:var(--soft); line-height:1.5;">{{ l.texto }}</p>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section id="comecar" style="max-width:1120px; margin:0 auto; padding:clamp(28px,5vw,44px) clamp(16px,4vw,32px) clamp(48px,8vw,88px);">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:clamp(16px,4vw,32px); align-items:center; background:var(--petrol); border-radius:6px; padding:clamp(24px,4.5vw,40px); color:#FFFFFF;">
+      <div>
+        <h2 style="font-family:'Archivo',sans-serif; font-weight:700; font-size:clamp(24px,4vw,34px); letter-spacing:-.02em; margin:0 0 10px; text-wrap:balance;">100 € por mês. O primeiro é grátis.</h2>
+        <p style="margin:0; font-size:15.5px; color:rgba(255,255,255,.78); max-width:44ch;">Sem cartão para experimentar, sem fidelização, cancelas quando quiseres. Se num mês não encontrares um carro que compense, não pagas o seguinte.</p>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <a href="#registo" style="display:inline-flex; align-items:center; justify-content:center; height:52px; border-radius:6px; background:var(--amber); color:#1A1305; font-family:'Archivo',sans-serif; font-weight:700; font-size:16.5px;" style-hover="color:#1A1305; filter:brightness(1.06)">Começar — 1.º mês grátis</a>
+        <span style="font-size:13px; color:rgba(255,255,255,.66); text-align:center;">Um preço só. Utilizadores ilimitados no stand.</span>
+      </div>
+    </div>
+  </section>
+
+  <footer style="border-top:1px solid var(--line);">
+    <div style="max-width:1120px; margin:0 auto; padding:22px clamp(16px,4vw,32px); display:flex; flex-wrap:wrap; gap:12px 24px; align-items:center; justify-content:space-between;">
+      <span style="font-family:'Archivo',sans-serif; font-weight:700; font-size:15px;">AutoImport</span>
+      <span style="font-size:12.5px; color:var(--steel); max-width:60ch;">Todos os valores são estimativas com base em anúncios públicos e na tabela do ISV de 2026. Não substituem a avaliação da Alfândega.</span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;tema&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+class Component extends DCLogic {
+  state = { tema: null, isv: true };
+  get tema() { return this.state.tema ?? this.props.tema ?? 'light'; }
+  renderVals() {
+    const d = this.tema === 'dark';
+    const good = d ? '#4FBE87' : '#1E7A4B', mid = d ? '#D9A23F' : '#9A6B12';
+    return {
+      tema: this.tema,
+      trocarTema: () => this.setState({ tema: this.tema === 'dark' ? 'light' : 'dark' }),
+      isvAberto: this.state.isv,
+      setaIsv: this.state.isv ? 180 : 0,
+      isvBg: d ? 'rgba(232,147,12,.12)' : '#FDF3E3',
+      toggleIsv: () => this.setState(s => ({ isv: !s.isv })),
+      metricas: [
+        { valor: '27 000', rot: 'anúncios lidos hoje' },
+        { valor: '174', rot: 'compensam agora' },
+        { valor: '2 850 €', rot: 'poupança mediana' },
+        { valor: '5', rot: 'países de origem' },
+      ],
+      linhas: [
+        { nome: 'Preço na origem (Alemanha)', valor: '21 400 €' },
+        { nome: 'Transporte até PT', valor: '950 €' },
+      ],
+      isvLinhas: [
+        { nome: 'Componente cilindrada (1 995 cm³)', valor: '4 986 €', cor: 'var(--ink)' },
+        { nome: 'Componente ambiental (128 g/km CO₂)', valor: '8 043 €', cor: 'var(--ink)' },
+        { nome: 'Redução por anos de uso (4 anos)', valor: '−6 819 €', cor: good },
+        { nome: 'IUC anual + legalização', valor: '599 €', cor: 'var(--ink)' },
+      ],
+      barras: [
+        { nome: 'Custo final importado', valor: '29 159 €', cor: 'var(--ink)', larg: '84%', fundo: 'var(--petrol)' },
+        { nome: 'Mercado português', valor: '34 900 €', cor: 'var(--soft)', larg: '100%', fundo: d ? '#374B53' : '#C4CDCF' },
+      ],
+      carros: [
+        { flag: '🇩🇪', titulo: 'BMW 320d Touring', sub: '2021 · 78 400 km · Munique', final: '29 159 €', poup: '+5 741 €', veredito: 'Compensa', foto: 'bmw-320d-01.jpg', vCor: good, vBg: 'var(--goodsoft)' },
+        { flag: '🇫🇷', titulo: 'Peugeot 3008 GT', sub: '2022 · 54 100 km · Lyon', final: '27 480 €', poup: '+3 120 €', veredito: 'Compensa', foto: 'peugeot-3008-01.jpg', vCor: good, vBg: 'var(--goodsoft)' },
+        { flag: '🇳🇱', titulo: 'Audi A4 Avant 35 TDI', sub: '2021 · 66 700 km · Utreque', final: '31 250 €', poup: '+4 380 €', veredito: 'Compensa', foto: 'audi-a4-01.jpg', vCor: good, vBg: 'var(--goodsoft)' },
+        { flag: '🇧🇪', titulo: 'Volvo XC40 D3', sub: '2020 · 91 000 km · Antuérpia', final: '26 940 €', poup: '+1 460 €', veredito: 'Marginal', foto: 'volvo-xc40-01.jpg', vCor: mid, vBg: d ? 'rgba(232,147,12,.14)' : '#FDF3E3' },
+      ],
+      passos: [
+        { n: '01', titulo: 'Dizes o que procuras', texto: 'Marca, modelo, orçamento, quilómetros. Ou deixas em aberto e vês tudo o que compensa hoje.' },
+        { n: '02', titulo: 'Nós fazemos a conta', texto: 'Todas as manhãs recalculamos ISV, transporte e legalização de cada anúncio e comparamos com o preço praticado em Portugal.' },
+        { n: '03', titulo: 'Contactas o vendedor', texto: 'Falas com o stand estrangeiro a partir da plataforma, com o email protegido, e guardas a papelada da compra num sítio só.' },
+      ],
+      limites: [
+        { titulo: 'São estimativas, não orçamentos', texto: 'Usamos a tabela do ISV de 2026 e valores médios de transporte. O valor real pode variar algumas centenas de euros.' },
+        { titulo: 'Não substituímos a Alfândega', texto: 'Quem fixa o ISV é a AT, na inspeção do veículo. A nossa conta serve para decidires se vale a pena avançar.' },
+        { titulo: 'Um anúncio pode já estar vendido', texto: 'Lemos os anúncios de manhã. Marcamos a hora da última verificação em cada carro para saberes o que estás a ver.' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

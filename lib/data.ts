@@ -76,6 +76,44 @@ export async function getListingsByIds(ids: string[]): Promise<Listing[]> {
   return q.getListingsByIdsQuery(ids, await activeStandId());
 }
 
+// ── Landing (público, sem sessão) ───────────────────────────────
+export interface LandingData {
+  totalListings: number;
+  activeOpportunities: number;
+  medianSavings: number;
+  bestSavings: number;
+  /** ISO — última leitura do pipeline; null se ainda não correu. */
+  lastSeenAt: string | null;
+  /** Os carros da grelha de oportunidades. */
+  featured: Listing[];
+  /**
+   * O carro que ilustra a conta do ISV. **Tem de ter ISV > 0**: a secção
+   * chama-se "a conta que ninguém quer fazer" e a melhor oportunidade do dia é
+   * muitas vezes um elétrico, cujo ISV é zero — mostrar essa conta ensina nada
+   * e desmonta o argumento. null se não houver nenhum com ISV.
+   */
+  isvExample: Listing | null;
+}
+
+/**
+ * Os números e carros que a landing mostra. **Sem sessão** — é página pública,
+ * por isso não passa pelo activeStandId (nenhum destes dados é por stand).
+ * A página cacheia o resultado (ver `revalidate` em app/(marketing)/page.tsx):
+ * mantém-na rápida sem servir números velhos.
+ */
+export async function getLandingData(): Promise<LandingData> {
+  const [stats, top] = await Promise.all([
+    q.landingStatsQuery(),
+    // Mais do que os 4 da grelha, para haver por onde escolher o exemplo do ISV.
+    q.topOpportunitiesQuery(12, null),
+  ]);
+  return {
+    ...stats,
+    featured: top.slice(0, 4),
+    isvExample: top.find((l) => l.cost.isv > 0) ?? null,
+  };
+}
+
 // ── Painel ──────────────────────────────────────────────────────
 export async function getDashboardStats(): Promise<DashboardStats> {
   return q.dashboardCountsQuery();

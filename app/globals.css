@@ -24,6 +24,10 @@
   --steel: #3e6b79;
   --amber: #e8930c;
   --amber-ink: #9a6200;
+  /* Fundo suave do âmbar — par de `good-soft`/`bad-soft`, para o destaque do
+     ISV e o chip "marginal" na landing. Melhor que `bg-amber/10`: a opacidade
+     mistura-se com o fundo e muda de tom entre claro e escuro. */
+  --amber-soft: #fdf1de;
 
   --good: #1e9e57;
   --good-soft: #e4f3ea;
@@ -49,6 +53,7 @@
   --steel: #6c9ba8;
   --amber: #f0a929;
   --amber-ink: #f0a929;
+  --amber-soft: #33240c;
 
   --good: #37b36c;
   --good-soft: #123026;
@@ -73,6 +78,7 @@
   --color-steel: var(--steel);
   --color-amber: var(--amber);
   --color-amber-ink: var(--amber-ink);
+  --color-amber-soft: var(--amber-soft);
 
   --color-good: var(--good);
   --color-good-soft: var(--good-soft);
