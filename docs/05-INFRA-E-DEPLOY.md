@@ -67,6 +67,28 @@ O corpus deixou de caber na Supabase (500 MB, ~150 000 anúncios — ver
 - **Credenciais de produção fora do carregamento automático:** vivem no
   `.env.production.local`; o `.env.local` aponta para o warehouse.
 
+Nota útil: `process.loadEnvFile()` **não** sobrepõe variáveis já definidas no shell, portanto
+`WAREHOUSE_URL=… pnpm <comando>` aponta para o warehouse sem tocar em ficheiros nenhuns.
+
+### Montar um warehouse do zero
+
+```sh
+createdb -h 127.0.0.1 autoimport_warehouse
+WAREHOUSE_URL='postgresql://<user>@127.0.0.1:5432/autoimport_warehouse' pnpm db:migrate
+WAREHOUSE_URL='…' pnpm db:seed                     # sources + isv_tables
+WAREHOUSE_URL='…' pnpm exec tsx scripts/pipeline/ingest.ts --dir <arquivo NDJSON>
+```
+
+**O catálogo ultimatespecs** (`us_models`/`us_versions`) é o único que não se reconstrói a
+partir do arquivo NDJSON — o NDJSON da recolha original não foi guardado. Ou se re-crawla
+(`run-ultimatespecs.ts --fast`), ou se copia da base da app (leitura; foi o que se fez em
+27/07/2026: 6 328 modelos + 56 084 versões = **29 MB sem a coluna `specs`**, contra 116 MB
+com ela). A `specs` não tem um único leitor no repo — só se recupera com re-crawl, e nada
+depende dela.
+
+O arquivo NDJSON vive em `/Volumes/SSD 500GB/autoimport-collector-out` (o disco interno não
+tem espaço: cada passagem `--full` são ~564 MB). Aponta-se com `COLLECTOR_OUT_DIR`.
+
 ## Variáveis & segredos
 - 🔒 Nunca em commit. Geridos no painel do host + `.env.example` no repo.
 - ✏️ **Onde estão os segredos de produção:**
