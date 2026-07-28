@@ -233,9 +233,22 @@ html {
    propósito: uma barra escura lê-se bem sobre o conteúdo claro que vem a
    seguir, enquanto uma barra transparente precisaria de JavaScript para saber
    quando solidificar — e ficaria ilegível se esse JavaScript falhasse. */
+/* Sem barra: o hero já desliza para debaixo do cabeçalho (`-mt-14` na secção),
+   portanto o vídeo passa por trás disto. O que se vê é o fundo, não uma faixa.
+   O gradiente não é decoração — é o que segura a legibilidade: o vídeo tem
+   zonas claras (o céu ao entardecer) e texto branco sobre elas desaparecia.
+   Escurece 80% no topo, onde está o texto, e desvanece antes do fim.
+   `backdrop-filter: none` anula o `backdrop-blur` da classe: desfocar aqui
+   devolve a leitura de "barra fosca", que é o que se quer evitar. */
 body:has([data-hero="escuro"]) [data-site-header] {
-  background: color-mix(in srgb, #08090b 82%, transparent);
-  border-color: rgb(255 255 255 / 0.1);
+  background: linear-gradient(
+    to bottom,
+    rgb(8 9 11 / 0.82) 0%,
+    rgb(8 9 11 / 0.5) 60%,
+    rgb(8 9 11 / 0) 100%
+  );
+  border-color: transparent;
+  backdrop-filter: none;
 }
 body:has([data-hero="escuro"]) [data-site-header] a,
 body:has([data-hero="escuro"]) [data-site-header] button {
