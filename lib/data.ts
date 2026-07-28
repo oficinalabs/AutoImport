@@ -109,7 +109,9 @@ export async function getLandingData(): Promise<LandingData> {
   ]);
   return {
     ...stats,
-    featured: top.slice(0, 4),
+    // 8, não 4: a fila sangra para fora do ecrã e é cortada à direita — é assim
+    // que se diz "há mais 174" sem ter de escrever uma legenda a dizê-lo.
+    featured: top.slice(0, 8),
     isvExample: top.find((l) => l.cost.isv > 0) ?? null,
   };
 }
