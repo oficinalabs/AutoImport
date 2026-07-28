@@ -570,3 +570,35 @@ export async function updateStandMutation(
     })
     .where(eq(organization.id, standId));
 }
+
+// ── Landing (números públicos) ──────────────────────────────────
+/**
+ * Os números que a landing mostra. Públicos e agregados — nada por stand.
+ * O `lastSeenAt` é o carimbo da última leitura do pipeline: sem ele, "174
+ * carros compensam hoje" é só mais uma promessa.
+ */
+export async function landingStatsQuery(): Promise<{
+  totalListings: number;
+  activeOpportunities: number;
+  medianSavings: number;
+  bestSavings: number;
+  /** ⚠️ String, não Date: vem de um `sql` cru, portanto o driver devolve o
+   *  timestamp como texto — o Drizzle só converte para Date o que passa pelo
+   *  mapeamento de uma coluna. Anotar `Date` aqui compila e rebenta em runtime. */
+  lastSeenAt: string | null;
+}> {
+  const [row] = await db
+    .select({
+      totalListings: sql<number>`(select count(*)::int from ${listings} where deleted_at is null)`,
+      activeOpportunities: sql<number>`count(*)::int`,
+      medianSavings: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${opportunities.savings}), 0)::int`,
+      bestSavings: sql<number>`coalesce(max(${opportunities.savings}), 0)::int`,
+      lastSeenAt: sql<
+        string | null
+      >`(select max(last_seen_at)::text from ${listings} where deleted_at is null)`,
+    })
+    .from(opportunities)
+    .innerJoin(listings, eq(listings.id, opportunities.listingId))
+    .where(and(isNull(opportunities.deletedAt), isNull(listings.deletedAt)));
+  return row;
+}

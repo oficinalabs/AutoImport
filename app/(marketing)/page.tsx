@@ -1,282 +1,312 @@
-import { CarImage } from "@/components/car-image";
-import { CountryFlag } from "@/components/country-flag";
-import { KmTrustBadge } from "@/components/km-trust-badge";
-import { SavingsBadge } from "@/components/savings-badge";
-import { Button } from "@/components/ui/button";
-import { VerdictBadge } from "@/components/verdict-badge";
-import { COUNTRY_LIST } from "@/lib/countries";
+import { LandingCostBreakdown } from "@/components/landing/cost-breakdown";
+import { OpportunityCard } from "@/components/landing/opportunity-card";
 import {
-  ArrowRight,
-  Bell,
-  Calculator,
-  GitCompareArrows,
-  Lock,
-  ShieldCheck,
-  Workflow,
-} from "lucide-react";
-import type { Metadata } from "next";
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { getLandingData } from "@/lib/data";
+import { formatEuro, formatNumber } from "@/lib/format";
+import { CONDICOES } from "@/lib/legal";
 import Link from "next/link";
 
-export const metadata: Metadata = {
-  title: "AutoImport — importa com contas",
-  description:
-    "Para stands automóveis: descobre que carros compensa importar da Europa, com o custo final em Portugal já com ISV, IUC, transporte e legalização.",
-  openGraph: {
-    title: "AutoImport — importa com contas",
-    description:
-      "Que carros compensa importar da Europa, com o custo final real já com impostos — para o teu stand.",
-    locale: "pt_PT",
-    type: "website",
-  },
-};
+/**
+ * Landing pública. Os números são REAIS (vêm da base) — é o argumento todo: em
+ * vez de prometer, mostra o que está a compensar agora.
+ *
+ * Cacheada 1 hora: é a primeira coisa que um stand vê, tem de abrir depressa, e
+ * o pipeline só corre uma vez por dia — uma hora de desfasamento é invisível.
+ *
+ * ── A PÁGINA É ESCURA SEMPRE ────────────────────────────────────────
+ * Não segue o tema claro/escuro do utilizador: é uma peça de marca, como uma
+ * capa. Por isso as cores aqui são LITERAIS (`text-white/55`, `bg-white/[0.04]`)
+ * e não tokens (`text-ink-soft`, `bg-surface`) — um token daria texto escuro
+ * sobre fundo escuro a quem tem o tema claro. É a exceção; o resto da app usa
+ * tokens e deve continuar a usar.
+ *
+ * ── COMPOSIÇÃO (não mexer sem perceber isto) ────────────────────────
+ * Uma página toda escura corre o risco de ficar plana — foi exatamente o defeito
+ * da 1.ª versão desta landing (5 de 6 secções com o mesmo padding, um só fundo,
+ * um só tamanho de h2). Aqui a variação é deliberada e mede-se:
+ *
+ *   ordem     hero · mercado · a conta do ISV · como funciona · preço
+ *   respiro   100svh · 80 · 96 · 56 · 80 px      (nunca dois iguais seguidos)
+ *   fundo     #08090b · #0d0f13 · #08090b · #0b0d11 · ÂMBAR
+ *   h1/h2     ~138 · 40 · 44 · — · 40 px
+ *   largura   1120 em tudo
+ *
+ * ⚠️ O mercado é a 2.ª secção e por isso TEM de ser banda (#0d0f13): a seguir
+ * ao hero, com o mesmo chão, as duas corriam juntas e a página voltava a ficar
+ * plana. Trocar a ordem destas secções obriga a reatribuir os fundos.
+ *
+ * A banda do preço é âmbar de propósito: num ecrã escuro do princípio ao fim,
+ * o único momento claro tem de ser onde se pede a decisão. É a inversão que
+ * faz o fim da página soar diferente do resto sem mudar de linguagem.
+ */
+export const revalidate = 3600;
 
 const STEPS = [
   {
-    title: "A engine vigia a Europa",
-    body: "Todos os dias analisamos anúncios nos principais mercados — Alemanha, França, Bélgica, Holanda e Espanha.",
+    n: "Dizes o que procuras",
+    body: "Marca, modelo, orçamento, quilómetros. Ou deixas em aberto e vês tudo o que compensa hoje.",
   },
   {
-    title: "Fazemos as contas todas",
-    body: "Preço na origem + transporte + ISV + IUC + legalização = custo final em Portugal, comparado com o mercado nacional.",
+    n: "Nós fazemos a conta",
+    body: "Todos os dias recalculamos ISV, IUC, transporte e legalização de cada anúncio, e comparamos com o preço praticado em Portugal.",
   },
   {
-    title: "Só vês o que compensa",
-    body: "Recebes alertas das oportunidades, negocias pela plataforma e acompanhas a compra até à matrícula.",
+    n: "Contactas o vendedor",
+    body: "Falas com o stand estrangeiro a partir da plataforma e acompanhas a compra até à matrícula portuguesa.",
   },
 ];
 
-const FEATURES = [
-  {
-    icon: Calculator,
-    title: "Custo final real",
-    body: "ISV e IUC calculados por viatura — sem surpresas na legalização.",
-  },
-  {
-    icon: GitCompareArrows,
-    title: "Comparação PT vs. Europa",
-    body: "O mesmo carro nos dois mercados, lado a lado, com a poupança à vista.",
-  },
-  {
-    icon: Bell,
-    title: "Alertas de oportunidade",
-    body: "Define os critérios e recebe só os negócios que batem certo.",
-  },
-  {
-    icon: Lock,
-    title: "Negociação privada",
-    body: "Fala com fornecedores por email mascarado, sem expor contactos.",
-  },
-  {
-    icon: Workflow,
-    title: "Pipeline até à matrícula",
-    body: "Da proposta ao registo português, com checklist de documentos.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Km com confiança",
-    body: "Sinalizamos o histórico e a verificação de quilometragem.",
-  },
-];
+export default async function LandingPage() {
+  const {
+    totalListings,
+    activeOpportunities,
+    medianSavings,
+    bestSavings,
+    lastSeenAt,
+    featured,
+    isvExample,
+  } = await getLandingData();
 
-const FAQ = [
-  {
-    q: "Compensa mesmo importar?",
-    a: "Depende do carro: cilindrada, CO₂ e idade mandam no ISV. É exatamente isso que a plataforma calcula por ti, anúncio a anúncio — e só te mostra o que compensa.",
-  },
-  {
-    q: "De onde vêm os anúncios?",
-    a: "Dos principais mercados europeus (Alemanha, França, Bélgica, Holanda e Espanha). Estamos a ligar as fontes por fases — durante o acesso antecipado verás dados de demonstração.",
-  },
-  {
-    q: "Tratam da importação por mim?",
-    a: "Não vendemos nem transportamos carros — damos-te a decisão. Ficas com o controlo do negócio e usas os teus parceiros de transporte e legalização.",
-  },
-  {
-    q: "Como funciona o trial?",
-    a: "1.º mês grátis, sem cartão de crédito. No fim decides se o AutoImport fica na equipa.",
-  },
-];
+  const atualizado = lastSeenAt
+    ? new Date(lastSeenAt).toLocaleDateString("pt-PT", { day: "numeric", month: "long" })
+    : null;
 
-export default function LandingPage() {
+  const STATS = [
+    { value: formatNumber(totalListings), label: "anúncios analisados" },
+    { value: formatNumber(activeOpportunities), label: "compensam agora" },
+    { value: formatEuro(medianSavings), label: "poupança mediana" },
+    { value: formatEuro(bestSavings), label: "a melhor de hoje" },
+  ];
+
   return (
-    <>
-      {/* Hero */}
-      <section className="mx-auto grid w-full max-w-[1120px] items-center gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:pt-20">
-        <div>
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-amber-ink">
-            Para stands automóveis
+    <div className="bg-[#08090b] text-white">
+      {/* ══ 1. HERO ══ vídeo, 100svh, o número a ocupar o ecrã ══════ */}
+      <section
+        data-hero="escuro"
+        className="relative -mt-14 flex min-h-[100svh] flex-col overflow-hidden px-4 pt-14 sm:px-6"
+      >
+        {/* `-mt-14`+`pt-14`: o hero desliza para debaixo do cabeçalho sticky
+            (h-14) e o conteúdo desce outra vez — o vídeo começa no topo do ecrã
+            em vez de abaixo de uma barra. */}
+        <video
+          className="absolute inset-0 size-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          poster="/video/hero-camiao-poster.jpg"
+          aria-hidden
+        >
+          <source src="/video/hero-camiao.mp4" type="video/mp4" />
+        </video>
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-[linear-gradient(102deg,rgba(8,9,11,.93)_0%,rgba(8,9,11,.78)_38%,rgba(8,9,11,.4)_70%,rgba(8,9,11,.74)_100%)]"
+        />
+
+        <div className="relative z-10 mx-auto flex w-full max-w-[1120px] flex-1 flex-col justify-center py-14 sm:py-20">
+          {atualizado && (
+            /* Sem `flex`: com `tracking` largo e duas linhas em mobile, o flex
+               abria um buraco no meio da frase. Ponto inline + `align-middle`
+               deixa o texto quebrar como texto normal. */
+            <p className="animar-entrada mb-7 text-[10px] uppercase leading-[2] tracking-[0.16em] text-white/60 sm:text-[11px] sm:leading-normal sm:tracking-[0.28em]">
+              <span
+                className="mr-2.5 inline-block size-1.5 rounded-full bg-emerald-400 align-middle ring-4 ring-emerald-400/20 motion-safe:animate-pulsar"
+                aria-hidden
+              />
+              Atualizado a {atualizado} ·{" "}
+              <span className="tnum">{formatNumber(totalListings)}</span> anúncios lidos
+            </p>
+          )}
+
+          <h1 className="font-display text-[clamp(2.9rem,11vw,8.6rem)] font-black uppercase leading-[0.86] tracking-[-0.05em]">
+            <span className="animar-entrada atraso-1 tnum block bg-[linear-gradient(94deg,#fbbf24,#fde9b8_46%,#e8930c)] bg-clip-text text-transparent">
+              {formatNumber(activeOpportunities)}
+            </span>
+            <span className="animar-entrada atraso-2 block">carros</span>
+            <span className="animar-entrada atraso-3 block">compensam.</span>
+          </h1>
+
+          <p className="animar-entrada atraso-4 mt-7 max-w-[34rem] text-pretty text-[15px] leading-relaxed text-white/65 sm:text-base">
+            Cinco mercados europeus. Custo final já com ISV, IUC, transporte e legalização —{" "}
+            <strong className="font-medium text-white">
+              comparado com o preço a que se vende em Portugal.
+            </strong>
           </p>
-          <h1 className="text-4xl font-bold leading-[1.08] sm:text-5xl">Importa com contas.</h1>
-          <p className="mt-4 max-w-[52ch] text-lg text-ink-soft">
-            O AutoImport mostra ao teu stand que carros compensa trazer da Europa — com o custo
-            final em Portugal <strong className="font-semibold text-ink">já com ISV</strong>, IUC,
-            transporte e legalização, comparado com o preço de mercado nacional.
-          </p>
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button asChild variant="accent" size="lg">
-              <Link href="/registar">
-                Começar — 1.º mês grátis <ArrowRight className="size-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="#como-funciona">Como funciona</Link>
-            </Button>
-          </div>
-          <p className="mt-3 text-xs text-ink-soft">
-            Sem cartão de crédito. Cancela quando quiseres.
-          </p>
-        </div>
 
-        {/* Cartão de negócio (exemplo real da app) */}
-        <div className="rounded-[12px] border border-line-strong bg-surface shadow-[0_12px_32px_-16px_rgba(14,59,74,.3)]">
-          <div className="flex items-start justify-between gap-3 border-b border-line p-4">
-            <div className="flex items-center gap-3">
-              <CarImage className="size-14 shrink-0" label="VW Golf" />
-              <div>
-                <div className="font-display font-semibold">VW Golf 1.5 TSI Style</div>
-                <div className="mt-0.5 text-xs text-ink-soft">
-                  2022 · 45 000 km · <CountryFlag code="DE" /> · AutoScout24
-                </div>
-              </div>
-            </div>
-            <VerdictBadge verdict="compensa" />
-          </div>
-          <div className="grid grid-cols-2 gap-4 p-4 text-sm">
-            <div className="flex flex-col gap-1.5">
-              <Row label="Preço na origem" value="22 500 €" />
-              <Row label="Transporte" value="700 €" />
-              <Row label="ISV + IUC" value="3 320 €" />
-              <Row label="Legalização" value="350 €" />
-              <div className="mt-1 flex items-center justify-between border-t border-line pt-2 font-semibold">
-                <span>Total em PT</span>
-                <span className="tnum font-mono">26 870 €</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-end justify-between">
-              <div className="text-right text-xs text-ink-soft">
-                Preço equivalente em Portugal
-                <div className="tnum font-mono text-base font-semibold text-ink">29 900 €</div>
-              </div>
-              <SavingsBadge savings={3030} savingsPct={10.1} verdict="compensa" size="lg" />
-            </div>
-          </div>
-          <div className="border-t border-line px-4 py-2.5">
-            <KmTrustBadge trust={{ level: "verificado", source: "carVertical" }} />
-          </div>
-        </div>
-      </section>
-
-      {/* Países */}
-      <section className="border-y border-line bg-surface">
-        <div className="mx-auto flex w-full max-w-[1120px] flex-wrap items-center justify-center gap-x-8 gap-y-2 px-4 py-5 text-sm text-ink-soft sm:px-6">
-          <span className="text-xs font-semibold uppercase tracking-wide">
-            A vigiar 5 mercados europeus
-          </span>
-          {COUNTRY_LIST.map((c) => (
-            <CountryFlag key={c.code} code={c.code} />
-          ))}
-        </div>
-      </section>
-
-      {/* Como funciona */}
-      <section id="como-funciona" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-6">
-        <h2 className="text-2xl font-bold">Como funciona</h2>
-        <div className="mt-8 grid gap-6 sm:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <div key={s.title} className="rounded-[10px] border border-line bg-surface p-5">
-              <span className="tnum font-mono text-sm font-semibold text-amber-ink">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <h3 className="mt-2 font-display text-lg font-semibold">{s.title}</h3>
-              <p className="mt-2 text-sm text-ink-soft">{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Funcionalidades */}
-      <section className="border-y border-line bg-surface">
-        <div className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-6">
-          <h2 className="text-2xl font-bold">Tudo o que o stand precisa para importar</h2>
-          <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ icon: Icon, title, body }) => (
-              <div key={title} className="flex gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-petrol text-white">
-                  <Icon className="size-4" />
-                </span>
-                <div>
-                  <h3 className="font-semibold">{title}</h3>
-                  <p className="mt-1 text-sm text-ink-soft">{body}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Preço */}
-      <section id="preco" className="mx-auto w-full max-w-[1120px] px-4 py-16 sm:px-6">
-        <div className="mx-auto max-w-md rounded-[12px] border border-line-strong bg-surface p-6 text-center">
-          <h2 className="text-xl font-bold">Um plano, sem letras pequenas</h2>
-          <div className="mt-4">
-            <span className="tnum font-display text-5xl font-bold">100 €</span>
-            <span className="text-ink-soft">/mês por stand</span>
-          </div>
-          <ul className="mx-auto mt-5 flex w-fit flex-col gap-2 text-left text-sm text-ink-soft">
-            <li>✓ Pesquisas e alertas ilimitados</li>
-            <li>✓ Toda a equipa do stand incluída</li>
-            <li>✓ Negociações e pipeline de compra</li>
-            <li>✓ Cancela quando quiseres</li>
-          </ul>
-          <Button asChild variant="accent" size="lg" className="mt-6 w-full">
-            <Link href="/registar">Começar — 1.º mês grátis</Link>
-          </Button>
-          <p className="mt-2 text-xs text-ink-soft">Sem cartão de crédito no trial.</p>
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="mx-auto w-full max-w-[720px] px-4 pb-16 sm:px-6">
-        <h2 className="text-2xl font-bold">Perguntas frequentes</h2>
-        <div className="mt-6 flex flex-col gap-2">
-          {FAQ.map((f) => (
-            <details
-              key={f.q}
-              className="group rounded-[8px] border border-line bg-surface px-4 py-3"
+          <div className="animar-entrada atraso-5 mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
+            <Link
+              href="/registar"
+              className="rounded-full bg-white px-7 py-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#08090b] transition-colors hover:bg-white/85"
             >
-              <summary className="flex items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
-                {f.q}
-                <span className="text-ink-soft transition-transform group-open:rotate-45">+</span>
-              </summary>
-              <p className="mt-2 text-sm text-ink-soft">{f.a}</p>
-            </details>
-          ))}
+              Começar — 1.º mês grátis ↗
+            </Link>
+            <span className="text-[11px] uppercase tracking-[0.14em] text-white/50">
+              Sem cartão · sem fidelização
+            </span>
+          </div>
         </div>
+
+        <dl className="animar-entrada atraso-6 relative z-10 mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-x-6 border-t border-white/15 pb-12 pt-6 sm:grid-cols-4 sm:pb-16">
+          {STATS.map((s) => (
+            <div key={s.label} className="py-2">
+              <dd className="tnum font-display text-[1.6rem] font-bold leading-none tracking-tight sm:text-[2rem]">
+                {s.value}
+              </dd>
+              <dt className="mt-2 text-[10px] uppercase tracking-[0.2em] text-white/45">
+                {s.label}
+              </dt>
+            </div>
+          ))}
+        </dl>
       </section>
 
-      {/* CTA final */}
-      <section className="bg-petrol">
-        <div className="mx-auto flex w-full max-w-[1120px] flex-wrap items-center justify-between gap-4 px-4 py-12 sm:px-6">
-          <div>
-            <h2 className="text-2xl font-bold text-white">Pronto para importar com contas?</h2>
-            <p className="mt-1 text-sm text-white/70">
-              Junta o teu stand no acesso antecipado — 1.º mês grátis.
+      {/* ══ 2. MERCADO ══ carrossel, em banda própria ══════════════ */}
+      {featured.length > 0 && (
+        <section id="mercado" className="border-y border-white/[0.07] bg-[#0d0f13] py-16 sm:py-20">
+          <div className="mx-auto max-w-[1120px] px-4 sm:px-6">
+            <div className="revelar flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+              <div>
+                <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+                  Mercado
+                </p>
+                <h2 className="font-display text-3xl font-black uppercase tracking-[-0.04em] sm:text-[2.5rem]">
+                  Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de
+                  hoje
+                </h2>
+              </div>
+              <Link
+                href="/registar"
+                className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
+              >
+                Ver todos ↗
+              </Link>
+            </div>
+
+            {/* A fila deixou de sangrar até ao bordo: com setas, o carrossel
+                precisa de margem para elas viverem, e uma seta cortada pelo
+                ecrã é pior do que não a ter. O `basis-[80%]` em mobile deixa
+                espreitar o cartão seguinte — é o que diz "isto arrasta". */}
+            {/* Sem `opts={{...}}`: um literal aqui é um objeto novo a cada
+                render e o embla faz reInit — o carrossel voltava ao princípio a
+                cada clique. O `align: "start"` já é o valor por omissão. */}
+            <Carousel className="revelar mt-7">
+              <CarouselContent className="-ml-4">
+                {featured.map((car) => (
+                  <CarouselItem key={car.id} className="basis-[80%] pl-4 sm:basis-1/2 lg:basis-1/3">
+                    <OpportunityCard car={car} />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
+
+            {/* A menção às imagens não é rodapé legal por precaução: os cartões
+                usam o render de catálogo do MODELO, não a foto daquele carro (ver
+                `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
+                argumento inteiro é rigor nos números, deixar passar uma foto de
+                estúdio como sendo o carro à venda custava mais do que ganhava. */}
+            <p className="mt-6 text-[11px] uppercase tracking-[0.1em] text-white/30">
+              Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
+              vendidos
             </p>
           </div>
-          <Button asChild variant="accent" size="lg">
-            <Link href="/registar">Criar conta do stand</Link>
-          </Button>
+        </section>
+      )}
+
+      {/* ══ 3. A CONTA DO ISV ══ o maior título, o maior respiro ════ */}
+      {isvExample && (
+        <section>
+          <div className="revelar mx-auto max-w-[1120px] px-4 py-16 sm:px-6 sm:py-24">
+            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+              A conta
+            </p>
+            <h2 className="max-w-[15ch] font-display text-3xl font-black uppercase leading-[0.94] tracking-[-0.04em] sm:text-[2.75rem]">
+              A conta que ninguém quer fazer
+            </h2>
+            <p className="mb-10 mt-5 max-w-[52ch] text-[15px] leading-relaxed text-white/55 sm:text-base">
+              Este é um carro que está à venda agora, com os números de hoje. Abre o ISV para veres
+              de onde vem o valor.
+            </p>
+            <LandingCostBreakdown car={isvExample} />
+          </div>
+        </section>
+      )}
+
+      {/* ══ 4. COMO FUNCIONA ══ banda calma, tipo pequeno ══════════
+             Os limites ("o que isto não faz") saíram por decisão do Rui — a
+             informação não se perdeu, vive na /ajuda, e o link para lá fecha a
+             secção. Três passos em três colunas: é uma grelha de partes
+             iguais, mas aqui é honesta — são três passos sequenciais do mesmo
+             peso, não três secções a fingir importância igual. ═════════ */}
+      <section id="como-funciona" className="border-y border-white/[0.07] bg-[#0b0d11]">
+        <div className="revelar mx-auto max-w-[1120px] px-4 py-14 sm:px-6">
+          {/* `h2` e não `p`: com os limites removidos esta secção deixou de ter
+              título grande, e ficava sem cabeçalho nenhum na árvore do
+              documento — um leitor de ecrã saltava de "Alguns dos 174" para
+              "100 € por mês" sem saber que passou por aqui. O aspeto é o
+              mesmo; a estrutura é que fica certa. */}
+          <h2 className="text-[10px] uppercase tracking-[0.24em] text-white/35">Como funciona</h2>
+          <ol className="mt-6 grid gap-x-12 gap-y-0 sm:grid-cols-3">
+            {STEPS.map((step) => (
+              <li key={step.n} className="border-t border-white/[0.09] py-4">
+                <h3 className="font-display text-[1.05rem] font-bold tracking-tight text-white">
+                  {step.n}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-white/45">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-8 border-t border-white/[0.09] pt-6">
+            <Link
+              href="/ajuda"
+              className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
+            >
+              As perguntas que os stands fazem mesmo ↗
+            </Link>
+          </p>
         </div>
       </section>
-    </>
-  );
-}
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-ink-soft">{label}</span>
-      <span className="tnum font-mono">{value}</span>
+      {/* ══ 5. PREÇO ══ a inversão: o único momento claro da página ══ */}
+      <section id="preco" className="bg-amber text-[#1a1204]">
+        <div className="revelar mx-auto grid max-w-[1120px] items-center gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.35fr_1fr]">
+          <div>
+            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-[#1a1204]/55">Preço</p>
+            <h2 className="font-display text-3xl font-black uppercase leading-[0.92] tracking-[-0.04em] sm:text-[2.5rem]">
+              <span className="tnum">{CONDICOES.precoMensalEuros} €</span> por mês.
+              <br />O primeiro é grátis.
+            </h2>
+            <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-[#1a1204]/70">
+              Sem cartão para experimentar, sem fidelização, cancelas quando quiseres. Um preço só,
+              toda a equipa do stand incluída.
+            </p>
+          </div>
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <Link
+              href="/registar"
+              className="rounded-full bg-[#08090b] px-8 py-4 text-[11px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#08090b]/85"
+            >
+              Começar — 1.º mês grátis ↗
+            </Link>
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[#1a1204]/60 lg:text-right">
+              Um carro dos de hoje paga{" "}
+              <span className="tnum">
+                {Math.floor(medianSavings / CONDICOES.precoMensalEuros)} meses
+              </span>{" "}
+              de subscrição
+            </span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

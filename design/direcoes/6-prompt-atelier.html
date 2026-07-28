@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>AutoImport — Prompt 3 — Atelier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Selector SEM JavaScript (radios escondidos + `:checked ~`). O visualizador
+   de ficheiros renderiza isto como imagem estática e não corre scripts — com
+   JS, os separadores não funcionavam lá. */
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#111;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.tnum{font-variant-numeric:tabular-nums}
+input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.bar{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:3px;
+     background:#0a0a0a;border-bottom:1px solid #262626;padding:9px 14px;flex-wrap:wrap}
+.bar b{font:600 10px Inter;letter-spacing:.15em;text-transform:uppercase;color:#6b6b6b;margin-right:8px}
+.bar .sep{width:1px;height:18px;background:#2e2e2e;margin:0 8px}
+.bar label{font:500 12px Inter;color:#a3a3a3;padding:7px 13px;border-radius:6px;
+     cursor:pointer;transition:.15s;user-select:none;white-space:nowrap}
+.bar label:hover{color:#fff;background:#1c1c1c}
+.views>section{display:none}
+#tA:checked~.views #A,#tB:checked~.views #B,#tC:checked~.views #C,
+#t1:checked~.views #P1,#t2:checked~.views #P2,#t3:checked~.views #P3{display:block}
+#tA:checked~.bar label[for=tA],#tB:checked~.bar label[for=tB],#tC:checked~.bar label[for=tC],
+#t1:checked~.bar label[for=t1],#t2:checked~.bar label[for=t2],#t3:checked~.bar label[for=t3]
+{color:#111;background:#fff}
+.tag{padding:24px 18px 0;max-width:1120px;margin:0 auto}
+.tag h4{font:600 10px Inter;letter-spacing:.16em;text-transform:uppercase;color:#fff;
+        background:#2b2b2b;display:inline-block;padding:5px 10px;border-radius:4px}
+.tag p{font:400 13px/1.6 Inter;color:#8a8a8a;margin-top:10px;max-width:74ch}
+.tag em{color:#d4a24a;font-style:normal}
+
+/* ══════════ A — TERMINAL ══════════ */
+.A{background:#0c0f10;color:#e8eaea;font-family:'IBM Plex Sans',sans-serif;padding-bottom:70px}
+.A .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.A .top{border-bottom:1px solid #1e2628;padding:14px 0;display:flex;gap:26px;align-items:center;flex-wrap:wrap;
+        font:500 11px 'IBM Plex Mono';letter-spacing:.1em;text-transform:uppercase;color:#5d6b6e}
+.A .top .b{color:#e8eaea;font-weight:600;letter-spacing:.02em;font-size:13px}
+.A .live{margin-left:auto;color:#3fbf7f}
+.A .live i{display:inline-block;width:6px;height:6px;background:#3fbf7f;margin-right:6px}
+.A h1{font:600 clamp(2.2rem,5.4vw,4.3rem)/1 'IBM Plex Mono';letter-spacing:-.045em;padding:50px 0 0;max-width:19ch}
+.A h1 em{font-style:normal;color:#f0a929}
+.A .sub{font:400 15px/1.65 'IBM Plex Sans';color:#8b9a9d;max-width:56ch;margin-top:18px}
+.A .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border-top:1px solid #1e2628;margin-top:40px}
+.A .grid div{border-right:1px solid #1e2628;padding:16px 18px 16px 0}
+.A .grid div:last-child{border-right:0}
+.A .grid .v{font:600 26px 'IBM Plex Mono';letter-spacing:-.03em}
+.A .grid .k{font:400 10px 'IBM Plex Mono';letter-spacing:.13em;text-transform:uppercase;color:#5d6b6e;margin-top:6px}
+.A .sect{border-top:1px solid #1e2628;margin-top:46px;padding-top:26px}
+.A .sect h2{font:500 11px 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:#5d6b6e}
+.A table{width:100%;border-collapse:collapse;margin-top:16px;font-family:'IBM Plex Mono'}
+.A td{padding:9px 0;border-bottom:1px solid #161d1f;font-size:13px}
+.A td:last-child{text-align:right}
+.A tr.hi td{background:#171308;color:#f0a929;font-weight:600;font-size:15px;padding:13px 10px}
+.A tr.tot td{border-bottom:0;border-top:2px solid #2b3639;font-size:19px;font-weight:600;padding-top:14px}
+.A .rowcars{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:1px;
+            background:#1e2628;margin-top:16px;border:1px solid #1e2628}
+.A .rowcars div{background:#0c0f10;padding:14px}
+.A .rowcars .n{font:500 13px 'IBM Plex Sans';margin-bottom:8px}
+.A .rowcars .m{font:400 11px 'IBM Plex Mono';color:#5d6b6e;letter-spacing:.05em}
+.A .rowcars .p{font:600 17px 'IBM Plex Mono';margin-top:12px;letter-spacing:-.02em}
+.A .rowcars .s{font:500 12px 'IBM Plex Mono';color:#3fbf7f;margin-top:3px}
+
+/* ══════════ B — CINEMÁTICO ══════════ */
+.B{background:#08090b;color:#fff;overflow:hidden}
+.B .hero{position:relative;min-height:84vh;display:flex;flex-direction:column;padding:0 clamp(20px,5vw,72px)}
+.B .glow{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.B .glow::before{content:'';position:absolute;width:900px;height:900px;left:50%;top:-46%;
+  transform:translateX(-50%);border-radius:50%;
+  background:radial-gradient(circle,rgba(232,147,12,.22),transparent 62%);filter:blur(60px)}
+.B .glow::after{content:'';position:absolute;width:700px;height:700px;right:-14%;bottom:-40%;border-radius:50%;
+  background:radial-gradient(circle,rgba(14,90,120,.4),transparent 65%);filter:blur(70px)}
+.B nav{position:relative;z-index:2;display:flex;align-items:center;gap:32px;padding:24px 0;flex-wrap:wrap;
+       font:400 12px Inter;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.B nav .b{font:800 19px Archivo;letter-spacing:-.02em;text-transform:none;color:#fff}
+.B nav .cta{margin-left:auto;border:1px solid rgba(255,255,255,.28);padding:10px 18px;border-radius:100px;color:#fff}
+.B .mid{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding:36px 0 54px}
+.B .pill{font:500 11px Inter;letter-spacing:.24em;text-transform:uppercase;color:rgba(255,255,255,.5);
+         display:flex;align-items:center;gap:9px;margin-bottom:24px}
+.B .pill i{width:6px;height:6px;border-radius:50%;background:#3fbf7f;box-shadow:0 0 0 4px rgba(63,191,127,.16)}
+.B h1{font-family:Archivo;font-weight:900;font-size:clamp(3rem,11vw,9rem);line-height:.86;
+      letter-spacing:-.05em;text-transform:uppercase}
+.B h1 span{display:block}
+.B h1 .num{background:linear-gradient(96deg,#f0a929,#ffd88a 45%,#e8930c);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.B .sub{font:300 clamp(15px,1.5vw,19px)/1.6 Inter;color:rgba(255,255,255,.62);max-width:46ch;margin-top:28px}
+.B .btns{display:flex;flex-wrap:wrap;gap:14px;margin-top:36px}
+.B .btns a{font:500 13px Inter;letter-spacing:.04em;padding:15px 28px;border-radius:100px;text-decoration:none}
+.B .btns .p{background:#fff;color:#08090b}
+.B .btns .s{border:1px solid rgba(255,255,255,.3);color:#fff}
+.B .stats{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:clamp(26px,5vw,68px);
+          border-top:1px solid rgba(255,255,255,.1);padding:24px 0 36px}
+.B .stats .v{font:700 clamp(23px,3vw,38px) Inter;letter-spacing:-.03em}
+.B .stats .k{font:400 10px Inter;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.42);margin-top:5px}
+.B .band{background:#0d0f13;border-top:1px solid rgba(255,255,255,.07);padding:66px clamp(20px,5vw,72px)}
+.B .band h2{font-family:Archivo;font-weight:800;font-size:clamp(1.9rem,4.4vw,3.3rem);letter-spacing:-.035em;line-height:1;max-width:16ch}
+.B .card{margin-top:32px;background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:clamp(22px,3vw,36px);display:grid;gap:32px}
+@media(min-width:900px){.B .card{grid-template-columns:1.1fr 1fr;gap:50px}}
+.B .ln{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.08);
+  font-size:14px;color:rgba(255,255,255,.66)}
+.B .ln b{color:#fff;font-weight:500}
+.B .isv{display:flex;justify-content:space-between;align-items:center;margin-top:16px;
+  background:rgba(240,169,41,.11);border:1px solid rgba(240,169,41,.24);border-radius:14px;padding:16px 18px}
+.B .isv .l{font:600 14px Inter;color:#f0a929}
+.B .isv .l small{display:block;font:400 11px Inter;color:rgba(255,255,255,.45);margin-top:3px}
+.B .isv .r{font:700 26px Inter;color:#f0a929;letter-spacing:-.03em}
+.B .tot{display:flex;justify-content:space-between;align-items:baseline;margin-top:20px;
+  border-top:1px solid rgba(255,255,255,.16);padding-top:18px}
+.B .tot b{font:700 29px Inter;letter-spacing:-.035em}
+.B .save{background:rgba(63,191,127,.11);border:1px solid rgba(63,191,127,.25);border-radius:16px;padding:22px;margin-top:auto}
+.B .save .k{font:600 10px Inter;letter-spacing:.2em;text-transform:uppercase;color:#3fbf7f}
+.B .save .v{font:700 clamp(30px,4vw,42px) Inter;color:#3fbf7f;letter-spacing:-.035em;line-height:1.1;margin-top:6px}
+.B .save p{font:400 13px/1.5 Inter;color:rgba(255,255,255,.55);margin-top:8px}
+.B .bar2{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:8px}
+.B .bar2 i{display:block;height:100%;border-radius:99px}
+.B .cars{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:16px;margin-top:32px}
+.B .cars div{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:18px}
+.B .cars .n{font:600 14px Inter}
+.B .cars .m{font:400 12px Inter;color:rgba(255,255,255,.44);margin-top:5px}
+.B .cars .p{font:700 20px Inter;letter-spacing:-.03em;margin-top:16px}
+.B .cars .s{font:600 13px Inter;color:#3fbf7f;margin-top:3px}
+
+/* ══════════ C — EDITORIAL ══════════ */
+.C{background:#f7f6f3;color:#14100c;padding-bottom:80px}
+.C .wrap{max-width:1160px;margin:0 auto;padding:0 clamp(20px,4vw,40px)}
+.C nav{display:flex;align-items:center;gap:28px;padding:26px 0;border-bottom:1px solid #ddd8ce;
+       font:400 13px Inter;color:#6b6257;flex-wrap:wrap}
+.C nav .b{font:400 24px 'Instrument Serif';color:#14100c;letter-spacing:-.01em}
+.C nav .cta{margin-left:auto;background:#14100c;color:#f7f6f3;padding:10px 20px;border-radius:100px;font-size:12px}
+.C .hero{display:grid;gap:42px;padding:clamp(38px,7vw,84px) 0;align-items:end}
+@media(min-width:960px){.C .hero{grid-template-columns:1.35fr .85fr;gap:68px}}
+.C .kicker{font:400 12px Inter;letter-spacing:.22em;text-transform:uppercase;color:#a08c6a;margin-bottom:20px}
+.C h1{font-family:'Instrument Serif';font-weight:400;font-size:clamp(2.6rem,6.8vw,5.4rem);line-height:1.02;letter-spacing:-.02em}
+.C h1 em{font-style:italic;color:#a0722a}
+.C .lead{font:300 clamp(16px,1.6vw,19px)/1.62 Inter;color:#4a4239;max-width:44ch;margin-top:24px}
+.C .side{border-left:1px solid #ddd8ce;padding-left:26px}
+.C .side .row{padding:14px 0;border-bottom:1px solid #e7e2d8}
+.C .side .row:last-child{border-bottom:0}
+.C .side .v{font:400 30px 'Instrument Serif';letter-spacing:-.01em}
+.C .side .k{font:400 11px Inter;letter-spacing:.14em;text-transform:uppercase;color:#8a7f70;margin-top:2px}
+.C .btns{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:32px}
+.C .btns a{text-decoration:none;font:500 13px Inter;padding:14px 26px;border-radius:100px}
+.C .btns .p{background:#14100c;color:#f7f6f3}
+.C .btns .s{color:#6b6257;border:1px solid #ccc5b8}
+.C .rule{border-top:1px solid #ddd8ce;padding-top:16px;margin-top:8px;
+         font:400 12px Inter;letter-spacing:.16em;text-transform:uppercase;color:#a08c6a}
+.C h2{font-family:'Instrument Serif';font-weight:400;font-size:clamp(2rem,4.4vw,3.3rem);
+      line-height:1.05;letter-spacing:-.015em;max-width:17ch}
+.C h2 em{font-style:italic}
+.C .feat{background:#fff;border:1px solid #e7e2d8;padding:clamp(24px,3.4vw,42px);margin-top:32px;display:grid;gap:36px}
+@media(min-width:900px){.C .feat{grid-template-columns:1.15fr .9fr;gap:54px}}
+.C .ln{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid #eee9df;font-size:15px;color:#4a4239}
+.C .ln b{font-weight:500;color:#14100c}
+.C .isv{display:flex;justify-content:space-between;align-items:center;margin-top:14px;background:#fbf3e5;padding:16px 18px}
+.C .isv .l{font:500 15px Inter;color:#8a5a12}
+.C .isv .l small{display:block;font:400 12px Inter;color:#a08c6a;margin-top:3px}
+.C .isv .r{font:400 30px 'Instrument Serif';color:#a0722a}
+.C .tot{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid #14100c;margin-top:18px;padding-top:16px}
+.C .tot b{font:400 33px 'Instrument Serif';letter-spacing:-.01em}
+.C .save{background:#eef3ec;padding:24px;margin-top:auto}
+.C .save .k{font:400 11px Inter;letter-spacing:.16em;text-transform:uppercase;color:#4e7a58}
+.C .save .v{font:400 clamp(33px,4.4vw,48px) 'Instrument Serif';color:#2f6b42;line-height:1.05;margin-top:4px}
+.C .save p{font:400 13px/1.55 Inter;color:#5d6b60;margin-top:8px}
+.C .bar2{height:6px;background:#e7e2d8;overflow:hidden;margin-top:8px}
+.C .bar2 i{display:block;height:100%}
+.C .cars{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:26px;margin-top:28px}
+.C .cars div{border-top:1px solid #ddd8ce;padding-top:16px}
+.C .cars .n{font:400 19px 'Instrument Serif'}
+.C .cars .m{font:400 12px Inter;color:#8a7f70;margin-top:5px}
+.C .cars .p{font:500 17px Inter;margin-top:14px;letter-spacing:-.02em}
+.C .cars .s{font:500 13px Inter;color:#2f6b42;margin-top:3px}
+
+/* ══════════ P1 — prompt 1 (VANGUARD) ══════════ */
+.P1{position:relative;min-height:94vh;display:flex;flex-direction:column;color:#fff;
+    padding:0 clamp(22px,5vw,64px);overflow:hidden;
+    background:linear-gradient(150deg,#101418,#1b232a 42%,#0a0d10)}
+.P1 .vid{position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 72% 18%,rgba(120,160,190,.3),transparent 58%),
+             radial-gradient(90% 80% at 18% 88%,rgba(232,147,12,.18),transparent 60%),
+             repeating-linear-gradient(102deg,rgba(255,255,255,.028) 0 2px,transparent 2px 7px)}
+.P1 .vid::after{content:'▶ aqui entrava o vídeo de fundo — /video/hero.mp4';
+  position:absolute;right:16px;bottom:14px;font:400 10px Inter;letter-spacing:.14em;
+  text-transform:uppercase;color:rgba(255,255,255,.3)}
+.P1 .scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.68),rgba(0,0,0,.46) 45%,rgba(0,0,0,.8))}
+.P1 nav{position:relative;z-index:2;display:flex;align-items:center;gap:30px;padding:22px 0;flex-wrap:wrap;
+        font:400 11px Inter;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.78)}
+.P1 nav .b{font-family:Archivo;font-size:26px;letter-spacing:-.02em;text-transform:none;color:#fff}
+.P1 nav .b i{font-style:normal;font-weight:400}
+.P1 nav .b s{text-decoration:none;font-weight:900}
+.P1 nav .cta{margin-left:auto;border:1px solid rgba(255,255,255,.3);padding:11px 20px;border-radius:100px;color:#fff}
+.P1 .mid{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;justify-content:center;padding:30px 0}
+.P1 .lbl{display:flex;align-items:center;gap:9px;margin-bottom:26px;
+  font:400 12px Inter;letter-spacing:.3em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.P1 .lbl i{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.2)}
+.P1 h1{font-family:Archivo;font-weight:900;text-transform:uppercase;line-height:.86;
+       letter-spacing:-.05em;font-size:clamp(3rem,11vw,9rem)}
+.P1 h1 span{display:block}
+.P1 h1 .g{background:linear-gradient(94deg,#fbbf24,#fde9b8 46%,#e8930c);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.P1 .sub{font:400 15px/1.62 Inter;color:rgba(255,255,255,.6);max-width:30rem;margin-top:26px}
+.P1 .sub b{color:#fff;font-weight:500}
+.P1 .row{display:flex;flex-wrap:wrap;align-items:center;gap:24px;margin-top:34px}
+.P1 .row .p{background:#fff;color:#111;border-radius:100px;padding:15px 28px;
+  font:600 12px Inter;letter-spacing:.14em;text-transform:uppercase;text-decoration:none}
+.P1 .row .badge{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.6);
+  font:400 11px Inter;letter-spacing:.1em;text-transform:uppercase;line-height:1.45}
+.P1 .row .badge svg{width:30px;height:30px;stroke:rgba(255,255,255,.45);fill:none;stroke-width:1.5}
+.P1 .st{position:relative;z-index:2;display:flex;flex-wrap:wrap;gap:clamp(24px,5vw,62px);padding:0 0 44px}
+.P1 .st .v{font:700 clamp(22px,3.1vw,40px) Inter;letter-spacing:-.03em}
+.P1 .st .k{font:400 9px Inter;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:5px}
+
+/* ══════════ P2 — prompt 2 (SkyElite) ══════════ */
+.P2{position:relative;min-height:94vh;background:#f3f5f5;overflow:hidden;display:flex;flex-direction:column}
+.P2 .vid{position:absolute;inset:0;
+  background:radial-gradient(70% 60% at 78% 26%,rgba(255,255,255,.9),transparent 62%),
+             linear-gradient(178deg,#dfe6e8,#cdd8dc 46%,#b9c8cd)}
+.P2 .vid::after{content:'▶ aqui entrava o vídeo de fundo — /video/hero.mp4';position:absolute;right:16px;bottom:14px;
+  font:400 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:rgba(14,59,74,.35)}
+.P2 .scrim{position:absolute;inset:0;background:rgba(255,255,255,.58)}
+.P2 nav{position:relative;z-index:2;max-width:80rem;margin:0 auto;width:100%;
+        display:flex;align-items:center;gap:30px;padding:24px clamp(20px,4vw,32px);flex-wrap:wrap;
+        font:400 14px Inter;color:#0E3B4A}
+.P2 nav .b{font:600 24px Inter;letter-spacing:-.02em}
+.P2 nav .sp{margin-left:auto}
+.P2 .mid{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;text-align:center;padding:0 24px 70px}
+.P2 .lbl{font:600 13px Inter;letter-spacing:.2em;text-transform:uppercase;color:#5B6B71;margin-bottom:16px}
+.P2 h1 .l1{font:400 clamp(3.2rem,9vw,7rem) Inter;color:#8a9a9f;line-height:1;letter-spacing:-.05em;display:block}
+.P2 h1 .l2{font:400 clamp(3.2rem,9vw,7rem) Inter;color:#0E3B4A;line-height:1;letter-spacing:-.05em;display:block;margin-top:-14px}
+.P2 .sub{font:400 clamp(17px,1.7vw,21px) Inter;color:#5B6B71;margin-top:22px;max-width:38rem}
+.P2 .btns{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap;justify-content:center}
+.P2 .btns a{text-decoration:none;font:500 14px Inter;padding:11px 22px;border-radius:100px}
+.P2 .btns .s{background:rgba(232,147,12,.16);color:#8a5a12}
+.P2 .btns .p{background:#0E3B4A;color:#fff}
+.P2 .proof{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin-top:38px;font:400 14px Inter;color:#5B6B71}
+
+/* ══════════ P3 — prompt 3 (Atelier) ══════════ */
+.P3{position:relative;min-height:94vh;display:flex;flex-direction:column;color:#fff;overflow:hidden;
+    background:linear-gradient(165deg,#1c2529,#2b3a3f 48%,#131a1d)}
+.P3 .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.P3 .scrim{position:absolute;inset:0;background:rgba(0,0,0,.45)}
+.P3 nav{position:relative;z-index:2;display:flex;align-items:center;gap:26px;flex-wrap:wrap;
+        padding:22px clamp(22px,5vw,64px);font:300 14px Inter;color:rgba(255,255,255,.8)}
+.P3 nav .b{font:600 18px Inter;letter-spacing:-.01em;color:#fff}
+.P3 nav .sp{margin-left:auto;display:flex;gap:14px;align-items:center}
+.P3 nav .cta{background:#fff;color:#111;border-radius:100px;padding:9px 20px;font-weight:500;font-size:13px}
+.P3 .mid{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;
+         justify-content:center;text-align:center;padding:0 24px 60px}
+.P3 h1{font-family:'Instrument Serif';font-weight:400;color:#fff;max-width:64rem;
+       font-size:clamp(2.6rem,7.4vw,6.4rem);line-height:1.05;letter-spacing:-.02em}
+.P3 h1 em{font-style:italic}
+.P3 .sub{font:300 clamp(15px,1.5vw,17px)/1.62 Inter;color:rgba(255,255,255,.7);max-width:34rem;margin-top:26px}
+.P3 .btns{display:flex;gap:14px;margin-top:32px;flex-wrap:wrap;justify-content:center}
+.P3 .btns a{text-decoration:none;font:500 14px Inter;padding:13px 28px;border-radius:100px;
+            display:inline-flex;align-items:center;gap:9px}
+.P3 .btns .p{background:#fff;color:#111}
+.P3 .btns .s{border:1px solid rgba(255,255,255,.4);color:#fff}
+.P3 .foot{position:relative;z-index:2;text-align:center;padding-bottom:44px;
+          font:400 11px Inter;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+
+/* Movimento reduzido: esconde o vídeo, fica o poster como fundo. */
+@media (prefers-reduced-motion: reduce){
+  .P3 .vid{display:none}
+  .P3{background-image:url(video/autoestrada-poster.jpg);background-size:cover;background-position:center}
+}
+</style>
+</head>
+<body>
+
+<div class="tag"><h4>Prompt 3 — do "Atelier"</h4>
+<p>Serifa Instrument sobre a <em>autoestrada à hora azul</em>. É o mais próximo da direção C — só que centrado em vez de assimétrico, e com o peso todo num ecrã em vez de distribuído pela página.</p></div>
+<div class="P3">
+  <video class="vid" autoplay muted loop playsinline preload="metadata" poster="video/autoestrada-poster.jpg"><source src="video/autoestrada.mp4" type="video/mp4"></video><div class="scrim"></div>
+  <nav><span class="b">AutoImport</span><span>Mercado</span><span>Como funciona</span><span>Preço</span><span>Ajuda</span>
+    <span class="sp"><span>Entrar</span><span class="cta">Começar grátis</span></span></nav>
+  <div class="mid">
+    <h1><span class="tnum">174</span> carros compensam<br>importar <em>hoje</em>.</h1>
+    <p class="sub">Cinco mercados europeus, o custo final já com ISV, IUC, transporte e legalização — comparado com o preço a que se vende em Portugal.</p>
+    <div class="btns"><a class="p" href="#">Começar grátis →</a><a class="s" href="#">Ver uma conta</a></div>
+  </div>
+  <div class="foot">29 281 anúncios lidos · atualizado hoje</div>
+</div>
+</body>
+</html>

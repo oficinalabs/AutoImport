@@ -18,6 +18,19 @@ export default async function StandPage() {
     getStandRole(),
     getSessionUser(),
   ]);
+
+  // Só acontece com sessão inválida (a rota é protegida) — estado honesto.
+  if (!stand || !utilizador) {
+    return (
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-bold">Stand / Perfil</h1>
+        <p className="text-sm text-ink-soft">
+          Não foi possível carregar os dados do teu stand. Entra outra vez.
+        </p>
+      </div>
+    );
+  }
+
   const sub = SUB_LABEL[stand.subscription.status];
   const isOwner = role === "owner";
 

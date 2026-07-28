@@ -4,7 +4,8 @@ import { DealStepper } from "@/components/deal-stepper";
 import { getDeals } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Check, Circle } from "lucide-react";
+import { Car, Check, Circle } from "lucide-react";
+import Link from "next/link";
 
 export default async function ComprasPage() {
   const deals = await getDeals();
@@ -17,6 +18,23 @@ export default async function ComprasPage() {
           Estado de cada importação, da negociação à matrícula portuguesa.
         </p>
       </div>
+
+      {deals.length === 0 && (
+        <div className="flex flex-col items-center gap-2 rounded-[10px] border border-dashed border-line-strong py-16 text-center">
+          <Car className="size-8 text-ink-soft" />
+          <p className="text-sm font-medium">Ainda não tens compras a decorrer</p>
+          <p className="max-w-sm text-sm text-ink-soft">
+            Quando começares a negociar um carro, o processo aparece aqui — da negociação à
+            matrícula portuguesa.
+          </p>
+          <Link
+            href="/pesquisar"
+            className="mt-1 text-sm font-medium text-petrol-ink hover:underline"
+          >
+            Ver oportunidades
+          </Link>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         {deals.map((d) => (

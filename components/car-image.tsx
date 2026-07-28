@@ -20,6 +20,16 @@ import { useState } from "react";
  * 3. Sem nenhuma das duas — ou com a foto partida e sem catálogo — o
  *    placeholder de sempre.
  *
+ * `prefer="catalog"` INVERTE 1 e 2. Serve para superfícies onde as fotos
+ * aparecem **lado a lado** e a coerência vale mais do que a exatidão: as fotos
+ * dos anúncios vêm de ~24 fontes e são um recorte de estúdio sobre branco ao
+ * lado de uma foto de stand com pendão e marca de água por cima. Em fila, isso
+ * lê-se como desleixo por muito bom que o cartão seja. As imagens de catálogo
+ * são todas renders limpos do mesmo sítio.
+ *
+ * ⚠️ NÃO usar `prefer="catalog"` na página de detalhe do anúncio: aí a pessoa
+ * está a avaliar AQUELE carro e precisa de ver AQUELE carro, não o modelo.
+ *
  * Ver docs/07-FRONTEND-HANDOFF.md.
  */
 export function CarImage({
@@ -28,43 +38,49 @@ export function CarImage({
   label,
   className,
   rounded = "rounded-[8px]",
+  prefer = "photo",
 }: {
   photo?: string;
   catalog?: string;
   label?: string;
   className?: string;
   rounded?: string;
+  prefer?: "photo" | "catalog";
 }) {
   const [broken, setBroken] = useState(false);
 
-  if (photo?.startsWith("https://") && !broken) {
-    return (
-      <div className={cn("relative overflow-hidden bg-surface", rounded, className)}>
-        <img
-          src={photo}
-          alt={label ? `Foto de ${label}` : ""}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          onError={() => setBroken(true)}
-          className="size-full object-cover"
-        />
-      </div>
-    );
-  }
+  const daFoto = () => (
+    <div className={cn("relative overflow-hidden bg-surface", rounded, className)}>
+      <img
+        src={photo}
+        alt={label ? `Foto de ${label}` : ""}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
+        className="size-full object-cover"
+      />
+    </div>
+  );
 
-  if (catalog) {
-    return (
-      <div className={cn("relative overflow-hidden bg-surface", rounded, className)}>
-        <Image
-          src={catalog}
-          alt={label ? `Foto de ${label}` : ""}
-          fill
-          sizes="(max-width: 768px) 100vw, 400px"
-          className="object-cover"
-        />
-      </div>
-    );
-  }
+  const daCatalogo = () => (
+    <div className={cn("relative overflow-hidden bg-surface", rounded, className)}>
+      <Image
+        src={catalog as string}
+        alt={label ? `Foto de ${label}` : ""}
+        fill
+        sizes="(max-width: 768px) 100vw, 400px"
+        className="object-cover"
+      />
+    </div>
+  );
+
+  const fotoUsavel = Boolean(photo?.startsWith("https://")) && !broken;
+
+  // A preferência só se aplica quando a alternativa existe — nunca degrada
+  // para o placeholder por causa dela.
+  if (prefer === "catalog" && catalog) return daCatalogo();
+  if (fotoUsavel) return daFoto();
+  if (catalog) return daCatalogo();
 
   return (
     <div

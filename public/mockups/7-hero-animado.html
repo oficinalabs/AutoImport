@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>AutoImport — hero animado (sem vídeo)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Hero animado SEM VÍDEO.
+
+   Não consigo gerar vídeo. Isto é a alternativa: as imagens de
+   catálogo que já temos na base (renders de estúdio, fundo limpo,
+   sem marcas de água), em fundido cruzado com Ken Burns lento.
+
+   A ideia que o salva de ser decoração: cada carro que passa é
+   uma oportunidade REAL, e a legenda em baixo mostra os números
+   dele. O fundo deixa de ser ambiente e passa a ser o produto —
+   e é uma coisa que nenhum vídeo de stock consegue fazer, porque
+   depende de dados que só nós temos.
+
+   ⚠️ As imagens estão em img/ e NÃO apontam para o ultimatespecs:
+   eles bloqueiam hotlinking direto do browser (testado — falha). Na
+   app real funciona porque o next/image vai buscá-las do lado do
+   servidor. Num hero destes em produção, tem de ser <Image>, nunca
+   background-image com URL externo.
+
+   Tudo em CSS. Zero JavaScript, zero bibliotecas, zero megabytes.
+   Um vídeo de fundo custaria 2-5 MB; isto são ~7 imagens que já
+   estão no CDN e já são servidas na landing.
+   ───────────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#08090b;font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.tnum{font-variant-numeric:tabular-nums}
+
+.hero{position:relative;min-height:100vh;display:flex;flex-direction:column;
+      padding:0 clamp(22px,5vw,68px);color:#fff;overflow:hidden;background:#08090b}
+
+/* ── o palco das imagens ───────────────────────────────────── */
+.stage{position:absolute;inset:0;overflow:hidden}
+.stage figure{position:absolute;inset:0;opacity:0;
+  background-size:cover;background-position:center 58%;
+  animation:ciclo 42s infinite;will-change:opacity,transform}
+/* 7 imagens × 6s cada. Cada uma entra, fica, sai — e faz um zoom
+   lento durante todo o tempo em que está visível (Ken Burns). */
+@keyframes ciclo{
+   0%    {opacity:0;transform:scale(1.02)}
+   1.5%  {opacity:1}
+  14.3%  {opacity:1}
+  17%    {opacity:0;transform:scale(1.12)}
+ 100%    {opacity:0;transform:scale(1.02)}
+}
+.stage figure:nth-child(1){animation-delay:0s}
+.stage figure:nth-child(2){animation-delay:6s}
+.stage figure:nth-child(3){animation-delay:12s}
+.stage figure:nth-child(4){animation-delay:18s}
+.stage figure:nth-child(5){animation-delay:24s}
+.stage figure:nth-child(6){animation-delay:30s}
+.stage figure:nth-child(7){animation-delay:36s}
+
+/* Véu: sem isto o texto não lê sobre fundos claros de estúdio. */
+.scrim{position:absolute;inset:0;
+  background:linear-gradient(105deg,rgba(8,9,11,.94) 0%,rgba(8,9,11,.8) 38%,rgba(8,9,11,.42) 68%,rgba(8,9,11,.72) 100%)}
+.scrim::after{content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 14% 8%,rgba(232,147,12,.14),transparent 46%)}
+
+nav{position:relative;z-index:3;display:flex;align-items:center;gap:30px;padding:24px 0;flex-wrap:wrap;
+    font:400 11px Inter;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+nav .b{font-family:Archivo;font-size:24px;letter-spacing:-.02em;text-transform:none;color:#fff}
+nav .b i{font-style:normal;font-weight:400}
+nav .b s{text-decoration:none;font-weight:900}
+nav .cta{margin-left:auto;border:1px solid rgba(255,255,255,.3);padding:10px 19px;border-radius:100px;color:#fff}
+
+.mid{position:relative;z-index:3;flex:1;display:flex;flex-direction:column;justify-content:center;padding:34px 0}
+.lbl{display:flex;align-items:center;gap:9px;margin-bottom:24px;
+  font:400 11px Inter;letter-spacing:.28em;text-transform:uppercase;color:rgba(255,255,255,.62)}
+.lbl i{width:6px;height:6px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.2);
+  animation:pulsa 2.4s ease-in-out infinite}
+@keyframes pulsa{0%,100%{box-shadow:0 0 0 4px rgba(52,211,153,.2)}50%{box-shadow:0 0 0 8px rgba(52,211,153,.05)}}
+
+h1{font-family:Archivo;font-weight:900;text-transform:uppercase;line-height:.86;
+   letter-spacing:-.05em;font-size:clamp(2.9rem,10.5vw,8.6rem)}
+h1 span{display:block}
+h1 .g{background:linear-gradient(94deg,#fbbf24,#fde9b8 46%,#e8930c);
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font:400 15px/1.62 Inter;color:rgba(255,255,255,.64);max-width:31rem;margin-top:26px}
+.sub b{color:#fff;font-weight:500}
+.btns{display:flex;flex-wrap:wrap;align-items:center;gap:18px;margin-top:32px}
+.btns .p{background:#fff;color:#111;border-radius:100px;padding:15px 28px;text-decoration:none;
+  font:600 12px Inter;letter-spacing:.13em;text-transform:uppercase}
+.btns .s{color:rgba(255,255,255,.62);font:400 12px Inter;letter-spacing:.1em;text-transform:uppercase}
+
+/* ── legenda sincronizada: o carro que está a passar ───────── */
+.legenda{position:relative;z-index:3;margin-bottom:26px;height:52px}
+.legenda div{position:absolute;inset:0;opacity:0;animation:ciclo 42s infinite;
+  display:flex;align-items:center;gap:14px}
+.legenda div:nth-child(1){animation-delay:0s}
+.legenda div:nth-child(2){animation-delay:6s}
+.legenda div:nth-child(3){animation-delay:12s}
+.legenda div:nth-child(4){animation-delay:18s}
+.legenda div:nth-child(5){animation-delay:24s}
+.legenda div:nth-child(6){animation-delay:30s}
+.legenda div:nth-child(7){animation-delay:36s}
+.legenda .f{font-size:19px;line-height:1}
+.legenda .n{font:500 14px Inter;color:#fff}
+.legenda .n small{display:block;font:400 11px Inter;color:rgba(255,255,255,.45);margin-top:3px;letter-spacing:.03em}
+.legenda .v{margin-left:auto;text-align:right}
+.legenda .v b{font:700 19px Inter;color:#34d399;letter-spacing:-.02em}
+.legenda .v small{display:block;font:400 9px Inter;letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(255,255,255,.4);margin-top:3px}
+
+.st{position:relative;z-index:3;display:flex;flex-wrap:wrap;gap:clamp(24px,5vw,58px);
+    border-top:1px solid rgba(255,255,255,.12);padding:22px 0 40px}
+.st .v{font:700 clamp(21px,2.9vw,36px) Inter;letter-spacing:-.03em}
+.st .k{font:400 9px Inter;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.48);margin-top:5px}
+
+/* Quem pediu menos movimento fica com a 1.ª imagem parada. */
+@media (prefers-reduced-motion: reduce){
+  .stage figure,.legenda div,.lbl i{animation:none}
+  .stage figure:nth-child(1),.legenda div:nth-child(1){opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="stage">
+    <figure style="background-image:url(img/c1.jpg)"></figure>
+    <figure style="background-image:url(img/c2.jpg)"></figure>
+    <figure style="background-image:url(img/c3.jpg)"></figure>
+    <figure style="background-image:url(img/c4.jpg)"></figure>
+    <figure style="background-image:url(img/c5.jpg)"></figure>
+    <figure style="background-image:url(img/c6.jpg)"></figure>
+    <figure style="background-image:url(img/c7.jpg)"></figure>
+  </div>
+  <div class="scrim"></div>
+
+  <nav>
+    <span class="b"><i>Auto</i><s>Import</s></span>
+    <span>Mercado</span><span>Como funciona</span><span>Preço</span>
+    <span class="cta">Começar grátis ↗</span>
+  </nav>
+
+  <div class="mid">
+    <div class="lbl"><i></i>Atualizado hoje · 29 281 anúncios lidos</div>
+    <h1><span class="g tnum">174</span><span>carros</span><span>compensam.</span></h1>
+    <p class="sub">Cinco mercados europeus. Custo final já com ISV, IUC, transporte e legalização — <b>comparado com o preço a que se vende em Portugal.</b></p>
+    <div class="btns">
+      <a class="p" href="#">Começar — 1.º mês grátis ↗</a>
+      <span class="s">Sem cartão · sem fidelização</span>
+    </div>
+  </div>
+
+  <!-- Sincronizada com as imagens: o fundo não é ambiente, é stock real. -->
+  <div class="legenda">
+    <div><span class="f">🇪🇸</span><span class="n">BMW iX xDrive45<small class="tnum">2025 · 22 000 km · custo final 62 705 €</small></span><span class="v"><b class="tnum">+11 745 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇩🇪</span><span class="n">Hyundai Tucson 1.6 T-GDI<small class="tnum">2026 · 5 km · custo final 33 935 €</small></span><span class="v"><b class="tnum">+9 305 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇳🇱</span><span class="n">BMW eDrive40<small class="tnum">2022 · 82 657 km · custo final 34 855 €</small></span><span class="v"><b class="tnum">+5 645 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇧🇪</span><span class="n">Peugeot 3008 1.2 Hybrid<small class="tnum">2024 · 31 000 km · custo final 24 467 €</small></span><span class="v"><b class="tnum">+5 433 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇫🇷</span><span class="n">Toyota Yaris Hybrid<small class="tnum">2023 · 41 200 km · custo final 18 940 €</small></span><span class="v"><b class="tnum">+4 210 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇩🇪</span><span class="n">Mercedes-Benz E 300 de<small class="tnum">2021 · 96 400 km · custo final 31 480 €</small></span><span class="v"><b class="tnum">+3 980 €</b><small>poupança</small></span></div>
+    <div><span class="f">🇪🇸</span><span class="n">BMW 216d Gran Coupé<small class="tnum">2022 · 68 300 km · custo final 22 150 €</small></span><span class="v"><b class="tnum">+3 640 €</b><small>poupança</small></span></div>
+  </div>
+
+  <div class="st">
+    <div><div class="v tnum">29 281</div><div class="k">anúncios analisados</div></div>
+    <div><div class="v tnum">174</div><div class="k">compensam agora</div></div>
+    <div><div class="v tnum">2 850 €</div><div class="k">poupança mediana</div></div>
+    <div><div class="v tnum">11 745 €</div><div class="k">a melhor de hoje</div></div>
+  </div>
+</section>
+
+</body>
+</html>

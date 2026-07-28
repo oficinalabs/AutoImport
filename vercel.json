@@ -3,5 +3,6 @@
   "github": {
     "silent": true
   },
-  "buildCommand": "pnpm db:migrate:deploy && next build"
+  "buildCommand": "pnpm db:migrate:deploy && next build",
+  "regions": ["fra1"]
 }

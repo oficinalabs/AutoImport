@@ -24,6 +24,10 @@
   --steel: #3e6b79;
   --amber: #e8930c;
   --amber-ink: #9a6200;
+  /* Fundo suave do âmbar — par de `good-soft`/`bad-soft`, para o destaque do
+     ISV e o chip "marginal" na landing. Melhor que `bg-amber/10`: a opacidade
+     mistura-se com o fundo e muda de tom entre claro e escuro. */
+  --amber-soft: #fdf1de;
 
   --good: #1e9e57;
   --good-soft: #e4f3ea;
@@ -49,6 +53,7 @@
   --steel: #6c9ba8;
   --amber: #f0a929;
   --amber-ink: #f0a929;
+  --amber-soft: #33240c;
 
   --good: #37b36c;
   --good-soft: #123026;
@@ -73,6 +78,7 @@
   --color-steel: var(--steel);
   --color-amber: var(--amber);
   --color-amber-ink: var(--amber-ink);
+  --color-amber-soft: var(--amber-soft);
 
   --color-good: var(--good);
   --color-good-soft: var(--good-soft);
@@ -133,6 +139,148 @@
   button:disabled {
     cursor: not-allowed;
   }
+}
+
+/* ───────────────────────────────────────────────
+   Movimento da landing — ver app/(marketing)/page.tsx
+
+   Duas regras que valem por todo o ficheiro:
+
+   1. O conteúdo é SEMPRE visível por omissão. As animações só ligam dentro
+      de `@supports` / `motion-safe`, portanto num browser sem suporte (o
+      Firefox ainda não tem scroll-driven animations) ou com "menos
+      movimento" ligado a página aparece inteira e estática. Nunca há um
+      caminho em que o texto fique invisível à espera de uma animação.
+
+   2. Só se anima `opacity` e `transform` — as duas propriedades que o
+      compositor trata sem refazer o layout. Animar `height` ou `top` numa
+      página com um vídeo de fundo dá tremura em portáteis.
+   ─────────────────────────────────────────────── */
+
+/* Âncoras do cabeçalho (#como-funciona, #preco) deslizam em vez de saltar. */
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+@keyframes entrada {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pulsar {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 20%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--good) 4%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Entrada escalonada do hero, ao carregar. */
+  .animar-entrada {
+    animation: entrada 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+  .atraso-1 {
+    animation-delay: 0.08s;
+  }
+  .atraso-2 {
+    animation-delay: 0.16s;
+  }
+  .atraso-3 {
+    animation-delay: 0.24s;
+  }
+  .atraso-4 {
+    animation-delay: 0.38s;
+  }
+  .atraso-5 {
+    animation-delay: 0.48s;
+  }
+  .atraso-6 {
+    animation-delay: 0.58s;
+  }
+  .animate-pulsar {
+    animation: pulsar 2.6s ease-in-out infinite;
+  }
+
+  /* Revelação ao scroll, sem uma linha de JavaScript. O `@supports` é o que
+     garante que isto é aditivo: onde `view()` não existe, nenhuma destas
+     regras se aplica e o bloco fica simplesmente visível. */
+  @supports (animation-timeline: view()) {
+    .revelar {
+      animation: entrada linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 26%;
+    }
+  }
+}
+
+/* Cabeçalho por cima do hero escuro da landing.
+   O SiteHeader é claro e é o layout que o rende — a página não lhe consegue
+   passar props. Daí o `:has()`: quando o documento contém o hero escuro, o
+   cabeçalho escurece. Fica escuro em toda a página (não só sobre o hero) de
+   propósito: uma barra escura lê-se bem sobre o conteúdo claro que vem a
+   seguir, enquanto uma barra transparente precisaria de JavaScript para saber
+   quando solidificar — e ficaria ilegível se esse JavaScript falhasse. */
+/* Sem barra: o hero já desliza para debaixo do cabeçalho (`-mt-14` na secção),
+   portanto o vídeo passa por trás disto. O que se vê é o fundo, não uma faixa.
+   O gradiente não é decoração — é o que segura a legibilidade: o vídeo tem
+   zonas claras (o céu ao entardecer) e texto branco sobre elas desaparecia.
+   Escurece 80% no topo, onde está o texto, e desvanece antes do fim.
+   `backdrop-filter: none` anula o `backdrop-blur` da classe: desfocar aqui
+   devolve a leitura de "barra fosca", que é o que se quer evitar. */
+body:has([data-hero="escuro"]) [data-site-header] {
+  background: linear-gradient(
+    to bottom,
+    rgb(8 9 11 / 0.82) 0%,
+    rgb(8 9 11 / 0.5) 60%,
+    rgb(8 9 11 / 0) 100%
+  );
+  border-color: transparent;
+  backdrop-filter: none;
+}
+body:has([data-hero="escuro"]) [data-site-header] a,
+body:has([data-hero="escuro"]) [data-site-header] button {
+  color: rgb(255 255 255 / 0.82);
+}
+body:has([data-hero="escuro"]) [data-site-header] a:hover,
+body:has([data-hero="escuro"]) [data-site-header] button:hover {
+  color: #fff;
+}
+/* Exceto o botão de acento, que já tem contraste próprio. */
+body:has([data-hero="escuro"]) [data-site-header] a[href="/registar"] {
+  color: var(--petrol);
+}
+
+/* Rodapé, pela mesma razão: a landing é escura de ponta a ponta e acabava num
+   degrau claro logo a seguir à banda âmbar do preço. */
+body:has([data-hero="escuro"]) {
+  background: #08090b;
+}
+body:has([data-hero="escuro"]) [data-site-footer] {
+  background: #08090b;
+  border-color: rgb(255 255 255 / 0.08);
+  color: rgb(255 255 255 / 0.55);
+}
+body:has([data-hero="escuro"]) [data-site-footer] a {
+  color: rgb(255 255 255 / 0.55);
+}
+body:has([data-hero="escuro"]) [data-site-footer] a:hover {
+  color: #fff;
+}
+body:has([data-hero="escuro"]) [data-site-footer] span {
+  color: rgb(255 255 255 / 0.9);
 }
 
 @media (prefers-reduced-motion: reduce) {
