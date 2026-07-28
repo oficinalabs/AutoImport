@@ -1,5 +1,12 @@
 import { LandingCostBreakdown } from "@/components/landing/cost-breakdown";
 import { OpportunityCard } from "@/components/landing/opportunity-card";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { getLandingData } from "@/lib/data";
 import { formatEuro, formatNumber } from "@/lib/format";
 import { CONDICOES } from "@/lib/legal";
@@ -27,7 +34,7 @@ import Link from "next/link";
  *   respiro   100svh · 96 · 64 · 56 · 80 px      (nunca dois iguais)
  *   fundo     #08090b · #0d0f13 · #08090b · #0b0d11 · ÂMBAR
  *   h1/h2     ~138 · 44 · 32 · 22 · 40 px
- *   largura   1120, exceto a fila de oportunidades, que sangra
+ *   largura   1120 em tudo
  *
  * A banda do preço é âmbar de propósito: num ecrã escuro do princípio ao fim,
  * o único momento claro tem de ser onde se pede a decisão. É a inversão que
@@ -64,11 +71,6 @@ const LIMITS = [
     body: "Lemos os anúncios uma vez por dia. Marcamos a data da última verificação para saberes o que estás a ver.",
   },
 ];
-
-/** Alinha o 1.º cartão da fila com a coluna de 1120 e deixa os outros correr até
- *  ao bordo do ecrã. É o único sítio onde a página sangra — de propósito: a
- *  fila cortada diz "há mais" melhor do que qualquer legenda. */
-const BLEED_PAD = "px-[max(1rem,calc((100vw-1120px)/2))]";
 
 export default async function LandingPage() {
   const {
@@ -195,45 +197,57 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* ══ 3. MERCADO ══ o único momento que sangra ════════════════ */}
+      {/* ══ 3. MERCADO ══ carrossel com setas ═══════════════════════ */}
       {featured.length > 0 && (
         <section id="mercado" className="py-14 sm:py-16">
-          <div className="revelar mx-auto flex max-w-[1120px] flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 sm:px-6">
-            <div>
-              <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
-                Mercado
-              </p>
-              <h2 className="font-display text-2xl font-black uppercase tracking-[-0.035em] sm:text-[2rem]">
-                Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de hoje
-              </h2>
+          <div className="mx-auto max-w-[1120px] px-4 sm:px-6">
+            <div className="revelar flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+              <div>
+                <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+                  Mercado
+                </p>
+                <h2 className="font-display text-2xl font-black uppercase tracking-[-0.035em] sm:text-[2rem]">
+                  Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de
+                  hoje
+                </h2>
+              </div>
+              <Link
+                href="/registar"
+                className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
+              >
+                Ver todos ↗
+              </Link>
             </div>
-            <Link
-              href="/registar"
-              className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
-            >
-              Ver todos ↗
-            </Link>
-          </div>
 
-          <div className="revelar mt-7 overflow-x-auto pb-3 [scrollbar-width:thin]">
-            <ul className={`flex w-max gap-3.5 ${BLEED_PAD}`}>
-              {featured.map((car) => (
-                <li key={car.id} className="w-[272px] shrink-0">
-                  <OpportunityCard car={car} />
-                </li>
-              ))}
-            </ul>
-          </div>
+            {/* A fila deixou de sangrar até ao bordo: com setas, o carrossel
+                precisa de margem para elas viverem, e uma seta cortada pelo
+                ecrã é pior do que não a ter. O `basis-[80%]` em mobile deixa
+                espreitar o cartão seguinte — é o que diz "isto arrasta". */}
+            {/* Sem `opts={{...}}`: um literal aqui é um objeto novo a cada
+                render e o embla faz reInit — o carrossel voltava ao princípio a
+                cada clique. O `align: "start"` já é o valor por omissão. */}
+            <Carousel className="revelar mt-7">
+              <CarouselContent className="-ml-4">
+                {featured.map((car) => (
+                  <CarouselItem key={car.id} className="basis-[80%] pl-4 sm:basis-1/2 lg:basis-1/4">
+                    <OpportunityCard car={car} />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
 
-          {/* A menção às imagens não é rodapé legal por precaução: os cartões
-              usam o render de catálogo do MODELO, não a foto daquele carro (ver
-              `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
-              argumento inteiro é rigor nos números, deixar passar uma foto de
-              estúdio como sendo o carro à venda custava mais do que ganhava. */}
-          <p className="mx-auto max-w-[1120px] px-4 text-[11px] uppercase tracking-[0.1em] text-white/30 sm:px-6">
-            Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
-            vendidos
-          </p>
+            {/* A menção às imagens não é rodapé legal por precaução: os cartões
+                usam o render de catálogo do MODELO, não a foto daquele carro (ver
+                `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
+                argumento inteiro é rigor nos números, deixar passar uma foto de
+                estúdio como sendo o carro à venda custava mais do que ganhava. */}
+            <p className="mt-6 text-[11px] uppercase tracking-[0.1em] text-white/30">
+              Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
+              vendidos
+            </p>
+          </div>
         </section>
       )}
 
