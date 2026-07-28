@@ -171,8 +171,14 @@ export default async function LandingPage() {
             </ul>
           </div>
 
+          {/* A menção às imagens não é rodapé legal por precaução: os cartões
+              usam o render de catálogo do MODELO, não a foto daquele carro (ver
+              `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
+              argumento inteiro é rigor nos números, deixar passar uma foto de
+              estúdio como sendo o carro à venda custava mais do que ganhava. */}
           <p className="mx-auto max-w-[1120px] px-4 text-sm text-steel sm:px-6">
-            Verificados na última leitura · podem já ter sido vendidos
+            Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
+            vendidos
           </p>
         </section>
       )}
