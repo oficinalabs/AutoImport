@@ -241,7 +241,16 @@ async function seedTarget(sql: Sql): Promise<Map<string, string>> {
     values ('pubmarke', 'p100', 'gasolina', 'pubfix|p100|gasolina', 130)
     returning id
   `;
-  for (const external of ["pub-fixture-2", "pub-fixture-3", "pub-fixture-4"]) {
+  // O `pub-fixture-alheio` NÃO existe na origem — é de uma fonte que o corpus
+  // local nunca recolheu. Caso real: em 27/07 o warehouse tinha 2 anúncios do
+  // autoscout24.de e a produção tinha 295 na montra, vistos nesse mesmo dia.
+  // Dá-los como mortos marcaria carros vivos como indisponíveis.
+  for (const external of [
+    "pub-fixture-2",
+    "pub-fixture-3",
+    "pub-fixture-4",
+    "pub-fixture-alheio",
+  ]) {
     await sql`
       insert into listings ${sql(
         listing(external, {
@@ -257,7 +266,12 @@ async function seedTarget(sql: Sql): Promise<Map<string, string>> {
     select id, external_id from listings where external_id like 'pub-fixture-%'
   `;
   const byExternal = new Map(ids.map((r) => [r.external_id as string, r.id as string]));
-  for (const external of ["pub-fixture-2", "pub-fixture-3", "pub-fixture-4"]) {
+  for (const external of [
+    "pub-fixture-2",
+    "pub-fixture-3",
+    "pub-fixture-4",
+    "pub-fixture-alheio",
+  ]) {
     const row = estimate(byExternal.get(external) as string, "normal");
     await sql`insert into import_cost_estimates ${sql(row)}`;
   }
@@ -317,9 +331,14 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     const dry = await publish({ sourceUrl: srcUrl(), targetUrl: tgtUrl(), quiet: true });
     assert.equal(dry.applied, false);
     assert.equal(dry.montra, 3, "montra = os 3 exato+normal vivos (1, 2 e 6)");
-    assert.equal(dry.montraNoDestino, 3, "o destino mostrava 2, 3 e 4");
-    assert.equal(dry.softDeleted, 1, "o 3 morreu");
+    assert.equal(dry.montraNoDestino, 4, "o destino mostrava 2, 3, 4 e o alheio");
+    assert.equal(dry.softDeleted, 1, "o 3 morreu — e SÓ ele: tem deleted_at na origem");
     assert.equal(dry.demoted, 1, "o 4 caiu da montra sem morrer");
+    assert.equal(
+      dry.unknownToSource,
+      1,
+      "o alheio não existe no corpus — ausência não é morte, não se lhe toca",
+    );
     assert.equal(dry.opportunitiesDeactivated, 1, "a oportunidade do 2 já não existe na origem");
     assert.equal(dry.written.listings, 3);
     assert.equal(await fingerprint(tgt), beforeFp, "dry-run não escreveu nada");
@@ -347,7 +366,8 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
       "escritas por tabela",
     );
 
-    // 1. A montra do destino passou a ser exatamente o conjunto publicado.
+    // 1. A montra do destino = o conjunto publicado ∪ o que o corpus desconhece.
+    // Não é "exatamente o publicado": o publicador só manda no que a origem cobre.
     const montra = await tgt`
       select l.external_id from listings l
       join import_cost_estimates e on e.listing_id = l.id
@@ -357,7 +377,7 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     `;
     assert.deepEqual(
       montra.map((r) => r.external_id),
-      ["pub-fixture-1", "pub-fixture-2", "pub-fixture-6"],
+      ["pub-fixture-1", "pub-fixture-2", "pub-fixture-6", "pub-fixture-alheio"],
     );
 
     // 2. O uuid do destino é o que manda — e o favorito do cliente sobreviveu.
@@ -392,6 +412,18 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     `;
     assert.equal(demoted.deleted_at, null, "o 4 continua à venda");
     assert.equal(demoted.pt_confidence, "alargada", "saiu da montra pela confiança, não por morte");
+
+    // 4b. O que o corpus desconhece fica EXATAMENTE como estava. Sem isto, uma
+    // fonte que o warehouse não recolheu levava a montra inteira dessa fonte a
+    // "indisponível" — 295 carros vivos, no caso real que motivou esta guarda.
+    const [alheio] = await tgt`
+      select l.deleted_at, l.match_confidence, e.pt_confidence from listings l
+      join import_cost_estimates e on e.listing_id = l.id
+      where l.external_id = 'pub-fixture-alheio'
+    `;
+    assert.equal(alheio.deleted_at, null, "o alheio NÃO foi dado como morto");
+    assert.equal(alheio.match_confidence, "exato", "nem despromovido");
+    assert.equal(alheio.pt_confidence, "normal", "continua na montra do destino, intocado");
 
     // 5. `designacao` não é montra — não atravessa.
     const [{ n: designacao }] = await tgt`

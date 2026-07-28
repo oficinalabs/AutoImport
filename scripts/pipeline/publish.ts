@@ -167,10 +167,13 @@ export interface PublishReport {
   montra: number;
   /** montra que o destino mostrava ANTES do ciclo */
   montraNoDestino: number;
-  /** mortos ou desaparecidos na origem → `deleted_at` no destino */
+  /** mortos NA ORIGEM (deleted_at verificado) → `deleted_at` no destino */
   softDeleted: number;
   /** vivos, mas fora da montra (perderam o `exato` ou a confiança `normal`) */
   demoted: number;
+  /** no destino mas AUSENTES do corpus — o warehouse não sabe nada deles, logo
+   *  não se lhes toca. Ver o comentário em `strays`. */
+  unknownToSource: number;
   opportunitiesDeactivated: number;
   /** por tabela: linhas novas ou alteradas */
   written: Record<string, number>;
@@ -284,11 +287,23 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
     const toDemote: { id: string; matchConfidence: string | null; ptConfidence: string | null }[] =
       [];
     const toDropEstimate: string[] = [];
+    const unknownToSource: { id: string; source_site: string }[] = [];
     for (const s of strays) {
       const state = stateByKey.get(natural(s.source_site, s.external_id));
-      if (!state || state.deleted_at) {
-        // Morto no warehouse, ou já lá não existe (o prune-stale confirmou 404/410).
-        toSoftDelete.push({ id: s.id as string, deadAt: (state?.deleted_at as string) ?? null });
+      if (!state) {
+        // AUSENTE do corpus — e ausência NÃO é prova de morte. O warehouse é
+        // carregado dos NDJSON que existirem, e pode nunca ter recolhido esta
+        // fonte: em 27/07 tinha 2 anúncios do autoscout24.de contra 295 na
+        // montra de produção (o `--full` desse site é o tier "mega", à parte).
+        // Dá-los como mortos marcaria 295 carros vivos, vistos nesse mesmo dia,
+        // como indisponíveis. A política do projeto já é esta: sumir do feed é
+        // CANDIDATO a vendido, e quem confirma é o check ao URL
+        // (check-gone/prune-stale), que grava `deleted_at` na origem — o ramo
+        // seguinte. Aqui não se toca.
+        unknownToSource.push({ id: s.id as string, source_site: s.source_site as string });
+      } else if (state.deleted_at) {
+        // Morto na origem: o check ao URL confirmou 404/410.
+        toSoftDelete.push({ id: s.id as string, deadAt: state.deleted_at as string });
       } else {
         // Vivo, mas já não é montra: espelhar a razão em vez de o dar como morto —
         // marcar "indisponível" um carro que ainda está à venda seria mentira.
@@ -301,14 +316,31 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
       }
     }
 
-    // Oportunidades ativas no destino que já não são oportunidade ativa na origem.
+    // Oportunidades ativas no destino que já não são oportunidade ativa na origem
+    // — mas SÓ as de anúncios que a origem conhece. Pelo mesmo motivo do
+    // `unknownToSource`: se o corpus nunca recolheu aquela fonte, desativar
+    // apagaria da montra oportunidades vivas (no caso real, 166 de 174).
     const keyBySrcId = new Map(
       listingRows.map((r) => [r.src_id, natural(r.source_site, r.external_id)]),
     );
     const activeOppKeys = new Set(opportunityRows.map((o) => keyBySrcId.get(o.src_listing_id)));
+    const oppKnown = targetOpps.length
+      ? await src`
+          select l.source_site, l.external_id from listings l
+          where (l.source_site, l.external_id) in (
+            select * from unnest(
+              ${targetOpps.map((o) => o.source_site as string)}::text[],
+              ${targetOpps.map((o) => o.external_id as string)}::text[]
+            )
+          )
+        `
+      : [];
+    const oppKnownKeys = new Set(oppKnown.map((r) => natural(r.source_site, r.external_id)));
     const oppsToDeactivate = targetOpps
+      .filter((o) => oppKnownKeys.has(natural(o.source_site, o.external_id)))
       .filter((o) => !activeOppKeys.has(natural(o.source_site, o.external_id)))
       .map((o) => o.id as string);
+    const oppsUnknown = targetOpps.length - oppKnownKeys.size;
 
     log(
       `publish: montra na origem ${listingRows.length} · montra no destino ` +
@@ -321,6 +353,7 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
       montraNoDestino: targetMontra.length,
       softDeleted: 0,
       demoted: 0,
+      unknownToSource: unknownToSource.length,
       opportunitiesDeactivated: 0,
       written,
       applied: apply,
@@ -539,10 +572,31 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
       if (err !== ROLLBACK) throw err;
     }
 
-    const saem = `${report.softDeleted} soft-delete (mortos/desaparecidos)`;
+    const saem = `${report.softDeleted} soft-delete (mortos confirmados na origem)`;
     const caem = `${report.demoted} despromovidos (vivos, fora da montra)`;
     const opps = `${report.opportunitiesDeactivated} oportunidades desativadas`;
     log(`publish: ${saem} · ${caem} · ${opps}`);
+    // Nunca em silêncio: se o corpus não cobre uma fonte, o publicador não faz
+    // ideia do que lá se passa — dizer quantos e de onde é o que deixa isso à vista.
+    if (report.unknownToSource) {
+      const contagem = new Map<string, number>();
+      for (const u of unknownToSource) {
+        contagem.set(u.source_site, (contagem.get(u.source_site) ?? 0) + 1);
+      }
+      const porFonte = [...contagem]
+        .sort((a, b) => b[1] - a[1])
+        .map(([site, n]) => `${site} ${n}`)
+        .join(" · ");
+      log(
+        `publish: ${report.unknownToSource} no destino AUSENTES do corpus — intocados ` +
+          `(ausência não é morte; quem confirma é o check ao URL): ${porFonte}`,
+      );
+    }
+    if (oppsUnknown > 0) {
+      log(
+        `publish: ${oppsUnknown} oportunidades no destino de anúncios fora do corpus — intocadas`,
+      );
+    }
     for (const [table, n] of Object.entries(written)) {
       log(`publish:   ${table.padEnd(22)} ${n} linhas novas ou alteradas`);
     }
