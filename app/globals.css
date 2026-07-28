@@ -250,6 +250,26 @@ body:has([data-hero="escuro"]) [data-site-header] a[href="/registar"] {
   color: var(--petrol);
 }
 
+/* Rodapé, pela mesma razão: a landing é escura de ponta a ponta e acabava num
+   degrau claro logo a seguir à banda âmbar do preço. */
+body:has([data-hero="escuro"]) {
+  background: #08090b;
+}
+body:has([data-hero="escuro"]) [data-site-footer] {
+  background: #08090b;
+  border-color: rgb(255 255 255 / 0.08);
+  color: rgb(255 255 255 / 0.55);
+}
+body:has([data-hero="escuro"]) [data-site-footer] a {
+  color: rgb(255 255 255 / 0.55);
+}
+body:has([data-hero="escuro"]) [data-site-footer] a:hover {
+  color: #fff;
+}
+body:has([data-hero="escuro"]) [data-site-footer] span {
+  color: rgb(255 255 255 / 0.9);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
