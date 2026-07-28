@@ -24,9 +24,14 @@ export function OpportunityCard({ car }: { car: Listing }) {
 
   return (
     <article className="flex h-full flex-col overflow-hidden rounded-[10px] border border-line bg-surface">
+      {/* `prefer="catalog"`: aqui os carros aparecem em fila, e as fotos dos
+          anúncios são de ~24 fontes — recorte de estúdio sobre branco ao lado
+          de foto de stand com pendão e marca de água. Em fila isso lê-se como
+          desleixo. Os renders de catálogo são todos do mesmo sítio e limpos. */}
       <CarImage
         photo={car.images[0]}
         catalog={car.catalogImage}
+        prefer="catalog"
         label={car.title}
         className="aspect-[16/10] w-full border-b border-line"
         rounded="rounded-none"
