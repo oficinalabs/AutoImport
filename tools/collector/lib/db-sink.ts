@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { assertWritable, dbUrl } from './db-target.ts';
 
 // País (formato dos coletores, MAIÚSCULAS) → ISO-2. Valores já ISO-2 passam.
 const PAIS_ISO2: Record<string, string> = {
@@ -136,7 +137,13 @@ export class DbSink {
 
   constructor(databaseUrl: string) {
     // prepare:false — compatível com o pooler transaction-mode da Supabase.
-    this.sql = postgres(databaseUrl, { prepare: false, max: 4 });
+    // max/idle_timeout configuráveis: o daemon corre muitos processos e precisa de um
+    // orçamento de ligações baixo (senão N processos × max rebentam o pooler da Supabase).
+    this.sql = postgres(databaseUrl, {
+      prepare: false,
+      max: Number(process.env.COLLECTOR_PG_MAX) || 4,
+      idle_timeout: Number(process.env.COLLECTOR_PG_IDLE) || 20,
+    });
   }
 
   /**
@@ -162,6 +169,15 @@ export class DbSink {
     const cashPrice = int(record.cash_price);
     const price = cashPrice != null && cashPrice > 0 ? cashPrice : int(record.price);
 
+    // raw ENXUTO: dos ~30 campos do coletor, só `engine_code` e `title` têm leitores
+    // (scripts/pipeline/match-models.ts lê `raw->>'engine_code'` e `raw->>'title'`). Guardar o
+    // registo INTEIRO inflava a linha ~1 KB+ sem ninguém o ler — e o arquivo completo já vive no
+    // NDJSON em disco. Os campos do "precio al contado" (ES) NÃO entram aqui: são acrescentados
+    // depois pelo enrich-es.ts (`raw::jsonb || …`) e preservados no on-conflict abaixo.
+    const rawMin: Record<string, unknown> = {};
+    if (record.engine_code != null) rawMin.engine_code = record.engine_code;
+    if (record.title != null) rawMin.title = record.title;
+
     const rows = await this.sql`
       insert into listings (
         source_site, external_id, source_id,
@@ -185,7 +201,7 @@ export class DbSink {
         ${str(record.source)}, ${sellerType(record)},
         ${(() => { const n = int(record.price_evaluation); return n != null && n >= 1 && n <= 5 ? n : null; })()},
         ${typeof record.is_damaged === 'boolean' ? record.is_damaged : null},
-        ${str(record.vin)}, ${this.sql.json(record as never)}, ${firstSeenAt}, ${seenAt}
+        ${str(record.vin)}, ${this.sql.json(rawMin as never)}, ${firstSeenAt}, ${seenAt}
       )
       on conflict (source_site, external_id) do update set
         -- Preço: o re-crawl NÃO pode desfazer a correção do "precio al contado"
@@ -255,11 +271,16 @@ export class DbSink {
 }
 
 /**
- * Cria o DbSink se houver DATABASE_URL (env ou .env.local da raiz do repo);
- * caso contrário devolve null — os coletores ficam em modo NDJSON puro.
+ * Cria o DbSink se houver base de dados configurada (WAREHOUSE_URL/DATABASE_URL,
+ * do env ou do .env.local da raiz do repo); caso contrário devolve null — os
+ * coletores ficam em modo NDJSON puro. O corpus é do warehouse: escrever numa
+ * base não-local exige DB_TARGET=prod (ver lib/db-url.ts).
  */
 export function createDbSink(): DbSink | null {
-  if (!process.env.DATABASE_URL) {
+  // Escotilha de segurança: o daemon corre os watches em modo NDJSON-only (só disco), para
+  // NÃO abrir ligações à BD — a ingestão é centralizada num único processo (ingest.ts).
+  if (process.env.COLLECTOR_NDJSON_ONLY === '1') return null;
+  if (!process.env.WAREHOUSE_URL && !process.env.DATABASE_URL) {
     try {
       // repo root a partir de tools/collector/lib/
       process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '../../../.env.local'));
@@ -267,6 +288,8 @@ export function createDbSink(): DbSink | null {
       /* sem .env.local — fica NDJSON puro */
     }
   }
-  const url = process.env.DATABASE_URL;
-  return url ? new DbSink(url) : null;
+  const url = dbUrl();
+  if (!url) return null;
+  assertWritable(url);
+  return new DbSink(url);
 }

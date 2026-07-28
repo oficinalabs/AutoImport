@@ -12,6 +12,7 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { assertWritable, dbUrl } from '../lib/db-target.ts';
 import type { ModelRef, VersionRecord } from './schema.ts';
 
 // Colunas integer na BD; o site tem valores decimais (ex. binário "39.2 Nm") → arredondar.
@@ -109,15 +110,21 @@ export class UsDbSink {
   }
 }
 
-/** Cria o sink se houver DATABASE_URL (env ou .env.local da raiz); senão null. */
+/**
+ * Cria o sink se houver base de dados configurada (WAREHOUSE_URL/DATABASE_URL,
+ * do env ou do .env.local da raiz); senão null. O catálogo é do warehouse:
+ * escrever numa base não-local exige DB_TARGET=prod (ver lib/db-url.ts).
+ */
 export function createUsDbSink(): UsDbSink | null {
-  if (!process.env.DATABASE_URL) {
+  if (!process.env.WAREHOUSE_URL && !process.env.DATABASE_URL) {
     try {
       process.loadEnvFile(join(dirname(fileURLToPath(import.meta.url)), '../../../.env.local'));
     } catch {
       /* sem .env.local — fica NDJSON */
     }
   }
-  const url = process.env.DATABASE_URL;
-  return url ? new UsDbSink(url) : null;
+  const url = dbUrl();
+  if (!url) return null;
+  assertWritable(url);
+  return new UsDbSink(url);
 }

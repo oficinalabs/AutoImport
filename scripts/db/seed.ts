@@ -4,6 +4,7 @@
  * Popula: `sources` (fontes com coletor) e `isv_tables` (tabelas fiscais 2026).
  * Corre com tsx (imports de db/ e drizzle não passam no type-stripping do Node).
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
 
 // O tsx (ao contrário do Next) não carrega o .env.local sozinho — e tem de
 // acontecer ANTES de importar db/ (o cliente postgres lê a env ao ser criado),
@@ -15,9 +16,7 @@ try {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL em falta — correr `pnpm db:up` e definir no .env.local");
-  }
+  assertWritable(dbUrl());
 
   const { db } = await import("../../db");
   const { isvTables, sources } = await import("../../db/schema");

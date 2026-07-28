@@ -73,11 +73,24 @@ export function buildBrandMatcher(brands: Brand[] = []): (title: unknown) => Bra
   };
 }
 
-// Extrai km do texto (título/corpo). Ex. "133.000 km", "176000 Km". Devolve int ou null.
-function parseKm(...texts: unknown[]): number | null {
+// Odómetro máximo plausível num ligeiro. Acima disto o que apanhámos não é quilometragem.
+const KM_MAX = 2_000_000;
+
+// Extrai km do texto (título/corpo). Ex. "133.000 km", "176000 Km", "217 828 km".
+//
+// ⚠️ Duas guardas, ambas vindas de dados reais (10 registos em 32k saíam absurdos, e um deles,
+// km=4020237000, nem sequer cabia no int4 do Postgres — o anúncio perdia-se em silêncio no
+// ingest, apanhado pelo try/catch por registo):
+//   • A captura tem de ser um NÚMERO, não um corredor de dígitos-espaços-pontos: o antigo
+//     `\d[\d.\s]{2,}` colava o que vinha antes ("2018 175.748 km" → 2018175748 = ano + km).
+//     Aceitamos grupos de milhares regulares (133.000 / 217 828) ou um inteiro corrido
+//     (176000), sempre a começar numa fronteira de palavra.
+//   • Continua a ser texto livre de vendedor, por isso o valor tem de ser plausível. Acima de
+//     KM_MAX é ruído e vale null (ausente) — nunca truncado ao máximo, que seria inventar um km.
+export function parseKm(...texts: unknown[]): number | null {
   for (const s of texts) {
-    const m = /(\d[\d.\s]{2,})\s*km\b/i.exec(String(s || ''));
-    if (m) { const n = toInt(m[1]); if (n) return n; }
+    const m = /\b(\d{1,3}(?:[.\s]\d{3})+|\d{3,7})\s*km\b/i.exec(String(s || ''));
+    if (m) { const n = toInt(m[1]); if (n && n <= KM_MAX) return n; }
   }
   return null;
 }

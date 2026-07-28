@@ -4,6 +4,8 @@
  * ou cujo anúncio desapareceu; reaparecer reativa.
  *   pnpm exec tsx scripts/pipeline/flag-opportunities.ts
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -11,6 +13,7 @@ try {
 }
 
 export async function flagOpportunities() {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { carIdentitySql } = await import("../../lib/engine/car-identity");

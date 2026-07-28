@@ -43,6 +43,13 @@
       "when": 1784284676237,
       "tag": "0005_bored_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785268157261,
+      "tag": "0006_amazing_whizzer",
+      "breakpoints": true
     }
   ]
 }

@@ -11,7 +11,9 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { after, test } from "node:test";
+import { after, before, test } from "node:test";
+import postgres from "postgres";
+import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
 
 try {
   process.loadEnvFile(".env.local");
@@ -19,24 +21,56 @@ try {
   /* CI: variáveis do ambiente */
 }
 
-const DB_URL = process.env.DATABASE_URL;
+// A mesma base a que o `db` liga (warehouse quando há WAREHOUSE_URL).
+const DB_URL = dbUrl();
 // Guarda anti-produção: este teste ESCREVE (ingest de fixtures, deletes no
-// cleanup) e o .env.local aponta para a Supabase REAL — correr `pnpm test` com
-// ele carregado já deixou resíduos na montra ("Testgen GenModel 1.0"). Só corre
-// contra Postgres LOCAL (docker `pnpm db:up` ou o serviço do CI, ambos em
-// localhost); URL não-local ou ilegível → salta.
-function isLocal(url: string): boolean {
-  try {
-    return ["localhost", "127.0.0.1"].includes(new URL(url).hostname);
-  } catch {
-    return false;
-  }
-}
+// cleanup) e a DATABASE_URL pode apontar para a Supabase REAL — correr
+// `pnpm test` com ela carregada já deixou resíduos na montra ("Testgen
+// GenModel 1.0"). Só corre contra Postgres LOCAL (warehouse, docker
+// `pnpm db:up` ou o serviço do CI); URL não-local ou ilegível → salta.
 const skip = !DB_URL
-  ? "sem DATABASE_URL — teste de integração saltado"
-  : !isLocal(DB_URL)
-    ? "DATABASE_URL não é local — o teste de integração escreve; só docker/CI"
+  ? "sem base de dados — teste de integração saltado"
+  : !isLocalDbUrl(DB_URL)
+    ? "base de dados não é local — o teste de integração escreve; só warehouse/docker/CI"
     : false;
+
+// Base DESCARTÁVEL própria (mesmo padrão de publish.test.ts). Antes corria-se
+// contra a base configurada, o que servia enquanto ela estava vazia; com o
+// warehouse a ter o corpus real (~600k anúncios) o `computeCosts()` do teste
+// passava a percorrer o corpus todo e estourava o timeout. Isolar também torna
+// os vereditos independentes do que houver na máquina.
+const TEST_DB = "autoimport_pipeline_test";
+const withDbName = (name: string) => {
+  const url = new URL(DB_URL as string);
+  url.pathname = `/${name}`;
+  return url.toString();
+};
+/** A base a que o `db` liga durante os testes — definida no before(). */
+let ACTIVE_URL = DB_URL as string;
+
+const admin = async (fn: (sql: ReturnType<typeof postgres>) => Promise<void>) => {
+  const sql = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
+  try {
+    await fn(sql);
+  } finally {
+    await sql.end();
+  }
+};
+
+before(async () => {
+  if (skip) return;
+  await admin(async (sql) => {
+    await sql.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
+    await sql.unsafe(`create database ${TEST_DB}`).simple();
+  });
+  ACTIVE_URL = withDbName(TEST_DB);
+  const env = { ...process.env, WAREHOUSE_URL: ACTIVE_URL, DATABASE_URL: ACTIVE_URL };
+  execFileSync("pnpm", ["exec", "drizzle-kit", "migrate"], { stdio: "pipe", env });
+  execFileSync("pnpm", ["exec", "tsx", "scripts/db/seed.ts"], { stdio: "pipe", env });
+  // O `db` é importado dinamicamente dentro dos testes e resolve a URL no import
+  // — definir aqui basta para ele (e para os subprocessos) ligarem à base de teste.
+  process.env.WAREHOUSE_URL = ACTIVE_URL;
+});
 
 async function cleanup() {
   const { db } = await import("../../db");
@@ -521,6 +555,9 @@ test(
       make: "Testmarke",
       model: "T900",
       variant: "T900d (contado ES)",
+      // `title` é um dos dois campos que o raw enxuto guarda (o outro é engine_code)
+      // — é por ele que se prova que o re-crawl refresca o raw. Ver db-sink.ts.
+      title: "T900d (contado ES)",
       year: 2023,
       km: 80000,
       fuel: "Gasolina",
@@ -533,14 +570,14 @@ test(
       source: "Fixture Concesionario",
       seller_type: "Dealer",
     };
-    const sink = new DbSink(DB_URL as string);
+    const sink = new DbSink(ACTIVE_URL);
     const state = async () => {
       const [row] = (await db.execute(sql`
         select l.price,
                (l.raw->>'precio_contado')::int as contado,
                (l.raw->>'precio_financiado')::int as financiado,
                (l.raw->>'precio_contado_checked') as checked,
-               l.raw->>'variant' as raw_variant,
+               l.raw->>'title' as raw_title,
                (select count(*) from listing_price_history h where h.listing_id = l.id)::int as n_hist
         from listings l where l.external_id = 'fixture-es-contado'
       `)) as unknown as {
@@ -548,7 +585,7 @@ test(
         contado: number | null;
         financiado: number | null;
         checked: string | null;
-        raw_variant: string;
+        raw_title: string;
         n_hist: number;
       }[];
       return row;
@@ -574,7 +611,7 @@ test(
 
       // 2.º crawl com o MESMO preço de montra: a correção sobrevive.
       await sink.upsertListing(
-        { ...record, variant: "T900d (contado ES, re-crawl)" },
+        { ...record, title: "T900d (contado ES, re-crawl)" },
         "new",
         "autoscout24",
       );
@@ -584,7 +621,7 @@ test(
       assert.equal(depois.financiado, 11900, "o financiado observado sobrevive");
       assert.equal(depois.checked, "true", "a marca de verificado sobrevive");
       assert.equal(
-        depois.raw_variant,
+        depois.raw_title,
         "T900d (contado ES, re-crawl)",
         "o resto do raw é o registo fresco da fonte",
       );
@@ -604,10 +641,106 @@ test(
   },
 );
 
-after(async () => {
-  if (!skip) {
+test(
+  "preço 0 ('sob consulta') não gera estimativa nem entra na amostra PT",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+
     await cleanup();
-    const { closeDb } = await import("../../db");
-    await closeDb(); // liberta o event loop — sem isto o runner não termina
-  }
+
+    // O bug real (medido em 599k anúncios): um anúncio "sob consulta" chega com
+    // price=0, o motor trata o 0 como preço de compra e a "poupança" que sai é a
+    // MEDIANA PT INTEIRA — 4 destes puseram 289.679 € de poupança fantasiada no
+    // topo da montra, que ordena por poupança.
+    await db.execute(sql`
+      insert into us_models (mid, make, model, slug, model_year, url) values
+        ('TG-ZERO', 'Testgen', 'ZeroModel', 'ZeroModel-1', 2022, 'https://example.test/zero')
+    `);
+    await db.execute(sql`
+      insert into us_versions
+        (version_id, mid, name, url, fuel_section, fuel, year, power_hp, displacement_cc, co2_wltp)
+      values
+        ('V-ZERO', 'TG-ZERO', 'ZeroModel 1.0', 'https://example.test/vzero', 'petrol', 'Petrol',
+         2022, 130, 1500, 135)
+    `);
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'zeromodel', 'gasolina', 'testgen|zeromodel|gasolina')
+      returning id
+    `)) as unknown as { id: string }[];
+
+    // Amostra PT sã (5 carros, 5 stands) + UM anúncio PT sem preço.
+    const ptRows = [30000, 30300, 30600, 30900, 31200].map((price, i) => ({
+      price,
+      id: `fixture-zero-pt-${i}`,
+    }));
+    ptRows.push({ price: 0, id: "fixture-zero-pt-semprec" });
+    for (const r of ptRows) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${r.id}, ${model.id}, 'Testgen', 'ZeroModel', 'Gasolina', 'gasolina',
+           'ZeroModel 1.0', 2022, 30000, 130, ${r.price}, 'PT', ${`Stand ${r.id}`},
+           ${`https://example.test/${r.id}`})
+      `);
+    }
+
+    // Dois estrangeiros idênticos: um com preço a sério, outro "sob consulta".
+    // O par é o que prova que a exclusão é do PREÇO e não de outra guarda.
+    for (const [id, price] of [
+      ["fixture-zero-de-ok", 18000],
+      ["fixture-zero-de-semprec", 0],
+    ] as const) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, displacement_cc, co2, price, country, detail_url,
+           first_registration, us_version_id, match_confidence)
+        values
+          ('autoscout24.de', ${id}, ${model.id}, 'Testgen', 'ZeroModel', 'Gasolina', 'gasolina',
+           'ZeroModel 1.0', 2022, 30000, 130, 1500, 135, ${price}, 'DE',
+           ${`https://example.test/${id}`}, '2022-06-01', 'V-ZERO', 'exato')
+      `);
+    }
+
+    await collectPtObservations();
+    await computeCosts();
+
+    const obs = (await db.execute(sql`
+      select l.external_id from pt_price_observations o
+      join listings l on l.id = o.listing_id
+      where l.external_id like 'fixture-zero-pt-%'
+    `)) as unknown as { external_id: string }[];
+    assert.equal(obs.length, 5, "só os 5 com preço entram na amostra PT");
+    assert.ok(
+      !obs.some((o) => o.external_id === "fixture-zero-pt-semprec"),
+      "o anúncio sem preço não pode puxar a mediana PT para baixo",
+    );
+
+    const est = (await db.execute(sql`
+      select l.external_id, e.origin_price, e.savings
+      from import_cost_estimates e join listings l on l.id = e.listing_id
+      where l.external_id like 'fixture-zero-de-%'
+    `)) as unknown as { external_id: string; origin_price: number; savings: number }[];
+    assert.deepEqual(
+      est.map((e) => e.external_id),
+      ["fixture-zero-de-ok"],
+      "o gémeo com preço é estimado; o 'sob consulta' não gera estimativa nenhuma",
+    );
+  },
+);
+
+after(async () => {
+  if (skip) return;
+  const { closeDb } = await import("../../db");
+  await closeDb(); // liberta o event loop — sem isto o runner não termina
+  await admin(async (sql) => {
+    await sql.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
+  });
 });

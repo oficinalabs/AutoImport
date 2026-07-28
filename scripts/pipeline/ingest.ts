@@ -7,6 +7,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { basename, join } from "node:path";
+import { assertWritable, dbUrl } from "../../lib/db-url";
 
 try {
   process.loadEnvFile(".env.local");
@@ -34,11 +35,11 @@ function sourceNameOf(file: string): string {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL em falta — correr `pnpm db:up` e definir no .env.local");
-  }
+  // Destino do corpus: warehouse local (ver lib/db-url.ts).
+  const url = dbUrl();
+  assertWritable(url);
   const { DbSink } = await import("../../tools/collector/lib/db-sink");
-  const db = new DbSink(process.env.DATABASE_URL);
+  const db = new DbSink(url);
 
   const { dir, source } = parseArgs();
   const files = readdirSync(dir)

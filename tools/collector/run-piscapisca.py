@@ -42,7 +42,8 @@ def main():
     ap.add_argument("--full", action="store_true", help="cobertura fatiada (marca ∪ distrito)")
     ap.add_argument("--resume", action="store_true", help="continuar do checkpoint")
     ap.add_argument("--rate", type=int, default=4000, help="delay mínimo entre pedidos, ms (default 4000)")
-    ap.add_argument("--out", type=str, default=os.path.join(_DIR, "out"), help="diretório de saída")
+    # --out > COLLECTOR_OUT_DIR > <collector>/out (mesma precedência dos coletores Node, lib/cli.ts)
+    ap.add_argument("--out", type=str, default=os.environ.get("COLLECTOR_OUT_DIR") or os.path.join(_DIR, "out"), help="diretório de saída")
     args = ap.parse_args()
 
     print(f"=== piscapisca.pt"

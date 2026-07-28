@@ -19,6 +19,7 @@
  *  - resto: só o anúncio.
  * A norma do CO₂ segue sempre o ano de matrícula (isv.ts), sem cross-norma.
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { DesignationFacts } from "../../lib/engine/match-version";
 import type { GenWindow } from "../../lib/engine/pt-market";
 import type { CountryCode } from "../../lib/types";
@@ -33,6 +34,7 @@ const FOREIGN: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
 const ISV_YEAR = 2026;
 
 export async function computeCosts() {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { computeCostBreakdown, co2Norm } = await import("../../lib/cost-engine");
@@ -70,6 +72,33 @@ export async function computeCosts() {
     return out;
   }
 
+  // Quem PODE ter estimativa. Fonte única: serve o `pending` (abaixo) e a limpeza
+  // das órfãs. Sem a partilha, apertar a regra aqui deixava para trás as estimativas
+  // já gravadas — o `dropStale` só visita quem entra no `pending`, portanto o que a
+  // regra passa a excluir nunca mais é visitado. Foi assim que 4 anúncios "sob
+  // consulta" continuaram a ser oportunidades depois da guarda do preço 0.
+  const elegivel = sql`
+        l.country = any(${`{${FOREIGN.join(",")}}`}::text[])
+    and l.deleted_at is null
+    and l.model_id is not null -- o join a vehicle_models é inner
+    and l.is_damaged is not true -- sinistrado barato ≠ oportunidade
+    and l.detail_url not like '%/leilao/%' -- leilões (autoline): o preço é a licitação corrente, não um preço de venda
+    and l.price > 0 -- 0 = "sob consulta", não é um preço: sem ele a poupança seria a mediana PT inteira
+    and l.year is not null
+    and l.km is not null
+    and l.fuel is not null
+  `;
+
+  // Estimativas de anúncios que já não são elegíveis. `coalesce(…, false)`: um
+  // predicado NULL (ex.: preço nulo) é inelegível, não "desconhecido logo fica".
+  const orfas = (await db.execute(sql`
+    delete from import_cost_estimates e
+    using listings l
+    where l.id = e.listing_id and not coalesce((${elegivel}), false)
+    returning e.id
+  `)) as unknown as { id: string }[];
+  if (orfas.length) console.log(`compute-costs: ${orfas.length} estimativas órfãs apagadas`);
+
   // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
   // o ISV é €5,61/cm³ e uma mediana envenenada/entre-trims produz impostos
   // confiantemente errados (caso real: Série 8 com mediana cc=844 → ISV 1k
@@ -94,14 +123,7 @@ export async function computeCosts() {
     join vehicle_models vm on vm.id = l.model_id
     left join us_versions v on v.version_id = l.us_version_id
     left join import_cost_estimates e on e.listing_id = l.id
-    where l.country = any(${`{${FOREIGN.join(",")}}`}::text[])
-      and l.deleted_at is null
-      and l.is_damaged is not true -- sinistrado barato ≠ oportunidade
-      and l.detail_url not like '%/leilao/%' -- leilões (autoline): o preço é a licitação corrente, não um preço de venda
-      and l.price is not null
-      and l.year is not null
-      and l.km is not null
-      and l.fuel is not null
+    where (${elegivel})
       -- recompute: novo/atualizado, OU o tier efetivo (exato/designacao) do
       -- anúncio diverge do gravado na estimativa, OU o DERIVADO que confina a
       -- amostra PT mudou (o rematch reescreve facts/versão sem tocar no

@@ -1,0 +1,237 @@
+{"site":"autotrader","rateMs":1500,"records":48,"warnings":0,"secs":4.6,"reqPerSec":10.5,"blocked":false}
+{"site":"autocasion","rateMs":1500,"records":73,"warnings":0,"secs":5,"reqPerSec":14.5,"blocked":false}
+{"site":"autotrader","rateMs":700,"records":53,"warnings":0,"secs":2.9,"reqPerSec":18,"blocked":false}
+{"site":"autocasion","rateMs":700,"records":73,"warnings":0,"secs":4,"reqPerSec":18.5,"blocked":false}
+{"site":"autoboerse","rateMs":1500,"records":54,"warnings":0,"secs":9.6,"reqPerSec":5.6,"blocked":false}
+{"site":"autotrader","rateMs":350,"records":48,"warnings":0,"secs":2.6,"reqPerSec":18.7,"blocked":false}
+{"site":"autotrader","rateMs":175,"records":55,"warnings":0,"secs":2.2,"reqPerSec":25.4,"blocked":false}
+{"site":"autocasion","rateMs":350,"records":76,"warnings":0,"secs":3.7,"reqPerSec":20.7,"blocked":false}
+{"site":"ocasionplus","rateMs":1500,"records":56,"warnings":0,"secs":5.1,"reqPerSec":10.9,"blocked":false}
+{"site":"autocasion","rateMs":175,"records":68,"warnings":0,"secs":5.2,"reqPerSec":13,"blocked":false}
+{"site":"autoboerse","rateMs":700,"records":54,"warnings":0,"secs":9.4,"reqPerSec":5.8,"blocked":false}
+{"site":"ocasionplus","rateMs":700,"records":56,"warnings":0,"secs":2.6,"reqPerSec":21.3,"blocked":false}
+{"site":"autoboerse","rateMs":350,"records":54,"warnings":0,"secs":1.9,"reqPerSec":28,"blocked":false}
+{"site":"theparking","rateMs":1500,"records":296,"warnings":0,"secs":21.4,"reqPerSec":13.8,"blocked":false}
+{"site":"ocasionplus","rateMs":350,"records":56,"warnings":0,"secs":1.5,"reqPerSec":37,"blocked":false}
+{"site":"ocasionplus","rateMs":175,"records":56,"warnings":0,"secs":1.7,"reqPerSec":33.8,"blocked":false}
+{"site":"autoboerse","rateMs":175,"records":54,"warnings":0,"secs":2.6,"reqPerSec":20.8,"blocked":false}
+{"site":"flexicar","rateMs":1500,"records":25,"warnings":0,"secs":6.9,"reqPerSec":3.6,"blocked":false}
+{"site":"trovit","rateMs":1500,"records":74,"warnings":0,"secs":4.5,"reqPerSec":16.6,"blocked":false}
+{"site":"flexicar","rateMs":700,"records":25,"warnings":0,"secs":3.8,"reqPerSec":6.5,"blocked":false}
+{"site":"trovit","rateMs":700,"records":74,"warnings":0,"secs":3.2,"reqPerSec":22.8,"blocked":false}
+{"site":"flexicar","rateMs":350,"records":25,"warnings":0,"secs":3.2,"reqPerSec":7.9,"blocked":false}
+{"site":"trovit","rateMs":350,"records":74,"warnings":0,"secs":2.4,"reqPerSec":30.9,"blocked":false}
+{"site":"theparking","rateMs":700,"records":296,"warnings":0,"secs":12.3,"reqPerSec":24.1,"blocked":false}
+{"site":"flexicar","rateMs":175,"records":25,"warnings":0,"secs":2.7,"reqPerSec":9.2,"blocked":false}
+{"site":"aramisauto","rateMs":5000,"records":72,"warnings":0,"secs":11.4,"reqPerSec":6.3,"blocked":false}
+{"site":"trovit","rateMs":175,"records":74,"warnings":0,"secs":3,"reqPerSec":24.7,"blocked":false}
+{"site":"quoka","rateMs":1500,"records":58,"warnings":0,"secs":5.2,"reqPerSec":11.1,"blocked":false}
+{"site":"meinauto","rateMs":1500,"records":141,"warnings":0,"secs":6.4,"reqPerSec":22.1,"blocked":false}
+{"site":"theparking","rateMs":350,"records":296,"warnings":0,"secs":9,"reqPerSec":33.1,"blocked":false}
+{"site":"quoka","rateMs":700,"records":58,"warnings":0,"secs":4.4,"reqPerSec":13.2,"blocked":false}
+{"site":"meinauto","rateMs":700,"records":141,"warnings":0,"secs":7.1,"reqPerSec":19.8,"blocked":false}
+{"site":"quoka","rateMs":350,"records":58,"warnings":0,"secs":4.3,"reqPerSec":13.4,"blocked":false}
+{"site":"theparking","rateMs":175,"records":297,"warnings":0,"secs":8.2,"reqPerSec":36.2,"blocked":false}
+{"site":"quoka","rateMs":175,"records":58,"warnings":0,"secs":3.5,"reqPerSec":16.7,"blocked":false}
+{"site":"meinauto","rateMs":350,"records":141,"warnings":0,"secs":7.3,"reqPerSec":19.3,"blocked":false}
+{"site":"autoline","rateMs":1500,"records":75,"warnings":0,"secs":4.7,"reqPerSec":15.9,"blocked":false}
+{"site":"autohero","rateMs":1500,"records":299,"warnings":0,"secs":4.1,"reqPerSec":72.4,"blocked":false}
+{"site":"autoline","rateMs":700,"records":75,"warnings":0,"secs":2.8,"reqPerSec":26.4,"blocked":false}
+{"site":"autohero","rateMs":700,"records":300,"warnings":0,"secs":2.4,"reqPerSec":126.5,"blocked":false}
+{"site":"autoline","rateMs":350,"records":75,"warnings":0,"secs":2,"reqPerSec":36.6,"blocked":false}
+{"site":"autohero","rateMs":350,"records":300,"warnings":0,"secs":2.3,"reqPerSec":133.2,"blocked":false}
+{"site":"meinauto","rateMs":175,"records":141,"warnings":0,"secs":6.5,"reqPerSec":21.8,"blocked":false}
+{"site":"autohero","rateMs":175,"records":300,"warnings":0,"secs":1.9,"reqPerSec":161.2,"blocked":false}
+{"site":"autoline","rateMs":175,"records":75,"warnings":0,"secs":2.4,"reqPerSec":31,"blocked":false}
+{"site":"standvirtual","rateMs":1500,"records":96,"warnings":0,"secs":5.4,"reqPerSec":17.8,"blocked":false}
+{"site":"olxpt","rateMs":1500,"records":156,"warnings":0,"secs":6.2,"reqPerSec":25.3,"blocked":false}
+{"site":"custojusto","rateMs":1500,"records":119,"warnings":0,"secs":7.9,"reqPerSec":15.1,"blocked":false}
+{"site":"standvirtual","rateMs":700,"records":95,"warnings":0,"secs":4.5,"reqPerSec":21.2,"blocked":false}
+{"site":"olxpt","rateMs":700,"records":156,"warnings":0,"secs":6.3,"reqPerSec":24.8,"blocked":false}
+{"site":"standvirtual","rateMs":350,"records":96,"warnings":0,"secs":4.8,"reqPerSec":20.1,"blocked":false}
+{"site":"custojusto","rateMs":700,"records":118,"warnings":0,"secs":7,"reqPerSec":16.9,"blocked":false}
+{"site":"olxpt","rateMs":350,"records":156,"warnings":0,"secs":6,"reqPerSec":26.1,"blocked":false}
+{"site":"standvirtual","rateMs":175,"records":96,"warnings":0,"secs":4.8,"reqPerSec":20,"blocked":false}
+{"site":"custojusto","rateMs":350,"records":118,"warnings":0,"secs":7.1,"reqPerSec":16.7,"blocked":false}
+{"site":"autopt","rateMs":1500,"records":60,"warnings":0,"secs":4,"reqPerSec":14.9,"blocked":false}
+{"site":"olxpt","rateMs":175,"records":156,"warnings":0,"secs":5.8,"reqPerSec":26.7,"blocked":false}
+{"site":"autopt","rateMs":700,"records":60,"warnings":0,"secs":2.3,"reqPerSec":25.6,"blocked":false}
+{"site":"autopt","rateMs":350,"records":60,"warnings":0,"secs":2.1,"reqPerSec":28.8,"blocked":false}
+{"site":"custojusto","rateMs":175,"records":118,"warnings":0,"secs":6.7,"reqPerSec":17.7,"blocked":false}
+{"site":"autopt","rateMs":175,"records":60,"warnings":0,"secs":2.1,"reqPerSec":29.1,"blocked":false}
+{"site":"autosapo","rateMs":1500,"records":60,"warnings":0,"secs":6.5,"reqPerSec":9.2,"blocked":false}
+{"site":"santogal","rateMs":1500,"records":120,"warnings":0,"secs":5.2,"reqPerSec":23,"blocked":false}
+{"site":"autosapo","rateMs":700,"records":60,"warnings":0,"secs":3.9,"reqPerSec":15.6,"blocked":false}
+{"site":"santogal","rateMs":700,"records":120,"warnings":0,"secs":2.2,"reqPerSec":54.3,"blocked":false}
+{"site":"autosapo","rateMs":350,"records":60,"warnings":0,"secs":3.3,"reqPerSec":18.1,"blocked":false}
+{"site":"santogal","rateMs":350,"records":120,"warnings":0,"secs":2.1,"reqPerSec":56.2,"blocked":false}
+{"site":"autosapo","rateMs":175,"records":60,"warnings":0,"secs":2.1,"reqPerSec":28.7,"blocked":false}
+{"site":"santogal","rateMs":175,"records":120,"warnings":0,"secs":1.9,"reqPerSec":64.4,"blocked":false}
+{"site":"caetano","rateMs":1500,"records":705,"warnings":0,"secs":6.4,"reqPerSec":110.7,"blocked":false}
+{"site":"carplus","rateMs":1500,"records":48,"warnings":0,"secs":6.2,"reqPerSec":7.7,"blocked":false}
+{"site":"caetano","rateMs":700,"records":705,"warnings":0,"secs":2.6,"reqPerSec":275.8,"blocked":false}
+{"site":"caetano","rateMs":350,"records":705,"warnings":0,"secs":1.9,"reqPerSec":363,"blocked":false}
+{"site":"carplus","rateMs":700,"records":48,"warnings":0,"secs":5.9,"reqPerSec":8.1,"blocked":false}
+{"site":"caetano","rateMs":175,"records":705,"warnings":0,"secs":1.8,"reqPerSec":391.7,"blocked":false}
+{"site":"carplus","rateMs":350,"records":48,"warnings":0,"secs":4.1,"reqPerSec":11.6,"blocked":false}
+{"site":"autoscout24","rateMs":1500,"records":260,"warnings":0,"secs":4.8,"reqPerSec":54.1,"blocked":false}
+{"site":"autoscout24","rateMs":700,"records":267,"warnings":0,"secs":3.3,"reqPerSec":80.3,"blocked":false}
+{"site":"carplus","rateMs":175,"records":48,"warnings":0,"secs":4.5,"reqPerSec":10.8,"blocked":false}
+{"site":"autoscout24","rateMs":350,"records":255,"warnings":0,"secs":4.2,"reqPerSec":60.3,"blocked":false}
+{"site":"ooyyo","rateMs":30000,"records":45,"warnings":0,"secs":91.3,"reqPerSec":0.5,"blocked":false}
+{"site":"autouncle","rateMs":1500,"records":75,"warnings":0,"secs":4.1,"reqPerSec":18.4,"blocked":false}
+{"site":"autouncle","rateMs":700,"records":75,"warnings":0,"secs":2.4,"reqPerSec":30.9,"blocked":false}
+{"site":"autoscout24","rateMs":175,"records":281,"warnings":0,"secs":3.9,"reqPerSec":72.2,"blocked":false}
+{"site":"autouncle","rateMs":350,"records":75,"warnings":0,"secs":2.1,"reqPerSec":36.1,"blocked":false}
+{"site":"autouncle","rateMs":175,"records":75,"warnings":0,"secs":1.7,"reqPerSec":43,"blocked":false}
+{"site":"encontracarros","rateMs":1500,"records":30,"warnings":0,"secs":57.9,"reqPerSec":0.5,"blocked":false}
+{"site":"encontracarros","rateMs":700,"records":30,"warnings":0,"secs":32.1,"reqPerSec":0.9,"blocked":false}
+{"site":"encontracarros","rateMs":350,"records":30,"warnings":0,"secs":21.2,"reqPerSec":1.4,"blocked":false}
+{"site":"encontracarros","rateMs":175,"records":30,"warnings":0,"secs":17.4,"reqPerSec":1.7,"blocked":false}
+---SUMMARY---
+[
+  {
+    "site": "theparking",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autotrader",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autoboerse",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autocasion",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "ocasionplus",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "flexicar",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "aramisauto",
+    "safeRateMs": 5000,
+    "floorMs": 5000,
+    "safeReqPerSec": 0.2
+  },
+  {
+    "site": "trovit",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "meinauto",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "quoka",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "ooyyo",
+    "safeRateMs": 30000,
+    "floorMs": 30000,
+    "safeReqPerSec": 0
+  },
+  {
+    "site": "autoline",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autohero",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "standvirtual",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "olxpt",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "custojusto",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autopt",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autosapo",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "encontracarros",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "santogal",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "caetano",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "carplus",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autoscout24",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  },
+  {
+    "site": "autouncle",
+    "safeRateMs": 175,
+    "floorMs": null,
+    "safeReqPerSec": 5.7
+  }
+]

@@ -208,9 +208,14 @@ const toListing = (r: BaseRow, history: { month: string; price: number }[] = [])
  * `alargada`) — alinhado com o flag-opportunities: a montra não mostra margens
  * assentes em amostras esticadas. Favoritos/detalhe/comparar continuam a abrir
  * itens já guardados (desaparecer sem explicação é pior — docs/08). */
+/** Os dois valores em SQL cru, para o publicador (scripts/pipeline/publish.ts) publicar
+ *  exatamente o conjunto que a montra mostra. Mudar a regra aqui muda-a nos dois sítios. */
+export const MONTRA_MATCH_CONFIDENCE = "exato";
+export const MONTRA_PT_CONFIDENCE = "normal";
+
 const COM_CATALOGO = and(
-  eq(listings.matchConfidence, "exato"),
-  eq(importCostEstimates.ptConfidence, "normal"),
+  eq(listings.matchConfidence, MONTRA_MATCH_CONFIDENCE),
+  eq(importCostEstimates.ptConfidence, MONTRA_PT_CONFIDENCE),
 );
 
 /**

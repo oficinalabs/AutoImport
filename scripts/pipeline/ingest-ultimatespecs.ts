@@ -6,6 +6,7 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { VersionRecord } from "../../tools/collector/ultimatespecs/schema";
 
 try {
@@ -40,9 +41,7 @@ function modelUrlOf(r: VersionRecord): string {
 }
 
 async function main() {
-  if (!process.env.DATABASE_URL) {
-    throw new Error("DATABASE_URL em falta — definir no .env.local");
-  }
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { usModels, usVersions } = await import("../../db/schema");
   const { sql } = await import("drizzle-orm");
@@ -170,7 +169,8 @@ async function main() {
           emissionStandard: r.deep?.emissionStandard,
           curbWeightKg: int(r.deep?.curbWeightKg),
           imageUrl: r.deep?.imageUrl,
-          specs: r.deep?.specs,
+          // `r.deep.specs` (a ficha crua) NÃO entra: fica no NDJSON, que é o
+          // arquivo. Ver o comentário de `usVersions` em db/schema.ts.
         })),
       )
       .onConflictDoUpdate({
@@ -192,7 +192,6 @@ async function main() {
           emissionStandard: sql`excluded.emission_standard`,
           curbWeightKg: sql`excluded.curb_weight_kg`,
           imageUrl: sql`excluded.image_url`,
-          specs: sql`excluded.specs`,
         },
       });
   }

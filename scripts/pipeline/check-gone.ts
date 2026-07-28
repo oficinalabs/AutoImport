@@ -9,6 +9,8 @@
  * O flag-opportunities a seguir cai as oportunidades cujos listings ficaram
  * apagados (o winners exige deleted_at is null).
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -47,6 +49,7 @@ async function probe(url: string): Promise<"gone" | "alive" | "error"> {
 }
 
 export async function checkGone(opts: { limit?: number } = {}) {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
 

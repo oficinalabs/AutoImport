@@ -16,6 +16,7 @@
  *   (SQL cru → sem $onUpdate); só reescreve quando a resolução muda
  *   (determinístico ⇒ 2.ª corrida = 0 updates).
  */
+import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { DesignationFacts } from "../../lib/engine/match-version";
 
 try {
@@ -69,6 +70,7 @@ function sellerTitleFromUrl(url: string | null): string | null {
 }
 
 export async function matchModels(opts: { rematch?: boolean } = {}) {
+  assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { inArray, sql } = await import("drizzle-orm");
   const { listings, vehicleModels } = await import("../../db/schema");
