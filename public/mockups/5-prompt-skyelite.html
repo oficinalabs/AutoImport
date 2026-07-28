@@ -216,12 +216,8 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 
 /* ══════════ P2 — prompt 2 (SkyElite) ══════════ */
 .P2{position:relative;min-height:94vh;background:#f3f5f5;overflow:hidden;display:flex;flex-direction:column}
-.P2 .vid{position:absolute;inset:0;
-  background:radial-gradient(70% 60% at 78% 26%,rgba(255,255,255,.9),transparent 62%),
-             linear-gradient(178deg,#dfe6e8,#cdd8dc 46%,#b9c8cd)}
-.P2 .vid::after{content:'▶ aqui entrava o vídeo de fundo — /video/hero.mp4';position:absolute;right:16px;bottom:14px;
-  font:400 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:rgba(14,59,74,.35)}
-.P2 .scrim{position:absolute;inset:0;background:rgba(255,255,255,.58)}
+.P2 .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
+.P2 .scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(243,245,245,.55) 0%,rgba(243,245,245,.72) 42%,rgba(243,245,245,.86) 78%,rgba(243,245,245,.94) 100%)}
 .P2 nav{position:relative;z-index:2;max-width:80rem;margin:0 auto;width:100%;
         display:flex;align-items:center;gap:30px;padding:24px clamp(20px,4vw,32px);flex-wrap:wrap;
         font:400 14px Inter;color:#0E3B4A}
@@ -266,14 +262,20 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 .P3 .btns .s{border:1px solid rgba(255,255,255,.4);color:#fff}
 .P3 .foot{position:relative;z-index:2;text-align:center;padding-bottom:44px;
           font:400 11px Inter;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+
+/* Movimento reduzido: esconde o vídeo, fica o poster como fundo. */
+@media (prefers-reduced-motion: reduce){
+  .P2 .vid{display:none}
+  .P2{background-image:url(video/porto-poster.jpg);background-size:cover;background-position:center}
+}
 </style>
 </head>
 <body>
 
 <div class="tag"><h4>Prompt 2 — do "SkyElite"</h4>
-<p>Claro em vez de escuro, com o truque das duas linhas sobrepostas ("Importa." / "Com contas."). É o mais sóbrio dos três prompts — <em>e o único que aguenta um stand a olhar de manhã</em>.</p></div>
+<p>Claro em vez de escuro, com o truque das duas linhas sobrepostas. O vídeo é o <em>terminal portuário</em> — o único dos quatro que aguenta um véu branco por cima sem ficar lamacento. É o mais sóbrio dos três prompts.</p></div>
 <div class="P2">
-  <div class="vid"></div><div class="scrim"></div>
+  <video class="vid" autoplay muted loop playsinline preload="metadata" poster="video/porto-poster.jpg"><source src="video/porto.mp4" type="video/mp4"></video><div class="scrim"></div>
   <nav><span class="b">AutoImport</span><span>Mercado</span><span>Como funciona</span><span>Preço</span><span>Ajuda</span><span class="sp">Entrar</span></nav>
   <div class="mid">
     <div class="lbl">Importação automóvel</div>

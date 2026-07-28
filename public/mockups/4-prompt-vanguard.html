@@ -179,13 +179,7 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 .P1{position:relative;min-height:94vh;display:flex;flex-direction:column;color:#fff;
     padding:0 clamp(22px,5vw,64px);overflow:hidden;
     background:linear-gradient(150deg,#101418,#1b232a 42%,#0a0d10)}
-.P1 .vid{position:absolute;inset:0;
-  background:radial-gradient(120% 90% at 72% 18%,rgba(120,160,190,.3),transparent 58%),
-             radial-gradient(90% 80% at 18% 88%,rgba(232,147,12,.18),transparent 60%),
-             repeating-linear-gradient(102deg,rgba(255,255,255,.028) 0 2px,transparent 2px 7px)}
-.P1 .vid::after{content:'▶ aqui entrava o vídeo de fundo — /video/hero.mp4';
-  position:absolute;right:16px;bottom:14px;font:400 10px Inter;letter-spacing:.14em;
-  text-transform:uppercase;color:rgba(255,255,255,.3)}
+.P1 .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
 .P1 .scrim{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.68),rgba(0,0,0,.46) 45%,rgba(0,0,0,.8))}
 .P1 nav{position:relative;z-index:2;display:flex;align-items:center;gap:30px;padding:22px 0;flex-wrap:wrap;
         font:400 11px Inter;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.78)}
@@ -266,14 +260,20 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 .P3 .btns .s{border:1px solid rgba(255,255,255,.4);color:#fff}
 .P3 .foot{position:relative;z-index:2;text-align:center;padding-bottom:44px;
           font:400 11px Inter;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+
+/* Movimento reduzido: esconde o vídeo, fica o poster como fundo. */
+@media (prefers-reduced-motion: reduce){
+  .P1 .vid{display:none}
+  .P1{background-image:url(video/camiao-poster.jpg);background-size:cover;background-position:center}
+}
 </style>
 </head>
 <body>
 
 <div class="tag"><h4>Prompt 1 — do "VANGUARD"</h4>
-<p>O resultado do 1.º prompt, com os nossos dados. <em>O fundo devia ser vídeo</em> — como não temos ficheiro, está um gradiente no lugar, marcado no canto. Repara que é <em>só um hero</em>: o prompt não diz nada sobre o que vem a seguir.</p></div>
+<p>O resultado do 1.º prompt, com os nossos dados e o <em>vídeo do camião porta-carros</em> que geraste. É o fundo mais on-message dos quatro: mostra literalmente a importação a acontecer. Repara que é <em>só um hero</em> — o prompt não diz nada sobre o que vem a seguir.</p></div>
 <div class="P1">
-  <div class="vid"></div><div class="scrim"></div>
+  <video class="vid" autoplay muted loop playsinline preload="metadata" poster="video/camiao-poster.jpg"><source src="video/camiao.mp4" type="video/mp4"></video><div class="scrim"></div>
   <nav><span class="b"><i>Auto</i><s>Import</s></span><span>Mercado</span><span>Como funciona</span><span>Preço</span><span class="cta">Começar grátis ↗</span></nav>
   <div class="mid">
     <div class="lbl"><i></i>Atualizado hoje · 29 281 anúncios lidos</div>

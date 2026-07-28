@@ -242,11 +242,7 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 /* ══════════ P3 — prompt 3 (Atelier) ══════════ */
 .P3{position:relative;min-height:94vh;display:flex;flex-direction:column;color:#fff;overflow:hidden;
     background:linear-gradient(165deg,#1c2529,#2b3a3f 48%,#131a1d)}
-.P3 .vid{position:absolute;inset:0;
-  background:radial-gradient(110% 80% at 26% 22%,rgba(200,215,220,.26),transparent 58%),
-             radial-gradient(90% 70% at 82% 78%,rgba(160,114,42,.24),transparent 62%)}
-.P3 .vid::after{content:'▶ aqui entrava o vídeo de fundo — /video/hero.mp4';position:absolute;right:16px;bottom:14px;
-  font:400 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.28)}
+.P3 .vid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center}
 .P3 .scrim{position:absolute;inset:0;background:rgba(0,0,0,.45)}
 .P3 nav{position:relative;z-index:2;display:flex;align-items:center;gap:26px;flex-wrap:wrap;
         padding:22px clamp(22px,5vw,64px);font:300 14px Inter;color:rgba(255,255,255,.8)}
@@ -266,14 +262,20 @@ input.t{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
 .P3 .btns .s{border:1px solid rgba(255,255,255,.4);color:#fff}
 .P3 .foot{position:relative;z-index:2;text-align:center;padding-bottom:44px;
           font:400 11px Inter;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+
+/* Movimento reduzido: esconde o vídeo, fica o poster como fundo. */
+@media (prefers-reduced-motion: reduce){
+  .P3 .vid{display:none}
+  .P3{background-image:url(video/autoestrada-poster.jpg);background-size:cover;background-position:center}
+}
 </style>
 </head>
 <body>
 
 <div class="tag"><h4>Prompt 3 — do "Atelier"</h4>
-<p>Serifa Instrument sobre vídeo escuro, tudo centrado. É o mais próximo da direção C — só que centrado em vez de assimétrico, e com o peso todo num ecrã em vez de distribuído pela página.</p></div>
+<p>Serifa Instrument sobre a <em>autoestrada à hora azul</em>. É o mais próximo da direção C — só que centrado em vez de assimétrico, e com o peso todo num ecrã em vez de distribuído pela página.</p></div>
 <div class="P3">
-  <div class="vid"></div><div class="scrim"></div>
+  <video class="vid" autoplay muted loop playsinline preload="metadata" poster="video/autoestrada-poster.jpg"><source src="video/autoestrada.mp4" type="video/mp4"></video><div class="scrim"></div>
   <nav><span class="b">AutoImport</span><span>Mercado</span><span>Como funciona</span><span>Preço</span><span>Ajuda</span>
     <span class="sp"><span>Entrar</span><span class="cta">Começar grátis</span></span></nav>
   <div class="mid">

@@ -49,3 +49,6 @@ tools/net-capture/package-lock.json
 
 # Claude Code — worktrees temporárias de subagentes (artefacto local)
 .claude/worktrees/
+
+# Vídeos em bruto do Canva (~17 MB) — só as versões comprimidas vão para o repo
+/videos/
