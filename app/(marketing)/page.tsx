@@ -31,10 +31,15 @@ import Link from "next/link";
  * da 1.ª versão desta landing (5 de 6 secções com o mesmo padding, um só fundo,
  * um só tamanho de h2). Aqui a variação é deliberada e mede-se:
  *
- *   respiro   100svh · 96 · 64 · 56 · 80 px      (nunca dois iguais)
+ *   ordem     hero · mercado · a conta do ISV · como funciona · preço
+ *   respiro   100svh · 56 · 96 · 56 · 80 px      (nunca dois iguais seguidos)
  *   fundo     #08090b · #0d0f13 · #08090b · #0b0d11 · ÂMBAR
- *   h1/h2     ~138 · 44 · 32 · 22 · 40 px
+ *   h1/h2     ~138 · 32 · 44 · — · 40 px
  *   largura   1120 em tudo
+ *
+ * ⚠️ O mercado é a 2.ª secção e por isso TEM de ser banda (#0d0f13): a seguir
+ * ao hero, com o mesmo chão, as duas corriam juntas e a página voltava a ficar
+ * plana. Trocar a ordem destas secções obriga a reatribuir os fundos.
  *
  * A banda do preço é âmbar de propósito: num ecrã escuro do princípio ao fim,
  * o único momento claro tem de ser onde se pede a decisão. É a inversão que
@@ -54,21 +59,6 @@ const STEPS = [
   {
     n: "Contactas o vendedor",
     body: "Falas com o stand estrangeiro a partir da plataforma e acompanhas a compra até à matrícula portuguesa.",
-  },
-];
-
-const LIMITS = [
-  {
-    title: "São estimativas, não orçamentos",
-    body: "Usamos a tabela do ISV em vigor e valores de referência de transporte. O valor real pode variar algumas centenas de euros.",
-  },
-  {
-    title: "Não substituímos a Alfândega",
-    body: "Quem fixa o ISV é a Autoridade Tributária, na inspeção do veículo. A nossa conta serve para decidires se vale a pena avançar.",
-  },
-  {
-    title: "Um anúncio pode já estar vendido",
-    body: "Lemos os anúncios uma vez por dia. Marcamos a data da última verificação para saberes o que estás a ver.",
   },
 ];
 
@@ -178,28 +168,9 @@ export default async function LandingPage() {
         </dl>
       </section>
 
-      {/* ══ 2. A CONTA DO ISV ══ banda mais clara, o maior título ═══ */}
-      {isvExample && (
-        <section id="como-funciona" className="border-y border-white/[0.07] bg-[#0d0f13]">
-          <div className="revelar mx-auto max-w-[1120px] px-4 py-16 sm:px-6 sm:py-24">
-            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
-              A conta
-            </p>
-            <h2 className="max-w-[15ch] font-display text-3xl font-black uppercase leading-[0.94] tracking-[-0.04em] sm:text-[2.75rem]">
-              A conta que ninguém quer fazer
-            </h2>
-            <p className="mb-10 mt-5 max-w-[52ch] text-[15px] leading-relaxed text-white/55 sm:text-base">
-              Este é um carro que está à venda agora, com os números de hoje. Abre o ISV para veres
-              de onde vem o valor.
-            </p>
-            <LandingCostBreakdown car={isvExample} />
-          </div>
-        </section>
-      )}
-
-      {/* ══ 3. MERCADO ══ carrossel com setas ═══════════════════════ */}
+      {/* ══ 2. MERCADO ══ carrossel, em banda própria ══════════════ */}
       {featured.length > 0 && (
-        <section id="mercado" className="py-14 sm:py-16">
+        <section id="mercado" className="border-y border-white/[0.07] bg-[#0d0f13] py-14 sm:py-16">
           <div className="mx-auto max-w-[1120px] px-4 sm:px-6">
             <div className="revelar flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
               <div>
@@ -251,51 +222,57 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* ══ 4. APOIO ══ banda calma, tipo pequeno, colunas 3fr/2fr ══
-             Assimétrico de propósito, para a página não ser só grelhas de
-             partes iguais. Os limites ficam ANTES do preço: quem os lê e mesmo
-             assim carrega no botão, chega convencido. ══════════════ */}
-      <section className="border-y border-white/[0.07] bg-[#0b0d11]">
-        <div className="revelar mx-auto grid max-w-[1120px] gap-x-16 gap-y-12 px-4 py-14 sm:px-6 lg:grid-cols-[3fr_2fr]">
-          <div>
-            <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-white/35">
-              Como funciona
+      {/* ══ 3. A CONTA DO ISV ══ o maior título, o maior respiro ════ */}
+      {isvExample && (
+        <section>
+          <div className="revelar mx-auto max-w-[1120px] px-4 py-16 sm:px-6 sm:py-24">
+            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+              A conta
             </p>
-            <ol>
-              {STEPS.map((step) => (
-                <li key={step.n} className="border-t border-white/[0.09] py-4">
-                  <h3 className="font-display text-[1.05rem] font-bold tracking-tight text-white">
-                    {step.n}
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-white/45">{step.body}</p>
-                </li>
-              ))}
-            </ol>
+            <h2 className="max-w-[15ch] font-display text-3xl font-black uppercase leading-[0.94] tracking-[-0.04em] sm:text-[2.75rem]">
+              A conta que ninguém quer fazer
+            </h2>
+            <p className="mb-10 mt-5 max-w-[52ch] text-[15px] leading-relaxed text-white/55 sm:text-base">
+              Este é um carro que está à venda agora, com os números de hoje. Abre o ISV para veres
+              de onde vem o valor.
+            </p>
+            <LandingCostBreakdown car={isvExample} />
           </div>
+        </section>
+      )}
 
-          <div>
-            <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
-              O que isto não faz
-            </p>
-            <ul>
-              {LIMITS.map((l) => (
-                <li key={l.title} className="border-t border-white/[0.09] py-4">
-                  <h3 className="font-display text-[1.05rem] font-bold tracking-tight text-white">
-                    {l.title}
-                  </h3>
-                  <p className="mt-1.5 text-[13px] leading-relaxed text-white/45">{l.body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4">
-              <Link
-                href="/ajuda"
-                className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
-              >
-                As perguntas que os stands fazem mesmo ↗
-              </Link>
-            </p>
-          </div>
+      {/* ══ 4. COMO FUNCIONA ══ banda calma, tipo pequeno ══════════
+             Os limites ("o que isto não faz") saíram por decisão do Rui — a
+             informação não se perdeu, vive na /ajuda, e o link para lá fecha a
+             secção. Três passos em três colunas: é uma grelha de partes
+             iguais, mas aqui é honesta — são três passos sequenciais do mesmo
+             peso, não três secções a fingir importância igual. ═════════ */}
+      <section id="como-funciona" className="border-y border-white/[0.07] bg-[#0b0d11]">
+        <div className="revelar mx-auto max-w-[1120px] px-4 py-14 sm:px-6">
+          {/* `h2` e não `p`: com os limites removidos esta secção deixou de ter
+              título grande, e ficava sem cabeçalho nenhum na árvore do
+              documento — um leitor de ecrã saltava de "Alguns dos 174" para
+              "100 € por mês" sem saber que passou por aqui. O aspeto é o
+              mesmo; a estrutura é que fica certa. */}
+          <h2 className="text-[10px] uppercase tracking-[0.24em] text-white/35">Como funciona</h2>
+          <ol className="mt-6 grid gap-x-12 gap-y-0 sm:grid-cols-3">
+            {STEPS.map((step) => (
+              <li key={step.n} className="border-t border-white/[0.09] py-4">
+                <h3 className="font-display text-[1.05rem] font-bold tracking-tight text-white">
+                  {step.n}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-white/45">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-8 border-t border-white/[0.09] pt-6">
+            <Link
+              href="/ajuda"
+              className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
+            >
+              As perguntas que os stands fazem mesmo ↗
+            </Link>
+          </p>
         </div>
       </section>
 
