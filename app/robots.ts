@@ -23,6 +23,12 @@ export default function robots(): MetadataRoute.Robots {
           "/entrar",
           "/registar",
           "/recuperar",
+          // ⚠️ TEMPORÁRIO — maquetes de design em public/mockups/, publicadas
+          // em produção só para a equipa as poder ver sem a proteção que tranca
+          // os previews da Vercel. Sai daqui quando as maquetes saírem.
+          // Quem impede mesmo a indexação é o <meta name="robots" noindex> que
+          // cada página tem; isto só evita o rastreio.
+          "/mockups/",
         ],
       },
     ],
