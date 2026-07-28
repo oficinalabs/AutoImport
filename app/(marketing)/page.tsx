@@ -1,6 +1,12 @@
 import { LandingCostBreakdown } from "@/components/landing/cost-breakdown";
 import { OpportunityCard } from "@/components/landing/opportunity-card";
-import { Button } from "@/components/ui/button";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { getLandingData } from "@/lib/data";
 import { formatEuro, formatNumber } from "@/lib/format";
 import { CONDICOES } from "@/lib/legal";
@@ -13,58 +19,48 @@ import Link from "next/link";
  * Cacheada 1 hora: é a primeira coisa que um stand vê, tem de abrir depressa, e
  * o pipeline só corre uma vez por dia — uma hora de desfasamento é invisível.
  *
- * ── Sobre a COMPOSIÇÃO (não mexer sem perceber isto) ────────────────
- * A 1.ª versão desta página tinha 5 de 6 secções com exatamente o mesmo padding
- * (44px), uma só largura, um só fundo e um só tamanho de h2. Cada secção estava
- * certa isolada; o conjunto lia-se como gerado, porque em 3 200 px de altura
- * nada mudava nunca.
+ * ── A PÁGINA É ESCURA SEMPRE ────────────────────────────────────────
+ * Não segue o tema claro/escuro do utilizador: é uma peça de marca, como uma
+ * capa. Por isso as cores aqui são LITERAIS (`text-white/55`, `bg-white/[0.04]`)
+ * e não tokens (`text-ink-soft`, `bg-surface`) — um token daria texto escuro
+ * sobre fundo escuro a quem tem o tema claro. É a exceção; o resto da app usa
+ * tokens e deve continuar a usar.
  *
- * O que segura a página agora é a VARIAÇÃO, e é deliberada:
- *   respiro   96 · 96 · 64 · 56 · 80 px   (a densidade diz o que importa)
- *   fundo     paper · surface · paper · surface · petróleo
- *   h2        —  · 44 · 32 · 22 · 40 px
- *   largura   1120 em tudo, EXCETO a fila de oportunidades, que sangra
+ * ── COMPOSIÇÃO (não mexer sem perceber isto) ────────────────────────
+ * Uma página toda escura corre o risco de ficar plana — foi exatamente o defeito
+ * da 1.ª versão desta landing (5 de 6 secções com o mesmo padding, um só fundo,
+ * um só tamanho de h2). Aqui a variação é deliberada e mede-se:
  *
- * A conta do ISV é a peça mais convincente que temos: leva a banda maior e o
- * maior título. Como funciona / o que não faz são material de apoio — tipo
- * pequeno, colunas assimétricas, sem cartões.
+ *   ordem     hero · mercado · a conta do ISV · como funciona · preço
+ *   respiro   100svh · 80 · 96 · 56 · 80 px      (nunca dois iguais seguidos)
+ *   fundo     #08090b · #0d0f13 · #08090b · #0b0d11 · ÂMBAR
+ *   h1/h2     ~138 · 40 · 44 · — · 40 px
+ *   largura   1120 em tudo
+ *
+ * ⚠️ O mercado é a 2.ª secção e por isso TEM de ser banda (#0d0f13): a seguir
+ * ao hero, com o mesmo chão, as duas corriam juntas e a página voltava a ficar
+ * plana. Trocar a ordem destas secções obriga a reatribuir os fundos.
+ *
+ * A banda do preço é âmbar de propósito: num ecrã escuro do princípio ao fim,
+ * o único momento claro tem de ser onde se pede a decisão. É a inversão que
+ * faz o fim da página soar diferente do resto sem mudar de linguagem.
  */
 export const revalidate = 3600;
 
 const STEPS = [
   {
-    title: "Dizes o que procuras",
+    n: "Dizes o que procuras",
     body: "Marca, modelo, orçamento, quilómetros. Ou deixas em aberto e vês tudo o que compensa hoje.",
   },
   {
-    title: "Nós fazemos a conta",
+    n: "Nós fazemos a conta",
     body: "Todos os dias recalculamos ISV, IUC, transporte e legalização de cada anúncio, e comparamos com o preço praticado em Portugal.",
   },
   {
-    title: "Contactas o vendedor",
+    n: "Contactas o vendedor",
     body: "Falas com o stand estrangeiro a partir da plataforma e acompanhas a compra até à matrícula portuguesa.",
   },
 ];
-
-const LIMITS = [
-  {
-    title: "São estimativas, não orçamentos",
-    body: "Usamos a tabela do ISV em vigor e valores de referência de transporte. O valor real pode variar algumas centenas de euros.",
-  },
-  {
-    title: "Não substituímos a Alfândega",
-    body: "Quem fixa o ISV é a Autoridade Tributária, na inspeção do veículo. A nossa conta serve para decidires se vale a pena avançar.",
-  },
-  {
-    title: "Um anúncio pode já estar vendido",
-    body: "Lemos os anúncios uma vez por dia. Marcamos a data da última verificação para saberes o que estás a ver.",
-  },
-];
-
-/** Alinha o 1.º cartão da fila com a coluna de 1120 e deixa os outros correr até
- *  ao bordo do ecrã. É o único sítio onde a página sangra — de propósito: a
- *  fila cortada diz "há mais" melhor do que qualquer legenda. */
-const BLEED_PAD = "px-[max(1rem,calc((100vw-1120px)/2))]";
 
 export default async function LandingPage() {
   const {
@@ -89,19 +85,15 @@ export default async function LandingPage() {
   ];
 
   return (
-    <>
-      {/* ── Hero cinematográfico ─────────────────────────────────
-          `data-hero="escuro"` não é decoração: o cabeçalho do site é claro e
-          fica por cima disto. O globals.css apanha-o com `body:has(...)` e
-          escurece-o SÓ nesta página. Tirar o atributo devolve um cabeçalho
-          branco em cima de um vídeo escuro. */}
+    <div className="bg-[#08090b] text-white">
+      {/* ══ 1. HERO ══ vídeo, 100svh, o número a ocupar o ecrã ══════ */}
       <section
         data-hero="escuro"
-        className="relative -mt-14 flex min-h-[100svh] flex-col overflow-hidden bg-[#08090b] px-4 pt-14 text-white sm:px-6"
+        className="relative -mt-14 flex min-h-[100svh] flex-col overflow-hidden px-4 pt-14 sm:px-6"
       >
         {/* `-mt-14`+`pt-14`: o hero desliza para debaixo do cabeçalho sticky
-            (h-14) e o conteúdo desce outra vez — o vídeo passa a começar no
-            topo do ecrã em vez de abaixo de uma barra clara. */}
+            (h-14) e o conteúdo desce outra vez — o vídeo começa no topo do ecrã
+            em vez de abaixo de uma barra. */}
         <video
           className="absolute inset-0 size-full object-cover"
           autoPlay
@@ -114,7 +106,6 @@ export default async function LandingPage() {
         >
           <source src="/video/hero-camiao.mp4" type="video/mp4" />
         </video>
-        {/* Véu: o vídeo é claro à direita e o texto branco não leria sem isto. */}
         <div
           aria-hidden
           className="absolute inset-0 bg-[linear-gradient(102deg,rgba(8,9,11,.93)_0%,rgba(8,9,11,.78)_38%,rgba(8,9,11,.4)_70%,rgba(8,9,11,.74)_100%)]"
@@ -124,11 +115,10 @@ export default async function LandingPage() {
           {atualizado && (
             /* Sem `flex`: com `tracking` largo e duas linhas em mobile, o flex
                abria um buraco no meio da frase. Ponto inline + `align-middle`
-               deixa o texto quebrar como texto normal. O tracking também
-               aperta em ecrãs pequenos, senão a frase ocupa três linhas. */
+               deixa o texto quebrar como texto normal. */
             <p className="animar-entrada mb-7 text-[10px] uppercase leading-[2] tracking-[0.16em] text-white/60 sm:text-[11px] sm:leading-normal sm:tracking-[0.28em]">
               <span
-                className="mr-2.5 inline-block size-1.5 rounded-full bg-good align-middle ring-4 ring-good/20 motion-safe:animate-pulsar"
+                className="mr-2.5 inline-block size-1.5 rounded-full bg-emerald-400 align-middle ring-4 ring-emerald-400/20 motion-safe:animate-pulsar"
                 aria-hidden
               />
               Atualizado a {atualizado} ·{" "}
@@ -152,16 +142,18 @@ export default async function LandingPage() {
           </p>
 
           <div className="animar-entrada atraso-5 mt-9 flex flex-wrap items-center gap-x-6 gap-y-4">
-            <Button asChild variant="accent" size="lg">
-              <Link href="/registar">Começar — 1.º mês grátis</Link>
-            </Button>
-            <span className="text-xs uppercase tracking-[0.14em] text-white/55">
+            <Link
+              href="/registar"
+              className="rounded-full bg-white px-7 py-4 text-[11px] font-bold uppercase tracking-[0.14em] text-[#08090b] transition-colors hover:bg-white/85"
+            >
+              Começar — 1.º mês grátis ↗
+            </Link>
+            <span className="text-[11px] uppercase tracking-[0.14em] text-white/50">
               Sem cartão · sem fidelização
             </span>
           </div>
         </div>
 
-        {/* Números sobre o vídeo, separados só por um fio. */}
         <dl className="animar-entrada atraso-6 relative z-10 mx-auto grid w-full max-w-[1120px] grid-cols-2 gap-x-6 border-t border-white/15 pb-12 pt-6 sm:grid-cols-4 sm:pb-16">
           {STATS.map((s) => (
             <div key={s.label} className="py-2">
@@ -176,14 +168,71 @@ export default async function LandingPage() {
         </dl>
       </section>
 
-      {/* ── A conta do ISV — a peça central, em banda própria ────── */}
+      {/* ══ 2. MERCADO ══ carrossel, em banda própria ══════════════ */}
+      {featured.length > 0 && (
+        <section id="mercado" className="border-y border-white/[0.07] bg-[#0d0f13] py-16 sm:py-20">
+          <div className="mx-auto max-w-[1120px] px-4 sm:px-6">
+            <div className="revelar flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+              <div>
+                <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+                  Mercado
+                </p>
+                <h2 className="font-display text-3xl font-black uppercase tracking-[-0.04em] sm:text-[2.5rem]">
+                  Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de
+                  hoje
+                </h2>
+              </div>
+              <Link
+                href="/registar"
+                className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
+              >
+                Ver todos ↗
+              </Link>
+            </div>
+
+            {/* A fila deixou de sangrar até ao bordo: com setas, o carrossel
+                precisa de margem para elas viverem, e uma seta cortada pelo
+                ecrã é pior do que não a ter. O `basis-[80%]` em mobile deixa
+                espreitar o cartão seguinte — é o que diz "isto arrasta". */}
+            {/* Sem `opts={{...}}`: um literal aqui é um objeto novo a cada
+                render e o embla faz reInit — o carrossel voltava ao princípio a
+                cada clique. O `align: "start"` já é o valor por omissão. */}
+            <Carousel className="revelar mt-7">
+              <CarouselContent className="-ml-4">
+                {featured.map((car) => (
+                  <CarouselItem key={car.id} className="basis-[80%] pl-4 sm:basis-1/2 lg:basis-1/3">
+                    <OpportunityCard car={car} />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
+
+            {/* A menção às imagens não é rodapé legal por precaução: os cartões
+                usam o render de catálogo do MODELO, não a foto daquele carro (ver
+                `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
+                argumento inteiro é rigor nos números, deixar passar uma foto de
+                estúdio como sendo o carro à venda custava mais do que ganhava. */}
+            <p className="mt-6 text-[11px] uppercase tracking-[0.1em] text-white/30">
+              Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
+              vendidos
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* ══ 3. A CONTA DO ISV ══ o maior título, o maior respiro ════ */}
       {isvExample && (
-        <section id="como-funciona" className="border-y border-line bg-surface">
+        <section>
           <div className="revelar mx-auto max-w-[1120px] px-4 py-16 sm:px-6 sm:py-24">
-            <h2 className="max-w-[18ch] text-balance font-display text-3xl font-bold tracking-[-0.03em] sm:text-[2.75rem] sm:leading-[1.05]">
+            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
+              A conta
+            </p>
+            <h2 className="max-w-[15ch] font-display text-3xl font-black uppercase leading-[0.94] tracking-[-0.04em] sm:text-[2.75rem]">
               A conta que ninguém quer fazer
             </h2>
-            <p className="mb-10 mt-4 max-w-[58ch] text-ink-soft sm:text-lg">
+            <p className="mb-10 mt-5 max-w-[52ch] text-[15px] leading-relaxed text-white/55 sm:text-base">
               Este é um carro que está à venda agora, com os números de hoje. Abre o ISV para veres
               de onde vem o valor.
             </p>
@@ -192,111 +241,72 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* ── Oportunidades — o único momento que sangra ───────────── */}
-      {featured.length > 0 && (
-        <section className="py-12 sm:py-16">
-          <div className="revelar mx-auto flex max-w-[1120px] flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 sm:px-6">
-            <h2 className="font-display text-2xl font-bold tracking-[-0.02em] sm:text-[2rem]">
-              Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de hoje
-            </h2>
+      {/* ══ 4. COMO FUNCIONA ══ banda calma, tipo pequeno ══════════
+             Os limites ("o que isto não faz") saíram por decisão do Rui — a
+             informação não se perdeu, vive na /ajuda, e o link para lá fecha a
+             secção. Três passos em três colunas: é uma grelha de partes
+             iguais, mas aqui é honesta — são três passos sequenciais do mesmo
+             peso, não três secções a fingir importância igual. ═════════ */}
+      <section id="como-funciona" className="border-y border-white/[0.07] bg-[#0b0d11]">
+        <div className="revelar mx-auto max-w-[1120px] px-4 py-14 sm:px-6">
+          {/* `h2` e não `p`: com os limites removidos esta secção deixou de ter
+              título grande, e ficava sem cabeçalho nenhum na árvore do
+              documento — um leitor de ecrã saltava de "Alguns dos 174" para
+              "100 € por mês" sem saber que passou por aqui. O aspeto é o
+              mesmo; a estrutura é que fica certa. */}
+          <h2 className="text-[10px] uppercase tracking-[0.24em] text-white/35">Como funciona</h2>
+          <ol className="mt-6 grid gap-x-12 gap-y-0 sm:grid-cols-3">
+            {STEPS.map((step) => (
+              <li key={step.n} className="border-t border-white/[0.09] py-4">
+                <h3 className="font-display text-[1.05rem] font-bold tracking-tight text-white">
+                  {step.n}
+                </h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-white/45">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-8 border-t border-white/[0.09] pt-6">
             <Link
-              href="/registar"
-              className="text-sm text-amber underline-offset-4 hover:underline"
+              href="/ajuda"
+              className="text-[11px] uppercase tracking-[0.14em] text-amber-400 transition-colors hover:text-amber-300"
             >
-              Ver todos →
+              As perguntas que os stands fazem mesmo ↗
             </Link>
-          </div>
-
-          <div className="revelar mt-6 overflow-x-auto pb-3 [scrollbar-width:thin]">
-            <ul className={`flex w-max gap-3.5 ${BLEED_PAD}`}>
-              {featured.map((car) => (
-                <li key={car.id} className="w-[272px] shrink-0">
-                  <OpportunityCard car={car} />
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* A menção às imagens não é rodapé legal por precaução: os cartões
-              usam o render de catálogo do MODELO, não a foto daquele carro (ver
-              `prefer="catalog"` em opportunity-card.tsx). Numa página cujo
-              argumento inteiro é rigor nos números, deixar passar uma foto de
-              estúdio como sendo o carro à venda custava mais do que ganhava. */}
-          <p className="mx-auto max-w-[1120px] px-4 text-sm text-steel sm:px-6">
-            Imagens ilustrativas do modelo · verificados na última leitura, podem já ter sido
-            vendidos
           </p>
-        </section>
-      )}
-
-      {/* ── Apoio: como funciona + limites. Banda calma, tipo pequeno,
-             colunas assimétricas (3fr/2fr) para a página não ser só grelhas
-             de partes iguais. Os limites ficam de propósito ANTES do preço:
-             quem os lê e mesmo assim carrega no botão, chega convencido. ── */}
-      <section className="border-y border-line bg-surface">
-        <div className="revelar mx-auto grid max-w-[1120px] gap-x-14 gap-y-10 px-4 py-12 sm:px-6 sm:py-14 lg:grid-cols-[3fr_2fr]">
-          <div>
-            <h2 className="font-display text-xl font-bold tracking-[-0.02em] sm:text-[1.375rem]">
-              Como funciona
-            </h2>
-            <ol className="mt-5">
-              {STEPS.map((step) => (
-                <li key={step.title} className="border-t border-line py-4">
-                  <h3 className="font-display text-[0.95rem] font-semibold">{step.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-soft">{step.body}</p>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div>
-            <h2 className="font-display text-xl font-bold tracking-[-0.02em] sm:text-[1.375rem]">
-              O que isto <span className="text-amber">não</span> faz
-            </h2>
-            <ul className="mt-5">
-              {LIMITS.map((l) => (
-                <li key={l.title} className="border-t border-line py-4">
-                  <h3 className="font-display text-[0.95rem] font-semibold">{l.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-ink-soft">{l.body}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 text-sm">
-              <Link href="/ajuda" className="text-amber underline underline-offset-2">
-                As perguntas que os stands fazem mesmo
-              </Link>
-            </p>
-          </div>
         </div>
       </section>
 
-      {/* ── Preço — banda cheia, alto e curto ────────────────────── */}
-      <section id="preco" className="bg-petrol text-white">
-        <div className="revelar mx-auto grid max-w-[1120px] items-center gap-8 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[1.4fr_1fr]">
+      {/* ══ 5. PREÇO ══ a inversão: o único momento claro da página ══ */}
+      <section id="preco" className="bg-amber text-[#1a1204]">
+        <div className="revelar mx-auto grid max-w-[1120px] items-center gap-10 px-4 py-16 sm:px-6 sm:py-20 lg:grid-cols-[1.35fr_1fr]">
           <div>
-            <h2 className="text-balance font-display text-3xl font-bold tracking-[-0.03em] sm:text-[2.5rem] sm:leading-[1.05]">
-              <span className="tnum">{CONDICOES.precoMensalEuros} €</span> por mês. O primeiro é
-              grátis.
+            <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-[#1a1204]/55">Preço</p>
+            <h2 className="font-display text-3xl font-black uppercase leading-[0.92] tracking-[-0.04em] sm:text-[2.5rem]">
+              <span className="tnum">{CONDICOES.precoMensalEuros} €</span> por mês.
+              <br />O primeiro é grátis.
             </h2>
-            <p className="mt-3 max-w-[46ch] text-white/70">
+            <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-[#1a1204]/70">
               Sem cartão para experimentar, sem fidelização, cancelas quando quiseres. Um preço só,
               toda a equipa do stand incluída.
             </p>
           </div>
-          <div className="flex flex-col gap-3 lg:items-end">
-            <Button asChild variant="accent" size="lg">
-              <Link href="/registar">Começar — 1.º mês grátis</Link>
-            </Button>
-            <span className="text-sm text-white/60">
+          <div className="flex flex-col items-start gap-4 lg:items-end">
+            <Link
+              href="/registar"
+              className="rounded-full bg-[#08090b] px-8 py-4 text-[11px] font-bold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#08090b]/85"
+            >
+              Começar — 1.º mês grátis ↗
+            </Link>
+            <span className="text-[11px] uppercase tracking-[0.12em] text-[#1a1204]/60 lg:text-right">
               Um carro dos de hoje paga{" "}
               <span className="tnum">
                 {Math.floor(medianSavings / CONDICOES.precoMensalEuros)} meses
               </span>{" "}
-              de subscrição.
+              de subscrição
             </span>
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }

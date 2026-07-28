@@ -10,7 +10,12 @@ import Link from "next/link";
  */
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line">
+    // `data-site-footer`: par do `data-site-header`. A landing é escura de ponta
+    // a ponta e o globals.css escurece este rodapé para a página não acabar num
+    // degrau claro logo a seguir à banda âmbar do preço. Atributo explícito, e
+    // não `footer` genérico, pela mesma razão do cabeçalho: um seletor largo já
+    // apanhou um elemento errado uma vez.
+    <footer data-site-footer className="border-t border-line">
       <div className="mx-auto w-full max-w-[1120px] px-4 py-10 sm:px-6">
         <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
           <div className="max-w-xs">

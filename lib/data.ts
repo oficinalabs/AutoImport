@@ -156,9 +156,11 @@ export async function getLandingData(): Promise<LandingData> {
   ]);
   return {
     ...stats,
-    // 8, não 4: a fila sangra para fora do ecrã e é cortada à direita — é assim
-    // que se diz "há mais 174" sem ter de escrever uma legenda a dizê-lo.
-    featured: top.slice(0, 8),
+    // 5: a fila passou a carrossel com setas (components/ui/carousel.tsx), e
+    // com 4 visíveis de cada vez, 5 deixa exatamente um por revelar — que é o
+    // que faz a seta valer a pena. Com 8 ficavam duas páginas e a segunda
+    // raramente se via.
+    featured: top.slice(0, 5),
     isvExample: escolherExemploIsv(top),
   };
 }
