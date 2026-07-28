@@ -151,9 +151,8 @@ async function seedSource(sql: Sql): Promise<void> {
       ('PF-M2', 'Pubmarke', 'P200', 'P200-2022', 2022, 'https://example.test/m2', null)
   `;
   await sql`
-    insert into us_versions (version_id, mid, name, url, power_hp, displacement_cc, specs)
-    values ('PF-V1', 'PF-M1', 'P100 2022 1.0 T 130', 'https://example.test/v1', 130, 999,
-            ${sql.json({ "Bore x Stroke": "71.0 x 84.0 mm" })})
+    insert into us_versions (version_id, mid, name, url, power_hp, displacement_cc)
+    values ('PF-V1', 'PF-M1', 'P100 2022 1.0 T 130', 'https://example.test/v1', 130, 999)
   `;
 
   const rows = [
@@ -437,9 +436,9 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
       usModels.map((r) => r.mid),
       ["PF-M1", "PF-M2"],
     );
-    const usVersions = await tgt`select version_id, mid, specs from us_versions`;
+    const usVersions = await tgt`select version_id, mid from us_versions`;
     assert.equal(usVersions.length, 1, "só a versão referenciada");
-    assert.equal(usVersions[0].specs, null, "a coluna specs (100 MB) não atravessa");
+    assert.equal(usVersions.length, 1, "só a versão referenciada pela montra atravessa");
 
     // 7. Dimensões com uuid: uma linha por chave natural, e os anúncios apontam
     //    para o uuid do DESTINO.

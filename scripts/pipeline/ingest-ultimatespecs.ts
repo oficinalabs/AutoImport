@@ -169,7 +169,8 @@ async function main() {
           emissionStandard: r.deep?.emissionStandard,
           curbWeightKg: int(r.deep?.curbWeightKg),
           imageUrl: r.deep?.imageUrl,
-          specs: r.deep?.specs,
+          // `r.deep.specs` (a ficha crua) NÃO entra: fica no NDJSON, que é o
+          // arquivo. Ver o comentário de `usVersions` em db/schema.ts.
         })),
       )
       .onConflictDoUpdate({
@@ -191,7 +192,6 @@ async function main() {
           emissionStandard: sql`excluded.emission_standard`,
           curbWeightKg: sql`excluded.curb_weight_kg`,
           imageUrl: sql`excluded.image_url`,
-          specs: sql`excluded.specs`,
         },
       });
   }

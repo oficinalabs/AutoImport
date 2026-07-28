@@ -23,9 +23,10 @@
  * apaga um listing — o que morre leva `deleted_at`, e a `favoritesQuery` mostra os
  * mortos de propósito (docs/08).
  *
- * O QUE NÃO ATRAVESSA: `us_versions.specs` (jsonb de ~100 MB dos 116 do catálogo,
- * sem um único leitor na app), `listings.raw`, `listings.match_evidence` e
+ * O QUE NÃO ATRAVESSA: `listings.raw`, `listings.match_evidence` e
  * `import_cost_estimates.inputs` — auditoria do pipeline, lida só no warehouse.
+ * (A `us_versions.specs` deixou de existir: era ~100 MB dos 116 do catálogo, sem
+ * leitores, e passou a viver no NDJSON — ver db/schema.ts.)
  *
  * DRY-RUN por omissão: corre o ciclo INTEIRO dentro de uma transação e faz ROLLBACK
  * no fim, portanto os números impressos são reais (e o ensaio prova que as FKs

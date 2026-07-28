@@ -526,9 +526,14 @@ export const usModels = pgTable(
 
 /**
  * Versão/motorização (ex. "Stonic 2021 1.0 T-GDI 100"): o grão do matching.
- * Os campos normalizados servem queries diretas; `specs` guarda TODAS as linhas
- * cruas `label → valor` da ficha (~37+/versão, Bore x Stroke, WLTP low/medium/…)
- * — nada do modo --deep se perde.
+ * Só os campos normalizados, que servem queries diretas.
+ *
+ * Houve aqui uma coluna `specs` (jsonb) com TODAS as linhas cruas `label → valor`
+ * da ficha do modo --deep (~39/versão). Pesava ~100 dos 116 MB da tabela — metade
+ * do orçamento da Supabase — e não tinha um único leitor no repositório. A ficha
+ * crua é ARQUIVO, não dado de query: vive no NDJSON em disco, como o resto do
+ * arquivo (`ultimatespecs-specs-2026-07-28.ndjson`, 56.084 fichas). Se um dia o
+ * matching precisar de bore/stroke ou dos WLTP parciais, lê-se de lá ou re-crawla-se.
  */
 export const usVersions = pgTable(
   "us_versions",
@@ -567,8 +572,6 @@ export const usVersions = pgTable(
     curbWeightKg: integer("curb_weight_kg"),
     /** imagem principal (w800) — URL direto ultimatespecs */
     imageUrl: text("image_url"),
-    /** ficha completa crua label→valor */
-    specs: jsonb("specs").$type<Record<string, string>>(),
     collectedAt: timestamp("collected_at"),
     ...domainTimestamps,
   },
