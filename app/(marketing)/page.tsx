@@ -32,9 +32,9 @@ import Link from "next/link";
  * um só tamanho de h2). Aqui a variação é deliberada e mede-se:
  *
  *   ordem     hero · mercado · a conta do ISV · como funciona · preço
- *   respiro   100svh · 56 · 96 · 56 · 80 px      (nunca dois iguais seguidos)
+ *   respiro   100svh · 80 · 96 · 56 · 80 px      (nunca dois iguais seguidos)
  *   fundo     #08090b · #0d0f13 · #08090b · #0b0d11 · ÂMBAR
- *   h1/h2     ~138 · 32 · 44 · — · 40 px
+ *   h1/h2     ~138 · 40 · 44 · — · 40 px
  *   largura   1120 em tudo
  *
  * ⚠️ O mercado é a 2.ª secção e por isso TEM de ser banda (#0d0f13): a seguir
@@ -170,14 +170,14 @@ export default async function LandingPage() {
 
       {/* ══ 2. MERCADO ══ carrossel, em banda própria ══════════════ */}
       {featured.length > 0 && (
-        <section id="mercado" className="border-y border-white/[0.07] bg-[#0d0f13] py-14 sm:py-16">
+        <section id="mercado" className="border-y border-white/[0.07] bg-[#0d0f13] py-16 sm:py-20">
           <div className="mx-auto max-w-[1120px] px-4 sm:px-6">
             <div className="revelar flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
               <div>
                 <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-amber-400/70">
                   Mercado
                 </p>
-                <h2 className="font-display text-2xl font-black uppercase tracking-[-0.035em] sm:text-[2rem]">
+                <h2 className="font-display text-3xl font-black uppercase tracking-[-0.04em] sm:text-[2.5rem]">
                   Alguns dos <span className="tnum">{formatNumber(activeOpportunities)}</span> de
                   hoje
                 </h2>
@@ -200,7 +200,7 @@ export default async function LandingPage() {
             <Carousel className="revelar mt-7">
               <CarouselContent className="-ml-4">
                 {featured.map((car) => (
-                  <CarouselItem key={car.id} className="basis-[80%] pl-4 sm:basis-1/2 lg:basis-1/4">
+                  <CarouselItem key={car.id} className="basis-[80%] pl-4 sm:basis-1/2 lg:basis-1/3">
                     <OpportunityCard car={car} />
                   </CarouselItem>
                 ))}
