@@ -1,0 +1,61 @@
+# Alertas dos stands: casa as oportunidades publicadas com os alertas guardados,
+# cria a notificação no sino e envia o email (scripts/pipeline/match-alerts.ts).
+#
+# PORQUÊ UM WORKFLOW PRÓPRIO. Até 27/07 os alertas eram o passo 10/10 do
+# `pipeline:daily`, que corria no cron do daily-batch. Esse cron saiu quando a
+# recolha passou a ser local (ver daily-batch.yml), mas os alertas NÃO podiam sair
+# com ele: são a única parte do pipeline que tem de correr na nuvem, porque
+# dependem só do que já está na Supabase — as oportunidades que o
+# `scripts/pipeline/publish.ts` publica a partir do warehouse local.
+#
+# É também a razão de não voltar a pendurar isto no `pipeline:daily`: esse
+# recomputa custos, e recomputá-los contra a Supabase produziria estimativas
+# PIORES do que as publicadas (a amostra PT de lá é uma fração da local).
+# Aqui só se LÊ o que foi publicado e se avisa quem pediu para ser avisado.
+name: Alertas
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC — depois da publicação da manhã
+  workflow_dispatch:
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  alertas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Casar alertas → sino + email
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # Sem a chave, o lib/email.ts avisa nos logs e segue — a notificação do
+          # sino é criada na mesma. Degradação honesta, não silêncio.
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || 'noreply@arestadigital.pt' }}
+          # Base dos links "Ver anúncio" no email e no sino.
+          BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || 'https://autoimport.arestadigital.pt' }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::secret DATABASE_URL ausente — sem base de dados não há alertas para casar."
+            exit 1
+          fi
+          if [ -z "$RESEND_API_KEY" ]; then
+            echo "::warning::secret RESEND_API_KEY ausente — os alertas criam a notificação no sino mas NÃO enviam email."
+          fi
+          # `pnpm pipeline:alerts`, não `tsx …/match-alerts.ts`: o script do
+          # package.json passa TSX_TSCONFIG_PATH=tsconfig.scripts.json, sem o qual
+          # o email rebenta com "React is not defined" — só em runtime, e só no
+          # envio (ver docs/09).
+          pnpm pipeline:alerts
