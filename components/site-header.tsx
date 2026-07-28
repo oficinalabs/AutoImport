@@ -5,7 +5,15 @@ import Link from "next/link";
 /** Cabeçalho público — landing, páginas legais e ajuda. */
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur">
+    // `data-site-header`: a landing tem um hero escuro e o globals.css precisa
+    // de escurecer ESTE cabeçalho. Sem o atributo, o seletor teria de ser
+    // `header` genérico — e apanhava também o <header> do bloco de custos
+    // (components/landing/cost-breakdown.tsx), que ficava com uma barra preta
+    // no meio de uma banda branca. Aconteceu; daí o atributo.
+    <header
+      data-site-header
+      className="sticky top-0 z-30 border-b border-line bg-paper/85 backdrop-blur"
+    >
       <div className="mx-auto flex h-14 w-full max-w-[1120px] items-center justify-between px-4 sm:px-6">
         <Link href="/" aria-label="AutoImport — início">
           <Wordmark />
