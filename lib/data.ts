@@ -87,12 +87,57 @@ export interface LandingData {
   /** Os carros da grelha de oportunidades. */
   featured: Listing[];
   /**
-   * O carro que ilustra a conta do ISV. **Tem de ter ISV > 0**: a secção
-   * chama-se "a conta que ninguém quer fazer" e a melhor oportunidade do dia é
-   * muitas vezes um elétrico, cujo ISV é zero — mostrar essa conta ensina nada
-   * e desmonta o argumento. null se não houver nenhum com ISV.
+   * O carro que ilustra a conta do ISV — ver `escolherExemploIsv()` para os
+   * dois critérios e porque existem. null só se não houver mesmo nenhum
+   * anúncio com ISV (stock todo elétrico), e aí a secção não aparece.
    */
   isvExample: Listing | null;
+}
+
+/**
+ * Km mínimos do carro que ilustra a conta do ISV.
+ *
+ * Sem isto sai muitas vezes um zero-quilómetros (a melhor oportunidade do dia
+ * chegou a ser um Tucson de 2026 com 5 km). O problema não é o carro ser bom —
+ * é que a linha que EXPLICA a conta é a «redução por anos de uso», e num carro
+ * novo essa linha diz literalmente "novo". A secção chama-se "a conta que
+ * ninguém quer fazer" e mostrava a versão da conta que não custa nada fazer.
+ *
+ * 20 000 km é o ponto a partir do qual um stand olha e vê um usado normal —
+ * que é o que os stands realmente importam.
+ */
+const ISV_EXEMPLO_KM_MIN = 20_000;
+
+/**
+ * Escolhe o carro que ilustra o ISV.
+ *
+ * ⚠️ NÃO é o de maior poupança, e isso é o ponto todo. Há uma correlação
+ * incómoda no produto: **quanto MENOR o imposto, maior a poupança** — logo o
+ * melhor negócio do dia é sistematicamente a pior lição sobre o ISV. Escolher
+ * pelo topo da lista deu, em dias seguidos, um elétrico (ISV 0 €) e um híbrido
+ * 1.2 (ISV 518 €, 2% do custo). Uma secção chamada "a conta que ninguém quer
+ * fazer" ilustrada com 518 € desmonta-se sozinha.
+ *
+ * Por isso ordena-se pelo **peso do ISV no custo final**, que é exatamente o
+ * número que o componente mostra em título. Entre candidatos igualmente
+ * reais (todos vêm de `opportunities`, já filtrados), fica o que ensina mais.
+ *
+ * Cascata, do melhor caso para o pior:
+ *   1. usado (≥ 20 000 km) com imposto, o de maior peso de ISV
+ *   2. qualquer um com imposto — pior exemplo, mas ainda ensina de onde vem
+ *   3. nenhum → a secção não aparece
+ *
+ * O passo 2 não é decoração: sem ele, um dia em que o topo do stock fosse todo
+ * elétrico ou semi-novo fazia **desaparecer a peça central da landing**. Um
+ * filtro que apaga a secção é pior do que um exemplo imperfeito.
+ */
+function escolherExemploIsv(top: Listing[]): Listing | null {
+  const peso = (l: Listing) => (l.cost.totalPt > 0 ? l.cost.isv / l.cost.totalPt : 0);
+  const comImposto = top.filter((l) => l.cost.isv > 0);
+  const usados = comImposto
+    .filter((l) => l.km >= ISV_EXEMPLO_KM_MIN)
+    .sort((a, b) => peso(b) - peso(a));
+  return usados[0] ?? comImposto[0] ?? null;
 }
 
 /**
@@ -104,13 +149,17 @@ export interface LandingData {
 export async function getLandingData(): Promise<LandingData> {
   const [stats, top] = await Promise.all([
     q.landingStatsQuery(),
-    // Mais do que os 4 da grelha, para haver por onde escolher o exemplo do ISV.
-    q.topOpportunitiesQuery(12, null),
+    // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
+    // largo porque os carros com imposto alto estão em baixo desta lista (é
+    // ordenada por poupança) — ver `escolherExemploIsv`.
+    q.topOpportunitiesQuery(48, null),
   ]);
   return {
     ...stats,
-    featured: top.slice(0, 4),
-    isvExample: top.find((l) => l.cost.isv > 0) ?? null,
+    // 8, não 4: a fila sangra para fora do ecrã e é cortada à direita — é assim
+    // que se diz "há mais 174" sem ter de escrever uma legenda a dizê-lo.
+    featured: top.slice(0, 8),
+    isvExample: escolherExemploIsv(top),
   };
 }
 
