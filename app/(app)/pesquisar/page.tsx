@@ -1,31 +1,17 @@
 import { SearchView } from "@/components/search-view";
 import { searchListings } from "@/lib/data";
-import type { CountryCode } from "@/lib/types";
-
-type Sort = "savings" | "recent" | "price";
-const COUNTRIES: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
-const SORTS: Sort[] = ["savings", "recent", "price"];
+import { type SearchParams, parseSearchFilters } from "./filters";
 
 export default async function PesquisarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pais?: string; oportunidades?: string; ordenar?: string }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const { pais, oportunidades, ordenar } = await searchParams;
-  const listings = await searchListings();
+  // Os nove filtros correm no SERVIDOR. Corriam no cliente, sobre a janela de 60
+  // que a query mandava: pedir diesel procurava diesel dentro dos 60 melhores
+  // negócios em euros, não na montra.
+  const filters = parseSearchFilters(await searchParams);
+  const { listings, total } = await searchListings(filters);
 
-  const initialCountry = COUNTRIES.includes(pais as CountryCode)
-    ? (pais as CountryCode)
-    : undefined;
-  const initialOnlyOpps = oportunidades === "1";
-  const initialSort = SORTS.includes(ordenar as Sort) ? (ordenar as Sort) : undefined;
-
-  return (
-    <SearchView
-      listings={listings}
-      initialCountry={initialCountry}
-      initialOnlyOpps={initialOnlyOpps}
-      initialSort={initialSort}
-    />
-  );
+  return <SearchView listings={listings} total={total} filters={filters} />;
 }

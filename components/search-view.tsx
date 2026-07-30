@@ -1,57 +1,107 @@
 "use client";
 
+import { searchFiltersToQuery } from "@/app/(app)/pesquisar/filters";
 import { CarCard } from "@/components/car-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_LIST } from "@/lib/countries";
-import type { CountryCode, Listing } from "@/lib/types";
+import type { SearchFilters } from "@/lib/data";
+import { formatNumber } from "@/lib/format";
+import type { CountryCode, FuelType, Listing, Transmission } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-type Sort = "savings" | "recent" | "price";
+type Sort = NonNullable<SearchFilters["sort"]>;
+
+/**
+ * Quanto tempo o campo de texto espera pela tecla seguinte antes de escrever no
+ * URL. 400 ms é a pausa entre palavras de quem escreve depressa: quem escreve
+ * "golf gti" de seguida faz uma navegação, não nove.
+ */
+const DEBOUNCE_TEXTO_MS = 400;
 
 export function SearchView({
   listings,
-  initialCountry,
-  initialOnlyOpps = false,
-  initialSort = "savings",
+  total,
+  filters,
 }: {
+  /** A janela que o servidor mandou (no máximo `SEARCH_LIMIT`), já filtrada e ordenada. */
   listings: Listing[];
-  initialCountry?: CountryCode;
-  /** Pré-filtros vindos do URL — usados quando se salta de um KPI do painel. */
-  initialOnlyOpps?: boolean;
-  initialSort?: Sort;
+  /** Quantos anúncios da montra passam o filtro — quase sempre muito mais do que a janela. */
+  total: number;
+  /** O que o URL diz. É a fonte de verdade; os controlos são o espelho dele. */
+  filters: SearchFilters;
 }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [countries, setCountries] = useState<CountryCode[]>(initialCountry ? [initialCountry] : []);
-  const [onlyOpps, setOnlyOpps] = useState(initialOnlyOpps);
-  const [sort, setSort] = useState<Sort>(initialSort);
+  const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
 
-  // Filtros avançados ("Mais filtros")
-  const [showMore, setShowMore] = useState(false);
-  const [minYear, setMinYear] = useState("");
-  const [maxKm, setMaxKm] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [fuel, setFuel] = useState("");
-  const [gearbox, setGearbox] = useState("");
-  const advancedCount = [minYear, maxKm, maxPrice, fuel, gearbox].filter(Boolean).length;
-
-  function clearAdvanced() {
-    setMinYear("");
-    setMaxKm("");
-    setMaxPrice("");
-    setFuel("");
-    setGearbox("");
+  // Espelho local do URL: os controlos respondem à primeira, sem esperar pela
+  // ida ao servidor (a página é force-dynamic — cada filtro é uma query nova).
+  // Quem manda continua a ser o URL: quando uma navegação assenta — incluindo o
+  // voltar do browser ou um link do painel — o espelho é reposto.
+  const [f, setF] = useState(filters);
+  const [texto, setTexto] = useState(filters.query ?? "");
+  const urlAtual = searchFiltersToQuery(filters);
+  const [urlEspelhado, setUrlEspelhado] = useState(urlAtual);
+  if (urlEspelhado !== urlAtual) {
+    setUrlEspelhado(urlAtual);
+    setF(filters);
+    // O texto cru só se repõe se o URL discordar do que já lá está: o servidor
+    // devolve-o aparado, e repor às cegas comia o espaço a meio de "golf gti".
+    if ((filters.query ?? "") !== texto.trim()) setTexto(filters.query ?? "");
   }
 
+  const timerTexto = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timerTexto.current), []);
+
+  /**
+   * Escreve os filtros no URL. `replace` para o texto — não vale a pena encher o
+   * histórico com meia palavra; `push` para os cliques, e assim o voltar desfaz
+   * um filtro em vez de sair da pesquisa. `scroll: false` porque mudar um filtro
+   * não é mudar de página: a grelha fica onde está.
+   */
+  function navegar(next: SearchFilters, replace = false) {
+    const qs = searchFiltersToQuery(next);
+    const url = qs ? `/pesquisar?${qs}` : "/pesquisar";
+    startTransition(() => {
+      if (replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    });
+  }
+
+  /** Um controlo mexeu: espelho já, URL a seguir. */
+  function aplicar(patch: Partial<SearchFilters>) {
+    clearTimeout(timerTexto.current);
+    const next = { ...f, ...patch };
+    setF(next);
+    navegar(next);
+  }
+
+  /**
+   * O texto é a exceção: agora quem filtra é o servidor, e escrever no URL é
+   * navegar. Sem espera, "golf" eram quatro navegações e quatro varreduras da
+   * montra. O campo responde à tecla; o URL só 400 ms depois da última.
+   */
+  function escreverTexto(value: string) {
+    setTexto(value);
+    const next = { ...f, query: value.trim() || undefined };
+    setF(next);
+    clearTimeout(timerTexto.current);
+    timerTexto.current = setTimeout(() => navegar(next, true), DEBOUNCE_TEXTO_MS);
+  }
+
+  // Filtros avançados ("Mais filtros") — abertos à partida se o link já os trouxer,
+  // senão um `?km=60000` partilhado filtrava com os controlos escondidos.
+  const avancados = [f.minYear, f.maxKm, f.maxPrice, f.fuel, f.gearbox].filter(Boolean).length;
+  const [showMore, setShowMore] = useState(avancados > 0);
+
   function toggleCountry(code: CountryCode) {
-    setCountries((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code],
-    );
+    const atuais = f.countries ?? [];
+    const next = atuais.includes(code) ? atuais.filter((c) => c !== code) : [...atuais, code];
+    aplicar({ countries: next.length ? next : undefined });
   }
 
   function toggleSelect(id: string) {
@@ -60,36 +110,27 @@ export function SearchView({
     );
   }
 
-  const results = useMemo(() => {
-    let out = [...listings];
-    if (query) {
-      const q = query.toLowerCase();
-      out = out.filter((l) => l.title.toLowerCase().includes(q));
-    }
-    if (countries.length) out = out.filter((l) => countries.includes(l.country));
-    if (onlyOpps) out = out.filter((l) => l.verdict === "compensa");
-    if (minYear) out = out.filter((l) => l.year >= Number(minYear));
-    if (maxKm) out = out.filter((l) => l.km <= Number(maxKm));
-    if (maxPrice) out = out.filter((l) => l.cost.totalPt <= Number(maxPrice));
-    if (fuel) out = out.filter((l) => l.model.fuel === fuel);
-    if (gearbox) out = out.filter((l) => l.model.transmission === gearbox);
-    out.sort((a, b) =>
-      sort === "price"
-        ? a.cost.totalPt - b.cost.totalPt
-        : sort === "recent"
-          ? b.seenAt.localeCompare(a.seenAt)
-          : b.savings - a.savings,
-    );
-    return out;
-  }, [listings, query, countries, onlyOpps, sort, minYear, maxKm, maxPrice, fuel, gearbox]);
+  const countries = f.countries ?? [];
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pesquisar</h1>
+          {/* O que se vê é uma janela sobre a montra — dizer só "60 anúncios" era
+              verdade sobre o que chegou e mentira sobre o que existe. */}
           <p className="mt-1 text-sm text-ink-soft">
-            <span className="tnum">{results.length}</span> anúncios · custo final já com ISV
+            {listings.length < total ? (
+              <>
+                A mostrar <span className="tnum">{listings.length}</span> de{" "}
+                <span className="tnum">{formatNumber(total)}</span> anúncios
+              </>
+            ) : (
+              <>
+                <span className="tnum">{formatNumber(total)}</span> anúncios
+              </>
+            )}{" "}
+            · custo final já com ISV
           </p>
         </div>
       </div>
@@ -98,23 +139,23 @@ export function SearchView({
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={texto}
+            onChange={(e) => escreverTexto(e.target.value)}
             placeholder="Marca ou modelo (ex.: Golf, BMW…)"
             className="max-w-xs"
           />
           <label
             className={cn(
               "flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border px-3 text-sm font-medium transition-colors",
-              onlyOpps
+              f.onlyOpportunities
                 ? "border-good bg-good-soft text-good"
                 : "border-line-strong text-ink-soft hover:text-ink",
             )}
           >
             <input
               type="checkbox"
-              checked={onlyOpps}
-              onChange={(e) => setOnlyOpps(e.target.checked)}
+              checked={Boolean(f.onlyOpportunities)}
+              onChange={(e) => aplicar({ onlyOpportunities: e.target.checked })}
               className="sr-only"
             />
             Só oportunidades
@@ -125,26 +166,27 @@ export function SearchView({
             aria-expanded={showMore}
             className={cn(
               "flex h-10 items-center gap-1.5 rounded-[6px] border px-3 text-sm transition-colors",
-              showMore || advancedCount > 0
+              showMore || avancados > 0
                 ? "border-petrol text-ink"
                 : "border-line-strong text-ink-soft hover:text-ink",
             )}
           >
             <SlidersHorizontal className="size-4" /> Mais filtros
-            {advancedCount > 0 && (
+            {avancados > 0 && (
               <span className="tnum flex size-5 items-center justify-center rounded-full bg-petrol text-[11px] font-semibold text-white">
-                {advancedCount}
+                {avancados}
               </span>
             )}
           </button>
           <div className="ml-auto">
             <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
+              value={f.sort ?? "savings"}
+              onChange={(e) => aplicar({ sort: e.target.value as Sort })}
               className="h-10 rounded-[6px] border border-line-strong bg-surface px-3 text-sm"
               aria-label="Ordenar"
             >
               <option value="savings">Maior poupança</option>
+              <option value="savingsPct">Maior poupança (%)</option>
               <option value="recent">Mais recentes</option>
               <option value="price">Preço mais baixo</option>
             </select>
@@ -156,8 +198,8 @@ export function SearchView({
           <div className="grid gap-3 rounded-[8px] border border-line bg-surface p-3 sm:grid-cols-3 lg:grid-cols-6">
             <Sel
               label="Ano mínimo"
-              value={minYear}
-              onChange={setMinYear}
+              value={f.minYear ? String(f.minYear) : ""}
+              onChange={(v) => aplicar({ minYear: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["2020", "2020+"],
@@ -169,8 +211,8 @@ export function SearchView({
             />
             <Sel
               label="Km máximos"
-              value={maxKm}
-              onChange={setMaxKm}
+              value={f.maxKm ? String(f.maxKm) : ""}
+              onChange={(v) => aplicar({ maxKm: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["30000", "até 30 000"],
@@ -181,8 +223,8 @@ export function SearchView({
             />
             <Sel
               label="Preço final máx."
-              value={maxPrice}
-              onChange={setMaxPrice}
+              value={f.maxPrice ? String(f.maxPrice) : ""}
+              onChange={(v) => aplicar({ maxPrice: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["20000", "até 20 000 €"],
@@ -191,10 +233,10 @@ export function SearchView({
                 ["50000", "até 50 000 €"],
               ]}
             />
-            <Sel
+            <Sel<FuelType>
               label="Combustível"
-              value={fuel}
-              onChange={setFuel}
+              value={f.fuel ?? ""}
+              onChange={(v) => aplicar({ fuel: v || undefined })}
               options={[
                 ["", "Todos"],
                 ["gasolina", "Gasolina"],
@@ -204,10 +246,10 @@ export function SearchView({
                 ["elétrico", "Elétrico"],
               ]}
             />
-            <Sel
+            <Sel<Transmission>
               label="Caixa"
-              value={gearbox}
-              onChange={setGearbox}
+              value={f.gearbox ?? ""}
+              onChange={(v) => aplicar({ gearbox: v || undefined })}
               options={[
                 ["", "Todas"],
                 ["manual", "Manual"],
@@ -217,8 +259,16 @@ export function SearchView({
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={clearAdvanced}
-                disabled={advancedCount === 0}
+                onClick={() =>
+                  aplicar({
+                    minYear: undefined,
+                    maxKm: undefined,
+                    maxPrice: undefined,
+                    fuel: undefined,
+                    gearbox: undefined,
+                  })
+                }
+                disabled={avancados === 0}
                 className="flex h-10 w-full items-center justify-center gap-1 rounded-[6px] border border-line-strong text-sm text-ink-soft transition-colors hover:text-ink disabled:opacity-40"
               >
                 <X className="size-3.5" /> Limpar
@@ -252,7 +302,7 @@ export function SearchView({
           {countries.length > 0 && (
             <button
               type="button"
-              onClick={() => setCountries([])}
+              onClick={() => aplicar({ countries: undefined })}
               className="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-ink-soft hover:text-ink"
             >
               <X className="size-3.5" /> limpar
@@ -262,13 +312,20 @@ export function SearchView({
       </div>
 
       {/* Resultados */}
-      {results.length === 0 ? (
+      {listings.length === 0 ? (
         <div className="rounded-[10px] border border-dashed border-line-strong py-16 text-center text-sm text-ink-soft">
           Nenhum anúncio com estes filtros.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {results.map((l) => (
+        <div
+          className={cn(
+            "grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            // Enquanto o servidor refaz a pesquisa, a grelha ainda mostra a
+            // anterior — sem isto parecia que o filtro não fez nada.
+            pending && "opacity-50",
+          )}
+        >
+          {listings.map((l) => (
             <div key={l.id} className="relative">
               <label className="absolute left-2 top-2 z-10 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
                 <input
@@ -313,23 +370,23 @@ export function SearchView({
   );
 }
 
-function Sel({
+function Sel<T extends string>({
   label,
   value,
   onChange,
   options,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: [string, string][];
+  value: T | "";
+  onChange: (value: T | "") => void;
+  options: [T | "", string][];
 }) {
   return (
     <label className="flex flex-col gap-1 text-xs text-ink-soft">
       {label}
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value as T | "")}
         className="h-10 rounded-[6px] border border-line-strong bg-surface px-2.5 text-sm text-ink"
       >
         {options.map(([v, l]) => (

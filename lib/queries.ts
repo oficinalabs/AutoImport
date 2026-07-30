@@ -3,7 +3,8 @@
  * lib/types.ts a partir de listings ⋈ import_cost_estimates ⋈ vehicle_models.
  * Consumidas exclusivamente por lib/data.ts ("use server").
  */
-import { and, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { type SQL, and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import type { PgSelect } from "drizzle-orm/pg-core";
 import { db } from "../db";
 import {
   alertEvents,
@@ -21,7 +22,7 @@ import {
   vehicleModels,
 } from "../db/schema";
 import { co2Norm } from "./cost-engine";
-import type { SearchFilters } from "./data";
+import type { SearchFilters, SearchResults } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
 import type {
@@ -163,20 +164,25 @@ function rowToListing(
   };
 }
 
-/** Junta as 4 peças de um Listing; devolve linhas cruas para o mapper. */
-function baseSelect(standId: string | null) {
+/** As colunas de que o mapper precisa. */
+const BASE_FIELDS = {
+  l: listings,
+  e: importCostEstimates,
+  vm: vehicleModels,
+  usv: usVersions,
+  usm: usModels,
+  sourceName: sources.name,
+  favoriteId: favorites.id,
+};
+
+/**
+ * Os joins de um Listing, num sítio só. É função à parte do `baseSelect` porque
+ * a contagem da pesquisa (ver `countSelect`) precisa dos MESMOS joins com outras
+ * colunas — duplicar seis joins era pior.
+ */
+function comJoins<Q extends PgSelect>(q: Q, standId: string | null) {
   return (
-    db
-      .select({
-        l: listings,
-        e: importCostEstimates,
-        vm: vehicleModels,
-        usv: usVersions,
-        usm: usModels,
-        sourceName: sources.name,
-        favoriteId: favorites.id,
-      })
-      .from(listings)
+    q
       .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
       .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
       .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
@@ -192,6 +198,11 @@ function baseSelect(standId: string | null) {
         and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? "")),
       )
   );
+}
+
+/** Junta as 4 peças de um Listing; devolve linhas cruas para o mapper. */
+function baseSelect(standId: string | null) {
+  return comJoins(db.select(BASE_FIELDS).from(listings).$dynamic(), standId);
 }
 
 type BaseRow = Awaited<ReturnType<ReturnType<typeof baseSelect>["execute"]>>[number];
@@ -241,36 +252,100 @@ const MONTRA_REPRESENTANTE = sql`not exists (
          or (e2.savings = ${importCostEstimates.savings} and l2.id < ${listings.id}))
 )`;
 
+/**
+ * Onde o texto livre procura. O cartão mostra o título do CATÁLOGO (ver
+ * `rowToListing`: marca do us_models + nome da versão), mas o servidor só
+ * conhecia os campos crus do anúncio — quem copiasse "Huracan Evo Spyder" do
+ * cartão não encontrava nada, porque o anúncio cru diz "LAMBORGHINI Huracán".
+ * Um monte de palha único com os dois mundos resolve os dois sentidos.
+ */
+const TEXTO_PESQUISAVEL = sql`concat_ws(' ',
+  ${usModels.make}, ${usModels.model}, ${usVersions.name},
+  ${listings.makeRaw}, ${listings.modelRaw}, ${listings.variant})`;
+
+/**
+ * O texto livre em condições — uma por PALAVRA, todas obrigatórias.
+ *
+ * Substring não chegava: o título mostrado não é substring de nada gravado. A
+ * marca vem do `us_models` e o nome do `us_versions` (colunas diferentes), e o
+ * `cleanVersionName` ainda corta o código de chassis à cabeça ("G16 8 Series…"
+ * → "8 Series…"). Por palavras, copiar o título do cartão encontra o carro, e
+ * escrever só "golf" continua a fazer o óbvio.
+ */
+function condsDoTexto(query: string): SQL[] {
+  return query
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((termo) => {
+      // `%` e `_` escritos pelo utilizador são literais, não jokers do LIKE.
+      const padrao = `%${termo.replace(/[\\%_]/g, "\\$&")}%`;
+      return sql`${TEXTO_PESQUISAVEL} ilike ${padrao}`;
+    });
+}
+
+/**
+ * O total que passa o filtro, em query PRÓPRIA e em paralelo com as linhas.
+ *
+ * A forma óbvia — `count(*) over ()` na mesma varredura — parecia de borla e não
+ * é: mata o corte antecipado do `LIMIT 60`. Com a janela, o planeador tem de
+ * levar o anti-join do `MONTRA_REPRESENTANTE` (correlacionado, sobre uma
+ * identidade calculada, sem índice possível) até ao fim das 32 695 linhas.
+ * Medido na montra sem filtros: **7 a 21 minutos** com a janela, contra 1,8 s
+ * sem ela e 21 s para esta contagem à parte. Numa base com só a montra (a forma
+ * da produção, onde o publicador manda 39 779 linhas) a janela é de facto grátis
+ * — 159 ms contra 163 ms — mas é um penhasco de planeador, não uma rampa: basta
+ * a tabela crescer ou o texto entrar no WHERE para cair do lado errado. Duas
+ * queries em `Promise.all` custam o máximo das duas, não a soma, e não têm
+ * penhasco.
+ */
+const countSelect = (standId: string | null) =>
+  comJoins(db.select({ total: sql<number>`count(*)::int` }).from(listings).$dynamic(), standId);
+
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
-): Promise<Listing[]> {
+): Promise<SearchResults> {
   const conds = [isNull(listings.deletedAt), COM_CATALOGO, MONTRA_REPRESENTANTE];
-  if (filters.query) {
-    const q = `%${filters.query}%`;
-    const textMatch = or(
-      ilike(listings.makeRaw, q),
-      ilike(listings.modelRaw, q),
-      ilike(listings.variant, q),
-    );
-    if (textMatch) conds.push(textMatch);
-  }
+  if (filters.query) conds.push(...condsDoTexto(filters.query));
   if (filters.countries?.length) conds.push(inArray(listings.country, filters.countries));
   if (filters.onlyOpportunities) conds.push(eq(importCostEstimates.verdict, "compensa"));
+  if (filters.minYear) conds.push(gte(listings.year, filters.minYear));
+  // Km desconhecidos ficam de fora de "até X km" — na montra não há nenhum (medido),
+  // e prometer um teto sobre um valor que não se sabe seria pior do que não o mostrar.
+  if (filters.maxKm) conds.push(lte(listings.km, filters.maxKm));
   if (filters.maxPrice) conds.push(lte(importCostEstimates.totalPt, filters.maxPrice));
+  // O combustível do cartão é o do anúncio com o do modelo canónico em fallback
+  // (ver `rowToListing`) — filtrar só por listings.fuel escondia os que só o
+  // vehicle_models sabe.
+  if (filters.fuel) {
+    conds.push(sql`coalesce(${listings.fuel}, ${vehicleModels.fuel}) = ${filters.fuel}`);
+  }
+  // A caixa não está gravada, é derivada: o `transmissionOf` chama automática a
+  // tudo o que tenha "auto" no gearbox e manual a TODO o resto — o null incluído
+  // (110 anúncios da montra hoje). O filtro tem de partir a montra no mesmo sítio.
+  if (filters.gearbox) {
+    conds.push(
+      filters.gearbox === "automática"
+        ? sql`${listings.gearbox} ~* 'auto'`
+        : sql`(${listings.gearbox} is null or ${listings.gearbox} !~* 'auto')`,
+    );
+  }
 
   const orderBy =
     filters.sort === "price"
       ? importCostEstimates.totalPt
       : filters.sort === "recent"
         ? desc(listings.lastSeenAt)
-        : desc(importCostEstimates.savings);
+        : filters.sort === "savingsPct"
+          ? desc(importCostEstimates.savingsPct)
+          : desc(importCostEstimates.savings);
 
-  const rows = await baseSelect(standId)
-    .where(and(...conds))
-    .orderBy(orderBy)
-    .limit(SEARCH_LIMIT);
-  return rows.map((r) => toListing(r));
+  const filtro = and(...conds);
+  const [rows, contagem] = await Promise.all([
+    baseSelect(standId).where(filtro).orderBy(orderBy).limit(SEARCH_LIMIT),
+    countSelect(standId).where(filtro),
+  ]);
+  return { listings: rows.map((r) => toListing(r)), total: contagem[0]?.total ?? 0 };
 }
 
 export async function getListingQuery(id: string, standId: string | null): Promise<Listing | null> {
