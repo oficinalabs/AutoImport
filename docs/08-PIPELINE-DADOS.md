@@ -23,7 +23,7 @@ pnpm dev            # a UI passa a mostrar dados reais (sem DATABASE_URL → moc
 | 3 | `pt-market.ts` | 1 observação de preço/dia por anúncio PT ativo → `pt_price_observations`. |
 | 4 | desaparecidos | soft-delete de anúncios sem sinal há 14+ dias (`--stale-days`). |
 | 5 | `check-gone.ts` | HEAD às oportunidades ativas: 404/410 → soft-delete, antes de recalcular veredito sobre um carro que já não existe. |
-| 6 | `compute-costs.ts` (1.ª) | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos; fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). Ver "Resolução de versão" e "Specs efetivas" abaixo. |
+| 6 | `compute-costs.ts` (1.ª) | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos, dispersão robusta (p75−p25)/mediana ≤ 0,25 e km comparáveis (ver "Guardas de coerência da amostra" abaixo); o preço de origem tem de ser plausível face ao próprio mercado estrangeiro (`lib/engine/origin-market.ts`: ≥ 0,50 × mediana dos comparáveis do mesmo país); fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). **Veículos novos ficam de fora**: pelo RITI, ≤6 000 km **ou** menos de 6 meses de matrícula é um *meio de transporte novo* e paga 23% de IVA em Portugal, que o motor não modela — excluir em vez de adivinhar (a semântica do IVA no preço anunciado em ES/DE é ambígua e desconhecida por anúncio). A regra vive no predicado `elegivel`, portanto também apaga as estimativas já gravadas destes anúncios. Ver "Resolução de versão" e "Specs efetivas" abaixo. |
 | 7 | `enrich-es.ts` | stands ES anunciam o FINANCIADO. Para os AS24-ES que a 1.ª passagem deu como `compensa`/`marginal`, busca a página de detalhe e extrai o "precio al contado" da descrição (`lib/engine/precio-contado.ts`), corrigindo o preço (1 visita por anúncio, rate 1,5 s). Só visita quem já parece negócio: o contado é ≥ ao anunciado, logo nunca cria uma oportunidade — só a pode desfazer. |
 | 8 | `compute-costs.ts` (2.ª) | recalcula os anúncios corrigidos no passo 7 (o `pending` filtra por `updated_at > computed_at`). |
 | 9 | `flag-opportunities.ts` | veredito `compensa` + confiança `normal` → `opportunities`. Corre no fim: nada é publicado como oportunidade ao preço financiado. |
@@ -115,6 +115,60 @@ estimativa é auditável até à versão que a alimentou.
 de um anúncio da geração nova seja contaminada por carros PT da geração velha de anos
 vizinhos (fronteira de geração). O guard **nunca relaxa, só aperta**: o fallback
 alargado (spread=2) continua confinado à geração; interseção vazia → sem amostra.
+
+## Guardas de coerência da amostra (pt-market)
+
+Contar 5 anúncios não prova que são o **mesmo carro** — e era só isso que a amostra
+`normal` exigia. Como a montra publica exclusivamente `pt_confidence='normal'`
+(flag-opportunities, `queries.ts`, publish), o único teto que existia — `MAX_WIDE_SPREAD`
+= 0,30 sobre (max−min)/mediana — nunca chegava a correr no que sai para o produto. Duas
+guardas novas, **as duas nos dois ramos**, medidas contra 14 741 oportunidades reais:
+
+- **Dispersão robusta** — `(p75−p25)/mediana ≤ 0,25`. Um Porsche 911 juntava Carrera, GTS
+  e Turbo na mesma amostra (p25 200 k€ · mediana 243 k€ · p75 375 k€) e fabricava 96 k€ de
+  "poupança". Corta ~4,4% da montra, mas **19–20% acima de 80 k€** — é lá que está a
+  patologia. Usa o intervalo interquartil e não max−min de propósito: max−min é dominado
+  por dois outliers e cortaria 68% de uma montra que, na massa, está saudável (IQR mediano
+  0,12). O teto de 0,30 do fallback mantém-se **ao lado** desta, não substituído.
+- **Comparabilidade de km** — `(km + 1000) / (mediana de km da amostra + 1000) ≤ 1,6`.
+  A banda tem 25 000 km e a amostra usa banda±1 (±2 no fallback), portanto um carro de
+  44 500 km comparava-se com a janela 0–74 999. **Unilateral de propósito**: menos km que
+  a amostra vale mais, e a poupança sai subestimada — o lado seguro do erro; só o excesso
+  a inflaciona. Corta 8,2% (16,7% na faixa 20–40 k€, 20,3% acima de 80 k€) e **1 110 dessas
+  1 137 passavam incólumes ao teto de dispersão**: o nº 1 da montra era um Huracán de
+  44 500 km contra uma amostra PT de mediana 7 322 km, internamente coerente (IQR 0,09),
+  que fabricava 123 227 € de "poupança".
+
+Como a de geração, **nunca relaxam, só apertam**. E como nenhuma delas mexe no
+`updated_at` nem no tier do match, **mudar uma guarda não recomputa nada** — é preciso
+`compute-costs.ts --all`.
+
+## Guarda de plausibilidade do preço de origem (origin-market)
+
+As guardas acima perguntam *"o conjunto com que comparo é um mercado?"* — são sobre o
+denominador. Esta pergunta *"o preço que me deram é um preço?"*, sobre o numerador, e o que
+corta é um anúncio mau com uma amostra impecável.
+
+As guardas do preço estrangeiro eram todas **sintáticas** (`price > 0`, `/leilao/`,
+`is_damaged`, `km > 6000`): nenhuma perguntava se aquele preço era de **mercado**. Um XC40
+T5 Recharge de 2022 a 6 900 € num mercado ES cuja mediana são 22 850 € apareceu na montra
+com 71,6% de "poupança"; um 3008 de 2021 a 5 900 € contra 18 790 €, com 59,5%. Não é viés
+de fonte — a mediana do autocasion face às outras fontes ES nos mesmos carros dá 1,000 — são
+outliers: avaria não declarada (`-Motorschaden-`), inspeção fora (`KEIN TÜV`), venda só a
+profissionais (`nur an Händler/Export`).
+
+`lib/engine/origin-market.ts` compara cada anúncio com o **seu próprio mercado** (mesmo
+`model_id`, **mesmo país**, ano±1, km 0,6×–1,6×, potência ±max(10%,15cv), deduplicado por
+carro físico — o cross-listing também existe lá fora) e recusa estimativa abaixo de
+**0,50 × mediana**. Mesmo país e não "todo o estrangeiro" porque DE e ES não são o mesmo
+mercado. Medido nas 11 758 oportunidades ativas: o rácio tem p50 0,905 e p05 0,742 — uma
+oportunidade **é** mais barata que o típico, por isso o corte tem de ficar longe da massa.
+Abaixo de 0,5 há **35 oportunidades e 50 estimativas** (0,3% da montra); 0,6 seriam 98/137 e
+0,7 seriam 299/442. Sem amostra (n<5, ~8%) **passa**: sem prova não se recusa — a regra de
+nunca adivinhar corta nos dois sentidos. A mediana e o `n` ficam em
+`import_cost_estimates.inputs` (`originMedian`, `originSampleSize`), e `null/null` significa
+"passou por falta de prova", não "foi validado". Como as outras, mudar o limiar **não
+recomputa nada** — é preciso `compute-costs.ts --all`.
 
 ## Harness de avaliação (`scripts/eval`)
 

@@ -2,13 +2,17 @@
  * Cálculo do negócio por anúncio estrangeiro: custo total de importação
  * (cost engine) + preço PT estimado (pt-market) → poupança e veredito →
  * upsert em import_cost_estimates.
- *   pnpm exec tsx scripts/pipeline/compute-costs.ts
+ *   pnpm exec tsx scripts/pipeline/compute-costs.ts          # só os pendentes
+ *   pnpm exec tsx scripts/pipeline/compute-costs.ts --all    # recomputa tudo
  * Recomputa quando: sem estimativa, anúncio atualizado depois do cálculo, ou o
  * tier efetivo (exato/designacao) do anúncio diverge do gravado na estimativa
  * (backfill/rematch não tocam no updated_at — sem esta condição ficariam presos
- * com a estimativa antiga).
+ * com a estimativa antiga). `--all` ignora esta condição (o `elegivel` continua
+ * a mandar): mudar as guardas da amostra PT não mexe em nenhum destes sinais.
  * Sem CO₂/cilindrada (não-elétricos) ou sem amostra PT → sem estimativa
- * (nunca adivinhar, nunca mostrar veredito fraco).
+ * (nunca adivinhar, nunca mostrar veredito fraco). Preço de origem implausível
+ * face ao PRÓPRIO mercado estrangeiro (lib/engine/origin-market.ts) → também sem
+ * estimativa: metade do que o mercado dele pede não é negócio, é avaria/erro.
  *
  * Specs efetivas do catálogo (fill-only-missing) por tier do match:
  *  - `exato`: cc/CO₂/potência em falta vêm da versão canónica; a janela de
@@ -33,14 +37,19 @@ try {
 const FOREIGN: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
 const ISV_YEAR = 2026;
 
-export async function computeCosts() {
+function flag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
+export async function computeCosts(opts: { all?: boolean } = {}) {
+  const all = opts.all ?? false;
   assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { computeCostBreakdown, co2Norm } = await import("../../lib/cost-engine");
+  const { MIN_ORIGIN_RATIO, estimateOriginPrice } = await import("../../lib/engine/origin-market");
   const { estimatePtPrice } = await import("../../lib/engine/pt-market");
   const { loadTaxTables } = await import("../../lib/engine/tax-tables");
-  const { kmBand } = await import("../../lib/engine/normalize-vehicle");
   const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
   const { verdictFromSavings } = await import("../../lib/verdict");
 
@@ -87,6 +96,19 @@ export async function computeCosts() {
     and l.year is not null
     and l.km is not null
     and l.fuel is not null
+    -- RITI: ≤6 000 km OU <6 meses desde a 1.ª matrícula = "meio de transporte
+    -- novo" → 23% de IVA em Portugal, que o motor NÃO modela (cost-engine soma
+    -- preço+transporte+ISV+IUC+legalização, sem IVA). Decisão do dono do
+    -- produto: excluir em vez de modelar — a semântica do IVA no preço anunciado
+    -- em ES/DE é ambígua (com/sem, regime de margem vs. geral) e não a sabemos
+    -- por anúncio; modelar era adivinhar. Nos casos do topo o IVA em falta era
+    -- maior que a "poupança" (F8 Tributo com 900 km: poupança 47.681, IVA
+    -- 69.667) — prejuízo apresentado como negócio.
+    and l.km > 6000
+    -- Matrícula desconhecida (~2/3 dos estrangeiros) não exclui: só a que se
+    -- SABE recente. O "is null or" mantém o predicado booleano (nunca NULL) —
+    -- a limpeza das órfãs abaixo lê not coalesce(…, false).
+    and (l.first_registration is null or l.first_registration <= now() - interval '6 months')
   `;
 
   // Estimativas de anúncios que já não são elegíveis. `coalesce(…, false)`: um
@@ -98,6 +120,32 @@ export async function computeCosts() {
     returning e.id
   `)) as unknown as { id: string }[];
   if (orfas.length) console.log(`compute-costs: ${orfas.length} estimativas órfãs apagadas`);
+
+  // recompute: novo/atualizado, OU o tier efetivo (exato/designacao) do
+  // anúncio diverge do gravado na estimativa, OU o DERIVADO que confina a
+  // amostra PT mudou (o rematch reescreve facts/versão sem tocar no
+  // updated_at — sem isto, uma estimativa calculada com a amostra antiga
+  // contaminada por outro corpo ficava presa). Tudo estabiliza à 1.ª
+  // recomputação: designacao compara facts↔inputs; exato só recomputa
+  // enquanto a estimativa ainda não gravou derivative (as novas gravam sempre).
+  // `--all` ignora esta condição — e SÓ esta: o `elegivel` continua a mandar em
+  // quem PODE ter estimativa. É a saída para mudanças que não deixam rasto em
+  // nenhum destes sinais (ex.: guardas da amostra PT em lib/engine/pt-market.ts
+  // ou a do preço de origem em lib/engine/origin-market.ts), que de outro modo
+  // deixariam as estimativas gravadas presas nos valores velhos.
+  const recompute = all
+    ? sql`true`
+    : sql`(
+        e.id is null
+        or l.updated_at > e.computed_at
+        or (case when l.match_confidence = 'exato' and l.us_version_id is not null then 'exato'
+                 when l.match_confidence = 'designacao' and l.designation_facts is not null then 'designacao' end)
+           is distinct from e.inputs->>'matchKind'
+        or (l.match_confidence = 'designacao'
+            and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
+        or (l.match_confidence = 'exato' and l.us_version_id is not null
+            and e.inputs->>'derivative' is null)
+      )`;
 
   // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
   // o ISV é €5,61/cm³ e uma mediana envenenada/entre-trims produz impostos
@@ -124,24 +172,7 @@ export async function computeCosts() {
     left join us_versions v on v.version_id = l.us_version_id
     left join import_cost_estimates e on e.listing_id = l.id
     where (${elegivel})
-      -- recompute: novo/atualizado, OU o tier efetivo (exato/designacao) do
-      -- anúncio diverge do gravado na estimativa, OU o DERIVADO que confina a
-      -- amostra PT mudou (o rematch reescreve facts/versão sem tocar no
-      -- updated_at — sem isto, uma estimativa calculada com a amostra antiga
-      -- contaminada por outro corpo ficava presa). Tudo estabiliza à 1.ª
-      -- recomputação: designacao compara facts↔inputs; exato só recomputa
-      -- enquanto a estimativa ainda não gravou derivative (as novas gravam sempre).
-      and (
-        e.id is null
-        or l.updated_at > e.computed_at
-        or (case when l.match_confidence = 'exato' and l.us_version_id is not null then 'exato'
-                 when l.match_confidence = 'designacao' and l.designation_facts is not null then 'designacao' end)
-           is distinct from e.inputs->>'matchKind'
-        or (l.match_confidence = 'designacao'
-            and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
-        or (l.match_confidence = 'exato' and l.us_version_id is not null
-            and e.inputs->>'derivative' is null)
-      )
+      and ${recompute}
   `)) as unknown as {
     id: string;
     price: number;
@@ -166,9 +197,15 @@ export async function computeCosts() {
     est_id: string | null;
   }[];
 
+  if (all)
+    console.log(
+      `compute-costs: --all — ${pending.length} anúncios elegíveis a recomputar (ignora a condição de recompute)`,
+    );
+
   let computed = 0;
   let semDados = 0;
   let semAmostra = 0;
+  let origemImplausivel = 0;
   const verdicts: Record<string, number> = {};
 
   // Apaga a estimativa pré-existente de um anúncio que, ao recomputar, deixou de
@@ -277,13 +314,34 @@ export async function computeCosts() {
       db,
       l.model_id,
       l.year,
-      kmBand(l.km),
+      l.km,
       powerEfetivo,
       genWindow,
       excludeMids,
     );
     if (!pt) {
       semAmostra++;
+      await dropStale(l.est_id);
+      continue;
+    }
+
+    // Plausibilidade do preço de ORIGEM (lib/engine/origin-market.ts): metade do
+    // que o próprio mercado estrangeiro pede pelo mesmo carro não é negócio — é
+    // avaria não declarada, erro de digitação ou venda só a profissionais.
+    // DEPOIS do estimatePtPrice de propósito: dos 325 005 elegíveis só ~79 000
+    // chegam a ter amostra PT, e adiar a guarda poupa 3/4 destas queries.
+    // Sem amostra de origem (n<5, ~8% dos casos) PASSA — sem prova não se recusa.
+    const origin = await estimateOriginPrice(
+      db,
+      l.model_id,
+      l.country,
+      l.year,
+      l.km,
+      powerEfetivo,
+      l.id,
+    );
+    if (origin && l.price / origin.median < MIN_ORIGIN_RATIO) {
+      origemImplausivel++;
       await dropStale(l.est_id);
       continue;
     }
@@ -316,6 +374,11 @@ export async function computeCosts() {
       matchKind,
       // derivado/corpo que confinou a amostra PT (quando conhecido): "" = base.
       ...(foreignDerivative != null ? { derivative: foreignDerivative } : {}),
+      // Guarda de plausibilidade do preço de origem: a mediana do próprio mercado
+      // e o n que a sustentam. null/null = sem amostra (n<5) — a estimativa
+      // passou por falta de prova, não por ter sido validada.
+      originMedian: origin?.median ?? null,
+      originSampleSize: origin?.n ?? null,
       ...(matchKind === "exato"
         ? { versionId: l.us_version_id, fromCatalog, genWindow: genWindow ?? null }
         : matchKind === "designacao"
@@ -357,13 +420,13 @@ export async function computeCosts() {
   }
 
   console.log(
-    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · vereditos ${JSON.stringify(verdicts)}`,
+    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · preço de origem implausível ${origemImplausivel} · vereditos ${JSON.stringify(verdicts)}`,
   );
-  return { pending: pending.length, computed, semDados, semAmostra, verdicts };
+  return { pending: pending.length, computed, semDados, semAmostra, origemImplausivel, verdicts };
 }
 
 if (process.argv[1]?.endsWith("compute-costs.ts")) {
-  computeCosts()
+  computeCosts({ all: flag("all") })
     .then(() => process.exit(0))
     .catch((err) => {
       console.error(err);
