@@ -26,9 +26,11 @@ import type {
   CountryInsight,
   DashboardStats,
   Deal,
+  FuelType,
   Listing,
   Notification,
   Stand,
+  Transmission,
 } from "./types";
 
 const hasDb = () => Boolean(process.env.DATABASE_URL);
@@ -56,15 +58,39 @@ const activeStandId = cache(async (): Promise<string | null> => {
 });
 
 // ── Pesquisa / anúncios ─────────────────────────────────────────
+/**
+ * Os filtros da pesquisa — TODOS eles. Até aqui cinco (minYear, maxKm, fuel,
+ * gearbox e a semântica do texto livre) só existiam no cliente e corriam sobre a
+ * janela de 60 que o servidor mandava: filtrar por diesel procurava diesel
+ * dentro dos 60 melhores negócios em euros, não na montra.
+ */
 export interface SearchFilters {
+  /** Texto livre — marca, modelo, versão; procura no anúncio cru E no catálogo. */
   query?: string;
   countries?: CountryCode[];
   onlyOpportunities?: boolean;
+  /** Ano de matrícula mínimo (inclusive). */
+  minYear?: number;
+  /** Quilómetros máximos (inclusive). */
+  maxKm?: number;
+  /** Teto do custo FINAL em Portugal (`cost.totalPt`), não do preço na origem. */
   maxPrice?: number;
-  sort?: "savings" | "recent" | "price";
+  fuel?: FuelType;
+  gearbox?: Transmission;
+  sort?: "savings" | "savingsPct" | "recent" | "price";
 }
 
-export async function searchListings(filters: SearchFilters = {}): Promise<Listing[]> {
+/**
+ * O que a pesquisa devolve. `total` NÃO é `listings.length`: a montra tem
+ * dezenas de milhares e o servidor manda uma página. Sem ele a UI dizia "60
+ * anúncios" — verdade sobre o que recebeu, mentira sobre o que existe.
+ */
+export interface SearchResults {
+  listings: Listing[];
+  total: number;
+}
+
+export async function searchListings(filters: SearchFilters = {}): Promise<SearchResults> {
   return q.searchListingsQuery(filters, await activeStandId());
 }
 
