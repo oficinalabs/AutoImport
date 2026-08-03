@@ -83,8 +83,30 @@ Um stand que abra a pesquisa e procure o que costuma vender não encontra nada.
 > `count(*) over()` não vinha em linha nenhuma e o total dava 0; e o filtro de
 > caixa tem de tratar `gearbox` nulo como manual, senão contradiz o cartão.
 >
-> ⬜ **Por medir:** um índice de pesquisa, se o `EXPLAIN` sobre dados do tamanho
-> de produção o justificar. Não se acrescentam índices a adivinhar.
+> **Medido depois** (publiquei a montra para uma base descartável — 39 759
+> anúncios, 86 MB, o tamanho da produção — e cronometrei a app compilada):
+>
+> | | |
+> |---|---|
+> | `/painel` | **34–92 ms** (era 8–19 s em dev) |
+> | `/pesquisar?q=Golf` | **~530 ms** |
+> | `/pesquisar` sem filtros | **~1,8 s** |
+>
+> **Não é preciso índice nenhum, e isso foi testado, não assumido.** Criei um
+> índice funcional sobre a expressão de identidade e o tempo não mexeu: 1,83 s
+> com e sem. O custo não está a ordenar a identidade — está em percorrer a montra
+> inteira para deduplicar, coisa que nenhum índice evita.
+>
+> ⚠️ O `NOT EXISTS` antigo, na **mesma base** e com a mesma forma de query (6
+> joins + `LIMIT`), **não terminou em 10 minutos** — tive de o cancelar. Na forma
+> em que eu o tinha medido antes (sem os joins e sem limite) fazia 278 ms. Ou
+> seja: era um campo minado de planeador, rápido numa forma e catastrófico
+> noutra. Isso explica os 8–19 s do painel na auditoria.
+>
+> ⬜ **Fica em aberto:** 1,8 s na pesquisa sem filtros é aceitável para arrancar,
+> mas é o número a vigiar. A cura é materializar o representante numa coluna
+> (escrita pelo pipeline), com migration e republicação — mais barulho do que o
+> problema justifica hoje.
 
 ### P0-2 · Não há como cobrar
 
