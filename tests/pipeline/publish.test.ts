@@ -15,11 +15,18 @@
  * Sem Postgres local (ou sem permissão para criar bases) o teste salta.
  */
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
 import { after, test } from "node:test";
 import postgres from "postgres";
-import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
+import { dbUrl } from "../../lib/db-url";
 import { publish } from "../../scripts/pipeline/publish";
+import {
+  cloneDatabase,
+  dropDatabases,
+  migrate,
+  recreateDatabases,
+  skipUnlessLocalDb,
+  withDbName,
+} from "../helpers/db";
 
 try {
   process.loadEnvFile(".env.local");
@@ -28,57 +35,21 @@ try {
 }
 
 const LOCAL = dbUrl();
-const skip = !LOCAL
-  ? "sem base de dados — teste do publicador saltado"
-  : !isLocalDbUrl(LOCAL)
-    ? "base de dados não é local — o publicador cria bases de teste; só local"
-    : false;
+const skip = skipUnlessLocalDb("o teste do publicador");
 
 const SRC_DB = "autoimport_publish_src_test";
 const TGT_DB = "autoimport_publish_dst_test";
 
-function withDbName(name: string): string {
-  const url = new URL(LOCAL);
-  url.pathname = `/${name}`;
-  return url.toString();
-}
-
-const srcUrl = () => withDbName(SRC_DB);
-const tgtUrl = () => withDbName(TGT_DB);
+const srcUrl = () => withDbName(LOCAL, SRC_DB);
+const tgtUrl = () => withDbName(LOCAL, TGT_DB);
 
 /** Cria as duas bases (destino migrado; origem clonada dele) do zero. */
 async function bootstrap(): Promise<void> {
-  const admin = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
-  try {
-    for (const name of [SRC_DB, TGT_DB]) {
-      await admin.unsafe(`drop database if exists ${name} with (force)`).simple();
-    }
-    await admin.unsafe(`create database ${TGT_DB}`).simple();
-  } finally {
-    await admin.end();
-  }
-  execFileSync("pnpm", ["exec", "drizzle-kit", "migrate"], {
-    stdio: "pipe",
-    env: { ...process.env, WAREHOUSE_URL: tgtUrl(), DATABASE_URL: tgtUrl() },
-  });
-  const admin2 = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
-  try {
-    // O esquema da origem é o mesmo — clonar evita segunda migração.
-    await admin2.unsafe(`create database ${SRC_DB} template ${TGT_DB}`).simple();
-  } finally {
-    await admin2.end();
-  }
-}
-
-async function dropDatabases(): Promise<void> {
-  const admin = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
-  try {
-    for (const name of [SRC_DB, TGT_DB]) {
-      await admin.unsafe(`drop database if exists ${name} with (force)`).simple();
-    }
-  } finally {
-    await admin.end();
-  }
+  await dropDatabases(LOCAL, SRC_DB, TGT_DB);
+  await recreateDatabases(LOCAL, TGT_DB);
+  migrate(tgtUrl());
+  // O esquema da origem é o mesmo — clonar evita segunda migração.
+  await cloneDatabase(LOCAL, TGT_DB, SRC_DB);
 }
 
 const SRC_SOURCE = "11111111-1111-1111-1111-111111111111";
@@ -508,5 +479,5 @@ test("publicar de uma base para ela própria é recusado", async (t) => {
 });
 
 after(async () => {
-  if (!skip) await dropDatabases();
+  if (!skip) await dropDatabases(LOCAL, SRC_DB, TGT_DB);
 });

@@ -12,8 +12,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { after, before, test } from "node:test";
-import postgres from "postgres";
-import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
+import { dbUrl } from "../../lib/db-url";
+import {
+  dropDatabases,
+  migrate,
+  recreateDatabases,
+  seed,
+  skipUnlessLocalDb,
+  withDbName,
+} from "../helpers/db";
 
 try {
   process.loadEnvFile(".env.local");
@@ -23,16 +30,7 @@ try {
 
 // A mesma base a que o `db` liga (warehouse quando há WAREHOUSE_URL).
 const DB_URL = dbUrl();
-// Guarda anti-produção: este teste ESCREVE (ingest de fixtures, deletes no
-// cleanup) e a DATABASE_URL pode apontar para a Supabase REAL — correr
-// `pnpm test` com ela carregada já deixou resíduos na montra ("Testgen
-// GenModel 1.0"). Só corre contra Postgres LOCAL (warehouse, docker
-// `pnpm db:up` ou o serviço do CI); URL não-local ou ilegível → salta.
-const skip = !DB_URL
-  ? "sem base de dados — teste de integração saltado"
-  : !isLocalDbUrl(DB_URL)
-    ? "base de dados não é local — o teste de integração escreve; só warehouse/docker/CI"
-    : false;
+const skip = skipUnlessLocalDb("o teste de integração");
 
 // Base DESCARTÁVEL própria (mesmo padrão de publish.test.ts). Antes corria-se
 // contra a base configurada, o que servia enquanto ela estava vazia; com o
@@ -40,33 +38,15 @@ const skip = !DB_URL
 // passava a percorrer o corpus todo e estourava o timeout. Isolar também torna
 // os vereditos independentes do que houver na máquina.
 const TEST_DB = "autoimport_pipeline_test";
-const withDbName = (name: string) => {
-  const url = new URL(DB_URL as string);
-  url.pathname = `/${name}`;
-  return url.toString();
-};
 /** A base a que o `db` liga durante os testes — definida no before(). */
 let ACTIVE_URL = DB_URL as string;
 
-const admin = async (fn: (sql: ReturnType<typeof postgres>) => Promise<void>) => {
-  const sql = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
-  try {
-    await fn(sql);
-  } finally {
-    await sql.end();
-  }
-};
-
 before(async () => {
   if (skip) return;
-  await admin(async (sql) => {
-    await sql.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
-    await sql.unsafe(`create database ${TEST_DB}`).simple();
-  });
-  ACTIVE_URL = withDbName(TEST_DB);
-  const env = { ...process.env, WAREHOUSE_URL: ACTIVE_URL, DATABASE_URL: ACTIVE_URL };
-  execFileSync("pnpm", ["exec", "drizzle-kit", "migrate"], { stdio: "pipe", env });
-  execFileSync("pnpm", ["exec", "tsx", "scripts/db/seed.ts"], { stdio: "pipe", env });
+  await recreateDatabases(DB_URL as string, TEST_DB);
+  ACTIVE_URL = withDbName(DB_URL as string, TEST_DB);
+  migrate(ACTIVE_URL);
+  seed(ACTIVE_URL);
   // O `db` é importado dinamicamente dentro dos testes e resolve a URL no import
   // — definir aqui basta para ele (e para os subprocessos) ligarem à base de teste.
   process.env.WAREHOUSE_URL = ACTIVE_URL;
@@ -740,7 +720,5 @@ after(async () => {
   if (skip) return;
   const { closeDb } = await import("../../db");
   await closeDb(); // liberta o event loop — sem isto o runner não termina
-  await admin(async (sql) => {
-    await sql.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
-  });
+  await dropDatabases(DB_URL as string, TEST_DB);
 });
