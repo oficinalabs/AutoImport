@@ -14,6 +14,11 @@ export { calculateIsv, co2Norm, vehicleAgeYears } from "./isv";
 export { calculateIuc } from "./iuc";
 export { estimateTransport, TRANSPORT_COST_EUR } from "./transport";
 export { estimateLegalization, LEGALIZATION_COSTS_EUR } from "./legalization";
+export {
+  ES_ISLAND_POSTAL_PREFIXES,
+  ES_ISLAND_REGION_REGEX_SOURCE,
+  isExcludedTerritory,
+} from "./territory";
 
 export interface CostResult {
   breakdown: CostBreakdown;

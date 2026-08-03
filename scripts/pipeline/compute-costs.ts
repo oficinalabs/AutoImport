@@ -37,7 +37,12 @@ export async function computeCosts() {
   assertWritable(dbUrl());
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
-  const { computeCostBreakdown, co2Norm } = await import("../../lib/cost-engine");
+  const {
+    computeCostBreakdown,
+    co2Norm,
+    ES_ISLAND_POSTAL_PREFIXES,
+    ES_ISLAND_REGION_REGEX_SOURCE,
+  } = await import("../../lib/cost-engine");
   const { estimatePtPrice } = await import("../../lib/engine/pt-market");
   const { loadTaxTables } = await import("../../lib/engine/tax-tables");
   const { kmBand } = await import("../../lib/engine/normalize-vehicle");
@@ -87,6 +92,18 @@ export async function computeCosts() {
     and l.year is not null
     and l.km is not null
     and l.fuel is not null
+    -- Ilhas espanholas (Canárias/Baleares): o motor não as sabe calcular
+    -- (transporte é um fixo de camião, e as Canárias estão fora do território
+    -- IVA da UE) → fora da montra. Ver lib/cost-engine/territory.ts.
+    -- Os coalesce mantêm o fragmento estritamente booleano: sem CP nem região
+    -- o predicado dá false (não excluir por falta de dados), nunca NULL.
+    and not (
+      coalesce(l.country, '') = 'ES'
+      and (
+        left(coalesce(l.postal_code, ''), 2) = any(${`{${ES_ISLAND_POSTAL_PREFIXES.join(",")}}`}::text[])
+        or coalesce(l.region, '') ~* ${ES_ISLAND_REGION_REGEX_SOURCE}
+      )
+    )
   `;
 
   // Estimativas de anúncios que já não são elegíveis. `coalesce(…, false)`: um
