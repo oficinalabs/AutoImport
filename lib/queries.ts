@@ -3,7 +3,20 @@
  * lib/types.ts a partir de listings ⋈ import_cost_estimates ⋈ vehicle_models.
  * Consumidas exclusivamente por lib/data.ts ("use server").
  */
-import { and, desc, eq, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import {
+  type SQL,
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../db";
 import {
   alertEvents,
@@ -21,7 +34,7 @@ import {
   vehicleModels,
 } from "../db/schema";
 import { co2Norm } from "./cost-engine";
-import type { SearchFilters } from "./data";
+import type { SearchFilters, SearchPage } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
 import type {
@@ -38,7 +51,14 @@ import type {
   Verdict,
 } from "./types";
 
-const SEARCH_LIMIT = 60;
+/** Anúncios por página. 24 divide certo nas grelhas de 2, 3 e 4 colunas da pesquisa. */
+export const PAGE_SIZE = 24;
+/**
+ * Teto de profundidade. `?pagina=99999` faria o Postgres percorrer a montra
+ * inteira para devolver zero linhas, e não há caso de uso: quem chega ao carro
+ * 5 000.º precisa de filtrar melhor, não de outra página.
+ */
+export const MAX_PAGE = 200;
 
 // ── Mapper ───────────────────────────────────────────────────────
 
@@ -163,35 +183,63 @@ function rowToListing(
   };
 }
 
+// As condições dos 6 joins que compõem um Listing, em constantes. O encadeado do
+// Drizzle não se deixa envolver numa função genérica (os tipos do builder mudam a
+// cada `.innerJoin`), por isso `baseSelect` e `searchSelect` repetem a cadeia —
+// mas as CONDIÇÕES, que é onde uma divergência daria resultados diferentes em
+// silêncio, vivem aqui e só aqui.
+const J_ESTIMATE = eq(importCostEstimates.listingId, listings.id);
+const J_MODEL = eq(vehicleModels.id, listings.modelId);
+const J_VERSION = eq(usVersions.versionId, listings.usVersionId);
+/** Modelo do catálogo para nome/imagem: via versão exata, senão via o mid dos
+ *  factos de designação (não-nulo ⟺ designacao com modelo único). */
+const J_US_MODEL = sql`${usModels.mid} = coalesce(${usVersions.mid}, ${listings.designationFacts}->>'mid')`;
+const J_SOURCE = eq(sources.id, listings.sourceId);
+const jFavorite = (standId: string | null) =>
+  and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? ""));
+
+const LISTING_COLUMNS = {
+  l: listings,
+  e: importCostEstimates,
+  vm: vehicleModels,
+  usv: usVersions,
+  usm: usModels,
+  sourceName: sources.name,
+  favoriteId: favorites.id,
+};
+
 /** Junta as 4 peças de um Listing; devolve linhas cruas para o mapper. */
 function baseSelect(standId: string | null) {
-  return (
-    db
-      .select({
-        l: listings,
-        e: importCostEstimates,
-        vm: vehicleModels,
-        usv: usVersions,
-        usm: usModels,
-        sourceName: sources.name,
-        favoriteId: favorites.id,
-      })
-      .from(listings)
-      .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
-      .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
-      .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
-      // Modelo do catálogo para nome/imagem: via versão exata, senão via o mid dos
-      // factos de designação (não-nulo ⟺ designacao com modelo único).
-      .leftJoin(
-        usModels,
-        sql`${usModels.mid} = coalesce(${usVersions.mid}, ${listings.designationFacts}->>'mid')`,
-      )
-      .leftJoin(sources, eq(sources.id, listings.sourceId))
-      .leftJoin(
-        favorites,
-        and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? "")),
-      )
-  );
+  return db
+    .select(LISTING_COLUMNS)
+    .from(listings)
+    .innerJoin(importCostEstimates, J_ESTIMATE)
+    .innerJoin(vehicleModels, J_MODEL)
+    .leftJoin(usVersions, J_VERSION)
+    .leftJoin(usModels, J_US_MODEL)
+    .leftJoin(sources, J_SOURCE)
+    .leftJoin(favorites, jFavorite(standId));
+}
+
+/**
+ * Igual ao `baseSelect`, mais o total do conjunto filtrado.
+ *
+ * `count(*) over()` corre depois do WHERE e antes do LIMIT, portanto dá o total
+ * verdadeiro sem uma segunda passagem pelo dedupe, que é a parte cara. Não está
+ * no `baseSelect` de propósito: a janela obriga a materializar o conjunto todo e
+ * tirava o early-stop ao `topOpportunitiesQuery`, que só quer os primeiros N.
+ * `::int` porque o driver devolveria o bigint do `count()` como string.
+ */
+function searchSelect(standId: string | null) {
+  return db
+    .select({ ...LISTING_COLUMNS, total: sql<number>`count(*) over()::int` })
+    .from(listings)
+    .innerJoin(importCostEstimates, J_ESTIMATE)
+    .innerJoin(vehicleModels, J_MODEL)
+    .leftJoin(usVersions, J_VERSION)
+    .leftJoin(usModels, J_US_MODEL)
+    .leftJoin(sources, J_SOURCE)
+    .leftJoin(favorites, jFavorite(standId));
 }
 
 type BaseRow = Awaited<ReturnType<ReturnType<typeof baseSelect>["execute"]>>[number];
@@ -221,56 +269,141 @@ const COM_CATALOGO = and(
 /**
  * Dedupe da pesquisa por CARRO físico (ver lib/engine/car-identity.ts): o mesmo
  * Tucson listado por caetano.pt e carplus.pt (chassis igual no slug do URL, preço
- * e km ligeiramente diferentes) aparecia 2×. Mantém só o REPRESENTANTE de cada
- * identidade — o de maior savings, desempate pelo id mais baixo — via "não existe
- * outro visível do mesmo carro que ganhe". Determinístico e sem mexer no ORDER
- * BY/LIMIT: o corte é anterior ao limite, logo dá sempre 1 linha por carro.
+ * e km ligeiramente diferentes) aparecia 2×. Fica só o REPRESENTANTE de cada
+ * identidade: o de maior savings, desempate pelo id mais baixo.
+ *
+ * Era um `not exists` correlacionado. Para CADA linha candidata voltava a juntar
+ * listings×estimates e a calcular a identidade — que inclui um `substring(… from
+ * '<regex>')` sobre o `detail_url` — dos DOIS lados. Não é sargável, não há índice
+ * que a cubra, e como o corte tem de ser anterior ao LIMIT, o custo era a montra
+ * inteira por linha (medido: 3,4 s numa versão simplificada sobre 600k anúncios).
+ *
+ * O `distinct on` responde à mesma pergunta numa passagem só, e é exatamente a
+ * forma que o `flag-opportunities.ts` já usa para a mesma identidade. A semântica
+ * é idêntica, não aproximada: `order by <identidade>, savings desc, id` elege o
+ * mesmo vencedor que o "não existe outro que ganhe" elegia.
+ *
  * Restrito ao MESMO conjunto visível da montra (não-apagado, exato, normal) para
  * não esconder um anúncio bom por causa de um duplicado que a montra nem mostra.
  */
-const MONTRA_REPRESENTANTE = sql`not exists (
-  select 1
-  from listings l2
-  join import_cost_estimates e2 on e2.listing_id = l2.id
-  where l2.deleted_at is null
-    and l2.match_confidence = 'exato'
-    and e2.pt_confidence = 'normal'
-    and l2.id <> ${listings.id}
-    and ${carIdentitySql("l2")} = ${carIdentitySql("listings")}
-    and (e2.savings > ${importCostEstimates.savings}
-         or (e2.savings = ${importCostEstimates.savings} and l2.id < ${listings.id}))
+const MONTRA_REPRESENTANTES = sql`(
+  select distinct on (${carIdentitySql("l")}) l.id
+  from listings l
+  join import_cost_estimates e on e.listing_id = l.id
+  where l.deleted_at is null
+    and l.match_confidence = ${MONTRA_MATCH_CONFIDENCE}
+    and e.pt_confidence = ${MONTRA_PT_CONFIDENCE}
+  order by ${carIdentitySql("l")}, e.savings desc, l.id
 )`;
+
+const E_REPRESENTANTE = sql`${listings.id} in ${MONTRA_REPRESENTANTES}`;
+
+/**
+ * Texto livre → SQL. Cada token tem de aparecer em ALGUM campo (AND entre tokens,
+ * OR entre campos).
+ *
+ * Duas correções face ao `ilike '%<query inteira>%'` de antes:
+ *
+ *  1. **Tokens.** "bmw 220d" procurava a string inteira numa só coluna e não
+ *     casava com nada — a marca está em `make_raw` e o "220d" na `variant`.
+ *  2. **O catálogo entra.** O servidor procurava só no texto CRU do anúncio, mas
+ *     o título que o cartão mostra é construído do ultimatespecs (ver
+ *     `rowToListing`). Procurar "Gran Coupe", que aparece em dezenas de cartões,
+ *     dava zero. O `baseSelect` já faz left join a `us_models`/`us_versions` —
+ *     é só incluí-los.
+ *
+ * Teto de 6 tokens: além disso é ruído, e cada token são 6 `ilike`.
+ */
+function textoSql(query: string): SQL | undefined {
+  const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 6);
+  if (!tokens.length) return undefined;
+  return and(
+    ...tokens.map((token) => {
+      const q = `%${token}%`;
+      return or(
+        ilike(listings.makeRaw, q),
+        ilike(listings.modelRaw, q),
+        ilike(listings.variant, q),
+        ilike(usModels.make, q),
+        ilike(usModels.model, q),
+        ilike(usVersions.name, q),
+      );
+    }),
+  );
+}
+
+/**
+ * Caixa em SQL, fiel ao `transmissionOf` que decide o que o CARTÃO mostra —
+ * incluindo a parte errada: `gearbox` nulo conta como manual. Não é a
+ * classificação certa (um DSG cai em "manual"), mas nesta fase o filtro não pode
+ * contradizer o cartão: filtrar "Manual" e receber um cartão a dizer "Automática"
+ * destrói a confiança no produto todo. A correção a sério é uma coluna
+ * `gearbox_norm` escrita pelo `normGearbox` (lib/engine/us-catalog.ts), que
+ * arruma o cartão e o filtro de uma vez — fica para uma migration própria.
+ */
+function caixaSql(gearbox: Transmission): SQL {
+  return gearbox === "automática"
+    ? sql`${listings.gearbox} ilike '%auto%'`
+    : sql`(${listings.gearbox} is null or ${listings.gearbox} not ilike '%auto%')`;
+}
+
+/**
+ * ORDER BY com **ordem total**: sem o `id` no fim, linhas com o mesmo valor
+ * (savings é inteiro em euros, repete muito) podiam trocar de posição entre
+ * pedidos, e a paginação por offset saltava ou repetia carros em silêncio.
+ */
+function ordemSql(sort: SearchFilters["sort"]): SQL[] {
+  const criterio =
+    sort === "price"
+      ? asc(importCostEstimates.totalPt)
+      : sort === "recent"
+        ? desc(listings.lastSeenAt)
+        : sort === "savings"
+          ? desc(importCostEstimates.savings)
+          : desc(importCostEstimates.savingsPct);
+  return [criterio, asc(listings.id)];
+}
 
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
-): Promise<Listing[]> {
-  const conds = [isNull(listings.deletedAt), COM_CATALOGO, MONTRA_REPRESENTANTE];
+): Promise<SearchPage> {
+  const conds = [isNull(listings.deletedAt), COM_CATALOGO, E_REPRESENTANTE];
   if (filters.query) {
-    const q = `%${filters.query}%`;
-    const textMatch = or(
-      ilike(listings.makeRaw, q),
-      ilike(listings.modelRaw, q),
-      ilike(listings.variant, q),
-    );
-    if (textMatch) conds.push(textMatch);
+    const texto = textoSql(filters.query);
+    if (texto) conds.push(texto);
   }
   if (filters.countries?.length) conds.push(inArray(listings.country, filters.countries));
   if (filters.onlyOpportunities) conds.push(eq(importCostEstimates.verdict, "compensa"));
   if (filters.maxPrice) conds.push(lte(importCostEstimates.totalPt, filters.maxPrice));
+  if (filters.minYear) conds.push(gte(listings.year, filters.minYear));
+  if (filters.maxKm) conds.push(lte(listings.km, filters.maxKm));
+  if (filters.fuel) conds.push(eq(listings.fuel, filters.fuel));
+  if (filters.gearbox) conds.push(caixaSql(filters.gearbox));
 
-  const orderBy =
-    filters.sort === "price"
-      ? importCostEstimates.totalPt
-      : filters.sort === "recent"
-        ? desc(listings.lastSeenAt)
-        : desc(importCostEstimates.savings);
+  const page = Math.min(Math.max(filters.page ?? 1, 1), MAX_PAGE);
 
-  const rows = await baseSelect(standId)
+  const rows = await searchSelect(standId)
     .where(and(...conds))
-    .orderBy(orderBy)
-    .limit(SEARCH_LIMIT);
-  return rows.map((r) => toListing(r));
+    .orderBy(...ordemSql(filters.sort))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
+
+  // O `count(*) over()` viaja NAS linhas — numa página vazia não vem nenhum, e o
+  // total ficava 0. Quem aterrasse numa página fora do conjunto (link antigo,
+  // stock que encolheu) via "0 anúncios" e perdia a paginação com que voltar
+  // atrás. Nesse caso — e só nesse — vale a pena a segunda ida à base.
+  const total =
+    rows[0]?.total ??
+    (page > 1 ? (await searchListingsQuery({ ...filters, page: 1 }, standId)).total : 0);
+
+  return {
+    items: rows.map((r) => toListing(r)),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    hasMore: page < MAX_PAGE && page * PAGE_SIZE < total,
+  };
 }
 
 export async function getListingQuery(id: string, standId: string | null): Promise<Listing | null> {

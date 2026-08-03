@@ -26,9 +26,11 @@ import type {
   CountryInsight,
   DashboardStats,
   Deal,
+  FuelType,
   Listing,
   Notification,
   Stand,
+  Transmission,
 } from "./types";
 
 const hasDb = () => Boolean(process.env.DATABASE_URL);
@@ -56,15 +58,44 @@ const activeStandId = cache(async (): Promise<string | null> => {
 });
 
 // ── Pesquisa / anúncios ─────────────────────────────────────────
+
+/**
+ * Ordenação da pesquisa. `percentagem` é o default e é uma decisão de produto:
+ * ordenar por poupança ABSOLUTA enchia o topo de Lamborghinis (preço médio dos
+ * primeiros 60: 147 169 €) quando 87% das oportunidades reais estão abaixo dos
+ * 40 000 € e o público-alvo são stands de usados. `savings` continua a existir
+ * porque os KPIs do painel são em euros e têm de aterrar na mesma ordem.
+ */
+export type SearchSort = "percentagem" | "savings" | "recent" | "price";
+
 export interface SearchFilters {
   query?: string;
   countries?: CountryCode[];
   onlyOpportunities?: boolean;
   maxPrice?: number;
-  sort?: "savings" | "recent" | "price";
+  minYear?: number;
+  maxKm?: number;
+  fuel?: FuelType;
+  gearbox?: Transmission;
+  sort?: SearchSort;
+  /** 1-based. Acima do teto (lib/queries.ts MAX_PAGE) fica preso ao teto. */
+  page?: number;
 }
 
-export async function searchListings(filters: SearchFilters = {}): Promise<Listing[]> {
+/**
+ * Uma página de resultados. Devolver `Listing[]` era o contrato antigo, mas sem
+ * `total` a UI não tem como dizer a verdade: mostrava o tamanho do array como se
+ * fosse o número de anúncios que existem ("60 anúncios" quando havia 6 402).
+ */
+export interface SearchPage {
+  items: Listing[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+}
+
+export async function searchListings(filters: SearchFilters = {}): Promise<SearchPage> {
   return q.searchListingsQuery(filters, await activeStandId());
 }
 
