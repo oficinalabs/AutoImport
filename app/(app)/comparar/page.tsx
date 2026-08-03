@@ -4,7 +4,7 @@ import { VerdictBadge } from "@/components/verdict-badge";
 import { getListingsByIds } from "@/lib/data";
 import { formatEuro, formatKm, formatPercent } from "@/lib/format";
 import type { Listing } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, isUuid } from "@/lib/utils";
 import { ArrowLeft, Trophy } from "lucide-react";
 import Link from "next/link";
 
@@ -24,7 +24,12 @@ export default async function CompararPage({
   searchParams: Promise<{ ids?: string }>;
 }) {
   const { ids } = await searchParams;
-  const list = ids ? await getListingsByIds(ids.split(",")) : [];
+  // O `?ids=` é texto solto vindo do URL. Os que não têm forma de uuid caem
+  // aqui em vez de rebentarem na query (ver lib/utils.ts); sobrando menos de
+  // dois, o ecrã de "escolhe 2 a 4" cá em baixo trata do resto — que é o mesmo
+  // que já acontecia com ids bem formados mas inexistentes.
+  const validos = ids?.split(",").filter(isUuid) ?? [];
+  const list = validos.length > 0 ? await getListingsByIds(validos) : [];
 
   if (list.length < 2) {
     return (

@@ -9,7 +9,7 @@ import { VerdictBadge } from "@/components/verdict-badge";
 import { getListing } from "@/lib/data";
 import { formatCc, formatEuro, formatKm, formatNumber, relativeDay } from "@/lib/format";
 import type { Listing } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, isUuid } from "@/lib/utils";
 import { ArrowLeft, PackageX } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -56,6 +56,10 @@ function specs(l: Listing): { label: string; value: string }[] {
 
 export default async function AnuncioPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Um id que nem sequer tem forma de uuid é um URL inventado, não um anúncio
+  // que sumiu — 404 antes de chegar à base de dados. Ver lib/utils.ts.
+  if (!isUuid(id)) notFound();
+
   const listing = await getListing(id);
   if (!listing) notFound();
 

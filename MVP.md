@@ -209,16 +209,19 @@ importação não é a mesma.
 
 ## 3. P2 — dívida a fechar antes de abrir ao público
 
-- [ ] **`/mockups` está público em produção** (~4,4 MB). Já documentado em
+- [x] **`/mockups` está público em produção** (~4,4 MB). ~~Já documentado em
       [`docs/00-VISAO.md`](docs/00-VISAO.md) com instruções de remoção. A direção
-      de design já foi escolhida — remover
+      de design já foi escolhida — remover~~ Feito: `public/mockups/` apagado e a
+      entrada saiu do `app/robots.ts`. As maquetes continuam em
+      `design/direcoes/` (não são servidas)
 - [ ] **Sem Sentry e sem PostHog.** Estão na stack fixa
       (`docs/00-GERAL.md`) e no `.env.example`; não estão no código. Sem eles não
       se sabe o que rebenta a um cliente. A UI já mostra o `digest` do erro para
       cruzar com logs — falta o sítio onde cruzar
-- [ ] **Sem `Content-Security-Policy`.** Os restantes cabeçalhos de segurança
-      estão todos lá e bem (`X-Frame-Options`, HSTS, `Permissions-Policy`,
-      COOP) — falta só a CSP
+- [ ] **`Content-Security-Policy` ainda em `Report-Only`.** A política está
+      escrita no `next.config.mjs` e não bloqueia nada — só reporta. Falta
+      observar produção durante um tempo e, se estiver limpa, passar ao header
+      a sério (`Content-Security-Policy`)
 - [ ] **Performance da montra.** `/painel` levou **8–19 s** em dev; a query de
       dedupe por identidade de carro leva **3,4 s** sozinha sobre o warehouse.
       Em produção o conjunto publicado é menor, mas a forma da query é a mesma.
@@ -229,8 +232,10 @@ importação não é a mesma.
 - [ ] Tabelas de ISV só de **2026** (`isv_tables`). Confirmar o plano de
       atualização anual antes da viragem do ano
 - [ ] `components/demo-banner.tsx` é código morto — nada o importa
-- [ ] Um UUID inválido em `/anuncio/<lixo>` dá erro 500 (com o boundary bonito,
-      mas mesmo assim) em vez de 404
+- [x] ~~Um UUID inválido em `/anuncio/<lixo>` dá erro 500 (com o boundary bonito,
+      mas mesmo assim) em vez de 404~~ Feito: as páginas validam o formato antes
+      de ir à base de dados (`/anuncio` → 404, `/comparar` → ignora os ids
+      malformados)
 - [ ] Em mobile, a etiqueta "Comparar" sobrepõe o badge "Compensa" no cartão
 - [ ] A poupança aparece como **"−95 958 €"**. O sinal negativo lê-se como
       prejuízo; é poupança. Confirmar que é mesmo a leitura pretendida
