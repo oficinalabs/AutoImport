@@ -1,34 +1,24 @@
-# 🤝 Handoff Frontend → Backend
+# 🤝 Fronteira Frontend ⇄ Backend
 
-O frontend está implementado e a correr sobre **dados mock**. Este documento diz
-ao backend **exatamente onde ligar os dados reais** para tornar a plataforma
-dinâmica, sem mexer na UI.
+Nasceu como handoff, quando a UI corria sobre mock. **O mock foi apagado** — hoje
+tudo vem da base de dados, e este documento passou a descrever *onde é a
+fronteira* e o que continua por ligar.
 
-## ✅ Autenticação (Better Auth) — implementada, falta a base de dados
+## ✅ Autenticação (Better Auth)
 
-O login/registo/logout já estão ligados ao **Better Auth** (email + password) com
-**Drizzle + Postgres** e multi-tenant (cada **stand** é uma organização, papéis
-owner/member). Só falta uma base de dados. Passos para a ativar:
-
-1. Criar a Postgres no **Supabase** (região UE) e copiar a connection string
-   (pooler *Transaction*, porta 6543).
-2. `cp .env.example .env.local` e preencher `DATABASE_URL` + `BETTER_AUTH_SECRET`
-   (gerar com `openssl rand -base64 32`).
-3. `pnpm db:push` — cria as tabelas de auth (`user`, `session`, `account`,
-   `verification`, `organization`, `member`, `invitation`).
-4. `pnpm dev` → registar um stand em `/registar` e entrar. Feito.
+Registo, login, logout, verificação de email obrigatória, reset de password e
+multi-tenant (cada **stand** é uma organização, papéis owner/member) — tudo a
+funcionar sobre Drizzle + Postgres. O stand é criado no **servidor**, num
+`databaseHook` de `lib/auth.ts`, para ser atómico com o utilizador.
 
 Ficheiros: [`lib/auth.ts`](../lib/auth.ts) (config), [`lib/auth-client.ts`](../lib/auth-client.ts),
-[`db/schema.ts`](../db/schema.ts) (gerado por `pnpm auth:generate`), [`middleware.ts`](../middleware.ts)
+[`db/schema.ts`](../db/schema.ts), [`middleware.ts`](../middleware.ts)
 (protege as rotas da app), [`app/api/auth/[...all]/route.ts`](../app/api/auth) (endpoint),
 [`components/auth-forms.tsx`](../components/auth-forms.tsx) (formulários).
 
-**Pendente (não bloqueia o login):** envio de emails de reset via **Resend**
-(`sendResetPassword` em `lib/auth.ts` está como TODO) + a página `/recuperar/definir`
-que consome o token; criação do stand no signup ainda é feita no cliente (mover para
-um `databaseHook` no servidor, para ser atómica). **Verificado sem DB:** o middleware
-protege `/painel`, e um POST a `/api/auth/sign-up/email` gera o SQL correto e só falha
-na ligação (`ECONNREFUSED`) — a cadeia está toda ligada.
+⚠️ **`pnpm auth:generate` regenera o `db/schema.ts`** a partir do Better Auth e
+apaga o que lá foi acrescentado à mão (os campos `nif`/`address`/`phone` da
+`organization`, por exemplo). Por isso a subscrição vive em tabela própria.
 
 > Regra de ouro: a UI só conhece os **tipos** em [`lib/types.ts`](../lib/types.ts) e
 > lê tudo através da camada [`lib/data.ts`](../lib/data.ts). **Só é preciso reescrever
@@ -47,45 +37,49 @@ pnpm lint           # biome
 Stack conforme os docs 00–06: Next.js 15 (App Router, RSC-first), TypeScript strict,
 Tailwind v4 + tokens em [`app/globals.css`](../app/globals.css), TanStack Query, Biome.
 
-## Onde ligar o backend — `lib/data.ts`
+## A fronteira — `lib/data.ts`
 
-Cada função devolve hoje mock ([`lib/mock.ts`](../lib/mock.ts)). Substituir o corpo por
-Server Action, Route Handler (`fetch`) ou query Drizzle. Mapeamento sugerido:
+Todas as funções lêem a base por [`lib/queries.ts`](../lib/queries.ts) (Drizzle).
+A UI **nunca** importa o Drizzle nem o `lib/queries.ts`.
 
 | Função | O que faz | Entidades (ver [04](04-BASE-DE-DADOS.md)) |
 |---|---|---|
-| `searchListings(filters)` | pesquisa/filtra anúncios | `listings` + `import_cost_estimates` + `pt_price_observations` |
-| `getListing(id)` | detalhe de um anúncio | idem, com histórico e ficha |
+| `searchListings(filters)` → `SearchPage` | pesquisa; **todos os filtros são SQL** | `listings` + `import_cost_estimates` |
+| `getListing(id)` | detalhe de um anúncio | idem, com histórico PT |
 | `getListingsByIds(ids)` | comparação | idem |
-| `getDashboardStats()` | KPIs do painel | agregações |
+| `getDashboardStats()` | KPIs do painel | `opportunities` |
 | `getTopOpportunities(n)` | oportunidades | `opportunities` |
 | `getCountryInsights()` | dinâmica por país | agregação por país |
-| `getFavorites()` / `toggleFavorite(id)` | favoritos | `favorites` (persistir) |
-| `getAlerts()` | alertas | `saved_searches` / `alerts` |
-| `getConversations()` / `getConversation(id)` | negociações | `conversations` + `messages` |
-| `sendMessage(convId, body)` | enviar mensagem | **email mascarado** (ver abaixo) |
-| `getDeals()` / `getDeal(id)` | pipeline de compra | `deals` |
-| `getStand()` | conta/stand/subscrição | `stands` + `subscriptions` |
+| `getFavorites()` / `toggleFavorite(id)` | favoritos | `favorites` |
+| `getAlerts()` / `createAlert()` / `toggleAlert()` | alertas | `alerts` + `alert_events` |
+| `getNotifications()` | o sino | `alert_events` |
+| `getStand()` / `updateStand()` | conta, stand e subscrição | `organization` + `subscriptions` |
+| `getConversations()` / `getDeals()` | ⬜ **sem backend** — devolvem vazio | — |
 
-**Cálculo do custo/veredito:** hoje é feito no mock a partir dos escalões em
-[`lib/verdict.ts`](../lib/verdict.ts) (`verdictFromSavings`) e da soma em `CostBreakdown`.
-Na produção, o **ISV e o custo final devem ser calculados na engine/backend** (as tabelas
-de ISV mudam por ano) e vir já preenchidos em `Listing.cost` / `savings` / `verdict`.
+**Custo e veredito são calculados na engine**, nunca na UI: o pipeline grava
+`import_cost_estimates` e a UI recebe `Listing.cost`/`savings`/`verdict` já
+preenchidos. As tabelas de ISV mudam por ano — ver [08](08-PIPELINE-DADOS.md).
 
-## Pontos que precisam de backend a sério (hoje são stub/otimista)
+⚠️ **`searchListings` devolve `SearchPage`, não `Listing[]`** — tem `items`,
+`total`, `page`, `pageSize` e `hasMore`. Sem o `total`, a UI mostrava o tamanho
+do array como se fosse o número de anúncios que existem.
 
-1. **Autenticação (Better Auth, [03](03-BACKEND.md)).** ✅ Implementada — ver a secção no
-   topo deste documento. Só falta a `DATABASE_URL`. Pendente ligado à sessão: o stand em
-   `getStand()` ainda é fixo (mock) — passar a vir da organização ativa da sessão.
-2. **Favoritos** — `CarCard` faz *optimistic update* local e chama `toggleFavorite` (no-op).
-   Persistir por utilizador/stand.
-3. **Negociações / email mascarado** — `sendMessage` só faz append local. Tem de enviar por
-   **email proxy da plataforma** (o email real do fornecedor e do stand fica privado, só se
-   comunica pela plataforma — requisito de produto, ver [06](06-SERVICOS-EXTERNOS.md)).
-4. **Alertas** — a UI já cria alertas e liga/desliga o toggle (otimista, em
-   `components/alerts-view.tsx`), chamando `createAlert`/`toggleAlert` em `lib/data.ts`
-   (no-ops). Falta persistir e o job que dispara emails quando há match (Inngest ou engine).
-5. **Subscrição** — "Gerir subscrição" deve ligar ao Polar (checkout/portal).
+## O que continua por ligar
+
+1. **Negociações e Compras** — `getConversations()`/`getDeals()` devolvem vazio
+   por construção, e as rotas estão **escondidas da navegação**. A decisão de
+   produto foi não as construir no MVP: o âmbito é a inteligência de decisão, não
+   ser um inbox. As rotas ficam a existir (um link guardado dá uma página honesta
+   em vez de 404) e o middleware continua a protegê-las.
+2. **Pagamentos** — a tabela `subscriptions` e o webhook
+   (`app/api/polar/webhook/`) existem, e o gate fecha a app quando o período
+   acaba. Falta o **checkout e o portal de faturação**, que precisam de
+   `POLAR_ACCESS_TOKEN` e de produtos criados do lado da Polar; até lá o botão
+   "Gerir subscrição" fica honestamente desativado.
+3. **Convidar equipa** — desativado. A landing vende "toda a equipa incluída";
+   hoje um stand é um utilizador.
+4. **Observabilidade** — sem Sentry. Os boundaries já mostram o `digest`
+   precisamente para cruzar com os logs; falta o sítio onde cruzar.
 
 ## Imagens dos carros
 
@@ -108,8 +102,9 @@ Notas apanhadas a testar os 24 hosts:
 - `referrerPolicy="no-referrer"` nas fotos: não vazamos os nossos URLs para os CDNs das fontes.
 
 O link para o anúncio de origem (`Listing.sourceUrl` ← `listings.detail_url`, 100% de
-cobertura) está na página do anúncio, como ação **secundária** — a negociação pela
-plataforma é que mantém o email do vendedor privado (ver [06](06-SERVICOS-EXTERNOS.md)).
+cobertura) é o **CTA principal** da página do anúncio. Já foi secundário, quando a
+negociação pela plataforma era o caminho previsto; com essa fora do MVP, mandar o
+stand ao anúncio é o que ele vai mesmo fazer.
 
 ## Tratamento de erros
 
@@ -132,7 +127,7 @@ Verificado em `next start`: o HTML entregue ao cliente não continha SQL, nomes 
 - **Verificação de email obrigatória**: o registo não cria sessão; o stand (organização) é criado no **servidor** (`databaseHook` em `lib/auth.ts`), não no cliente.
 - **Segredos**: nunca em `NEXT_PUBLIC_*`; `.env.local` está no gitignore. Só o `.env.example` é commitado.
 
-⚠️ **Dívida conhecida:** `pnpm db:push` rebenta contra esta Supabase (bug do drizzle-kit 0.31 a introspecionar CHECK constraints dos schemas internos do Supabase). A coluna `user.stand_name` foi aplicada por `ALTER TABLE` direto. Para mudanças de schema futuras, preferir migrations versionadas (`pnpm db:generate` + `db:migrate`), como manda o [04](04-BASE-DE-DADOS.md).
+⚠️ **`pnpm db:push` não funciona** contra esta Supabase (bug do drizzle-kit a introspecionar os schemas internos do Supabase). Todas as mudanças de schema são **migrations versionadas** — `pnpm db:generate`, commitar o `.sql`, e a Vercel aplica-o no build. Ver o [CLAUDE.md](../CLAUDE.md), que tem a história de como isto já partiu a produção.
 
 ## Convenções úteis
 
@@ -146,24 +141,34 @@ Verificado em `next start`: o HTML entregue ao cliente não continha SQL, nomes 
 ## Mapa de ficheiros
 
 ```
-app/                     rotas (RSC-first), em 3 grupos:
+app/                     rotas (RSC-first), em 4 grupos:
   (marketing)/           landing pública em / (indexável)
-  (auth)/                /entrar /registar /recuperar (UI pronta p/ Better Auth)
-  (app)/                 a app (noindex até haver auth)
-    painel/              Painel (nota: mudou de / para /painel)
-    pesquisar/           Pesquisa (+ "Mais filtros" client-side)
-    anuncio/[id]/        Detalhe
-    comparar/            Comparação
-    negociacoes/         Mensagens (email mascarado)
-    compras/             Pipeline
-    favoritos/ alertas/ stand/
+  (auth)/                /entrar /registar /recuperar
+  (legal)/               /ajuda /legal/* (indexáveis)
+  (app)/                 a app (noindex)
+    layout.tsx           barra de topo — envolve TUDO, /stand incluída
     loading.tsx          skeleton partilhado do grupo
-  robots.ts sitemap.ts   SEO (só a landing é indexável)
+    stand/               conta e subscrição — FORA do gate, de propósito
+    (gated)/             ⚠️ grupo do gate da subscrição. Os parênteses não
+      layout.tsx           entram no URL: /painel continua /painel. Rota nova
+      painel/              aqui dentro fica fechada por omissão — falha
+      pesquisar/           FECHADO, que é o que se quer numa porta.
+      anuncio/[id]/
+      comparar/ favoritos/ alertas/
+      negociacoes/ compras/   (escondidas da navegação, ver acima)
+  api/auth/[...all]/     Better Auth
+  api/polar/webhook/     estado da subscrição
+  robots.ts sitemap.ts   SEO (só a landing e as legais são indexáveis)
 components/              UI (ui/ = primitivas estilo shadcn)
 lib/
   types.ts               ← CONTRATO de domínio
-  data.ts                ← SEAM: ligar backend aqui
-  mock.ts                ← dados de exemplo (apagar quando houver backend)
+  data.ts                ← A FRONTEIRA: a UI lê tudo por aqui
+  queries.ts             ← Drizzle, só servidor. A UI nunca importa isto.
+  subscription.ts polar-webhook.ts
   format.ts verdict.ts countries.ts deal-stages.ts
-.github/workflows/ci.yml lint → typecheck → build em cada PR (docs/05)
+tests/
+  helpers/db.ts          base descartável partilhada
+  queries/               a camada de queries da app
+  smoke/                 a app compilada, a servir (pnpm test:smoke)
+.github/workflows/       ci · alertas · frescura · publicação · daily-batch
 ```
