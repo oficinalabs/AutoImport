@@ -101,6 +101,12 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+
+  // Pasta do build. Configurável só para o teste de fumo (tests/smoke) poder
+  // compilar para um sítio próprio: um `next build` normal apaga o `.next` por
+  // baixo de um `next dev` que esteja a correr e deixa-o em coma até se reiniciar.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+
   // Não anunciar a stack.
   poweredByHeader: false,
 
