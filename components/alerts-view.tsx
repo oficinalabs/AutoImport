@@ -4,22 +4,34 @@ import { CountryFlag } from "@/components/country-flag";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_LIST } from "@/lib/countries";
-import { createAlert, toggleAlert } from "@/lib/data";
-import { formatEuro } from "@/lib/format";
-import type { Alert, CountryCode } from "@/lib/types";
+import { createAlert, deleteAlert, toggleAlert } from "@/lib/data";
+import { formatEuro, relativeDay } from "@/lib/format";
+import type { Alert, AlertModelOption, CountryCode } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { BellPlus, BellRing, X } from "lucide-react";
-import { useState } from "react";
+import { BellPlus, BellRing, Trash2, TriangleAlert, X } from "lucide-react";
+import { useMemo, useState } from "react";
 
-export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
+export function AlertsView({
+  initialAlerts,
+  models,
+}: {
+  initialAlerts: Alert[];
+  models: AlertModelOption[];
+}) {
   const [alerts, setAlerts] = useState(initialAlerts);
   const [showForm, setShowForm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Estado do formulário de novo alerta
   const [name, setName] = useState("");
-  const [criteria, setCriteria] = useState("");
+  const [modelo, setModelo] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [countries, setCountries] = useState<CountryCode[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  /** Rótulo escrito → família. É o que valida a escolha: o que não estiver aqui
+   *  não existe na montra e não teria como casar. */
+  const porRotulo = useMemo(() => new Map(models.map((m) => [m.label.toLowerCase(), m])), [models]);
 
   function toggleCountry(code: CountryCode) {
     setCountries((prev) =>
@@ -39,10 +51,21 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
     await toggleAlert(id, next); // otimista: a UI move-se já, o servidor confirma depois
   }
 
+  async function onDelete(id: string) {
+    setConfirmDelete(null);
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    await deleteAlert(id);
+  }
+
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim() || !criteria.trim()) return;
-    const summary = [criteria.trim(), maxPrice && `< ${formatEuro(Number(maxPrice))}`]
+    const escolhido = porRotulo.get(modelo.trim().toLowerCase());
+    if (!escolhido) {
+      setError("Escolhe um modelo da lista — só esses é que existem na montra.");
+      return;
+    }
+    if (!name.trim()) return;
+    const summary = [escolhido.label, maxPrice && `< ${formatEuro(Number(maxPrice))}`]
       .filter(Boolean)
       .join(" · ");
     const draft = {
@@ -50,6 +73,8 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
       criteria: summary,
       countries,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      makeKey: escolhido.makeKey,
+      modelKey: escolhido.modelKey,
     };
     setAlerts((prev) => [
       {
@@ -59,13 +84,15 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
         countries: draft.countries,
         active: true,
         matchCount: 0,
+        matchable: true,
       },
       ...prev,
     ]);
     setName("");
-    setCriteria("");
+    setModelo("");
     setMaxPrice("");
     setCountries([]);
+    setError(null);
     setShowForm(false);
     await createAlert(draft); // persiste na BD (lib/data.ts)
   }
@@ -105,16 +132,33 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="alert-criteria" className="text-sm font-medium">
-                Marca / modelo / critérios
+              <label htmlFor="alert-model" className="text-sm font-medium">
+                Modelo a vigiar
               </label>
+              {/*
+                Lista real de modelos da montra, não texto livre. O texto livre
+                era o bug: escrevia-se "Golf 2.0 TDI" e nada no mundo casava
+                aquilo com um anúncio — o alerta ficava guardado e calado para
+                sempre. Escolhido daqui, o alerta apanha o modelo TODO (todas as
+                grafias, gerações e combustíveis), que é o que se está a pedir.
+              */}
               <Input
-                id="alert-criteria"
-                value={criteria}
-                onChange={(e) => setCriteria(e.target.value)}
-                placeholder="Ex.: BMW 320d · > 2021 · < 80 000 km"
+                id="alert-model"
+                list="alert-models"
+                value={modelo}
+                onChange={(e) => {
+                  setModelo(e.target.value);
+                  setError(null);
+                }}
+                placeholder="Escreve e escolhe — ex.: Volkswagen Golf"
+                autoComplete="off"
                 required
               />
+              <datalist id="alert-models">
+                {models.map((m) => (
+                  <option key={`${m.makeKey}|${m.modelKey}`} value={m.label} />
+                ))}
+              </datalist>
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="alert-price" className="text-sm font-medium">
@@ -156,7 +200,20 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
                 );
               })}
             </div>
+            {/* Nenhum país escolhido = todos. Antes era o contrário sem o dizer:
+                a lista vazia não casava com país nenhum e o alerta nascia morto. */}
+            <p className="mt-2 text-xs text-ink-soft">
+              {countries.length === 0
+                ? "Sem escolha, avisamos-te de todos os países."
+                : "Só destes países."}
+            </p>
           </div>
+
+          {error && (
+            <p role="alert" className="text-sm text-bad">
+              {error}
+            </p>
+          )}
 
           <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
             <p className="text-xs text-ink-soft">
@@ -188,6 +245,20 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
                 )}
               </div>
               <p className="mt-1 text-sm text-ink-soft">{a.criteria}</p>
+              {a.lastMatchAt && (
+                <p className="mt-0.5 text-xs text-ink-soft">
+                  Último match {relativeDay(a.lastMatchAt)}
+                </p>
+              )}
+              {/* Um alerta que nunca poderá casar não pode ficar aí quieto a
+                  fingir que vigia (ver lib/alert-criteria.ts). */}
+              {!a.matchable && (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-warn">
+                  <TriangleAlert className="size-3.5 shrink-0" />
+                  Sem modelo reconhecido — este alerta não consegue casar. Apaga-o e cria outro
+                  escolhendo o modelo da lista.
+                </p>
+              )}
               {a.countries.length > 0 && (
                 <div className="mt-1.5 flex items-center gap-2 text-xs text-ink-soft">
                   {a.countries.map((c) => (
@@ -197,29 +268,58 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => onToggle(a.id)}
-              role="switch"
-              aria-checked={a.active}
-              aria-label={`Alerta ${a.name} ${a.active ? "ativo" : "inativo"}`}
-              className="flex items-center gap-2 text-sm"
-            >
-              <span className="text-ink-soft">{a.active ? "Ativo" : "Inativo"}</span>
-              <span
-                className={cn(
-                  "relative h-5 w-9 rounded-full transition-colors",
-                  a.active ? "bg-good" : "bg-line-strong",
-                )}
+            <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => onToggle(a.id)}
+                role="switch"
+                aria-checked={a.active}
+                aria-label={`Alerta ${a.name} ${a.active ? "ativo" : "inativo"}`}
+                className="flex items-center gap-2 text-sm"
               >
+                <span className="text-ink-soft">{a.active ? "Ativo" : "Inativo"}</span>
                 <span
                   className={cn(
-                    "absolute top-0.5 size-4 rounded-full bg-white transition-all",
-                    a.active ? "left-[18px]" : "left-0.5",
+                    "relative h-5 w-9 rounded-full transition-colors",
+                    a.active ? "bg-good" : "bg-line-strong",
                   )}
-                />
-              </span>
-            </button>
+                >
+                  <span
+                    className={cn(
+                      "absolute top-0.5 size-4 rounded-full bg-white transition-all",
+                      a.active ? "left-[18px]" : "left-0.5",
+                    )}
+                  />
+                </span>
+              </button>
+
+              {/* Apagar é irreversível (leva os matches atrás) — dois passos, sem
+                  diálogo do browser. */}
+              {confirmDelete === a.id ? (
+                <span className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => onDelete(a.id)}>
+                    Apagar mesmo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConfirmDelete(null)}
+                  >
+                    Cancelar
+                  </Button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(a.id)}
+                  aria-label={`Apagar alerta ${a.name}`}
+                  className="text-ink-soft transition-colors hover:text-bad"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>

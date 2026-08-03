@@ -21,6 +21,7 @@ import * as q from "./queries";
 import { checkStandFields } from "./stand-fields";
 import type {
   Alert,
+  AlertModelOption,
   Conversation,
   CountryCode,
   CountryInsight,
@@ -226,16 +227,24 @@ export async function getAlerts(): Promise<Alert[]> {
   return standId ? q.alertsQuery(standId) : [];
 }
 
+/** As famílias de modelos que existem na montra — a lista do formulário de /alertas. */
+export async function getAlertModels(): Promise<AlertModelOption[]> {
+  return q.alertModelsQuery();
+}
+
 export interface AlertDraft {
   name: string;
   criteria: string;
   countries: CountryCode[];
   maxPrice?: number;
-  /** Preenchidos quando o alerta nasce de um anúncio (ver
-   * components/listing-actions.tsx) — vão para o JSONB de criteria, para o
-   * futuro job de matching comparar exato em vez de reanalisar texto livre. */
+  /** Texto CRU do anúncio, quando o alerta nasce de um (ver
+   * components/listing-actions.tsx). O servidor normaliza-o para a família em
+   * `createAlertMutation`. */
   make?: string;
   model?: string;
+  /** Família já escolhida de uma lista real (formulário de /alertas). */
+  makeKey?: string;
+  modelKey?: string;
 }
 
 export async function createAlert(draft: AlertDraft): Promise<void> {
@@ -246,6 +255,18 @@ export async function createAlert(draft: AlertDraft): Promise<void> {
 export async function toggleAlert(id: string, active: boolean): Promise<void> {
   const standId = await activeStandId();
   if (standId) await q.toggleAlertMutation(standId, id, active);
+}
+
+/**
+ * Apaga um alerta. O `standId` vem da SESSÃO e nunca do cliente — só o id do
+ * alerta é que o cliente escolhe, e ele sozinho não chega para apagar nada de
+ * outro stand (o WHERE em lib/queries.ts leva os dois).
+ */
+export async function deleteAlert(id: string): Promise<void> {
+  const standId = await activeStandId();
+  if (!standId) return;
+  await q.deleteAlertMutation(standId, id);
+  revalidatePath("/alertas");
 }
 
 // ── Negociações ─────────────────────────────────────────────────

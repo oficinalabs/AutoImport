@@ -130,6 +130,22 @@ export interface Alert {
   active: boolean;
   matchCount: number;
   lastMatchAt?: string;
+  /**
+   * `false` quando os critérios não identificam um modelo — o alerta nunca
+   * poderá casar com nada. Acontece nos alertas antigos, criados quando o
+   * formulário de /alertas aceitava texto livre. A UI di-lo em vez de os deixar
+   * parados a zero para sempre (ver lib/alert-criteria.ts).
+   */
+  matchable: boolean;
+}
+
+/** Uma família de modelos que existe mesmo na montra — o que o formulário de
+ *  /alertas oferece para escolher. */
+export interface AlertModelOption {
+  makeKey: string;
+  modelKey: string;
+  /** "Volkswagen Golf" */
+  label: string;
 }
 
 // ── Negociações (email mascarado) ───────────────────────────────

@@ -7,6 +7,7 @@ import {
   type SQL,
   and,
   asc,
+  count,
   desc,
   eq,
   gte,
@@ -14,6 +15,7 @@ import {
   inArray,
   isNull,
   lte,
+  max,
   or,
   sql,
 } from "drizzle-orm";
@@ -34,6 +36,7 @@ import {
   user,
   vehicleModels,
 } from "../db/schema";
+import { type AlertCriteria, alertModelKeys, familyLabel } from "./alert-criteria";
 import { co2Norm } from "./cost-engine";
 import type { SearchFilters, SearchPage } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
@@ -42,6 +45,7 @@ import { CONDICOES } from "./legal";
 import { estadoEfetivo } from "./subscription";
 import type {
   Alert,
+  AlertModelOption,
   CostBreakdown,
   CountryCode,
   CountryInsight,
@@ -180,6 +184,17 @@ function rowToListing(
     savings: e.savings,
     savingsPct: e.savingsPct,
     verdict: e.verdict as Verdict,
+    // NÃO usar aqui o VIN-do-URL do `carIdentitySql` (lib/engine/car-identity.ts).
+    // Medido no warehouse (3 ago): dos 39 759 anúncios da montra (exato+normal),
+    // ZERO têm `vin` — as 3 908 linhas com VIN são todas PT (Caetano/CarPlus/OLX),
+    // que são a amostra de comparação, nunca a montra. E os 1 158 que o regex de
+    // 17 chars apanha no `detail_url` são 100% falsos positivos: 1 032 hashes SHA-1
+    // do meinauto.de (`/detail/007f59b2f834ed69caf…`), 78 ids de slug do Quoka,
+    // 47 URLs de tracking do Trovit, 1 do Ooyyo — nem um VIN. Como chave de dedupe
+    // um hash estável por anúncio é inofensivo; aqui faria o cartão anunciar
+    // "Histórico disponível · VIN" sobre um carro sem VIN nenhum. Mentir é pior do
+    // que o ruído que isto tem hoje. VIN real só virá de uma fonte que o publique
+    // (ou de carVertical/autoDNA) — ver MVP.md P1-3.
     kmTrust: l.vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" },
     seenAt: l.lastSeenAt.toISOString(),
     isFavorite,
@@ -537,40 +552,68 @@ export async function toggleFavoriteMutation(standId: string, listingId: string)
 }
 
 // ── Alertas ──────────────────────────────────────────────────────
-
-interface AlertCriteria {
-  summary?: string;
-  maxPrice?: number;
-  /** Marca/modelo exatos, quando o alerta nasce de um anúncio (ver
-   * components/listing-actions.tsx) — sem migration, é só mais uma chave no
-   * JSONB. Preparado para o futuro job de matching comparar exato, em vez de
-   * ter de reanalisar o resumo em texto livre. */
-  make?: string;
-  model?: string;
-}
+// A forma do JSONB `criteria` e a resolução da família a vigiar vivem em
+// lib/alert-criteria.ts — partilhadas com o scripts/pipeline/match-alerts.ts,
+// que é quem casa. Aqui só se lê e escreve.
 
 export async function alertsQuery(standId: string): Promise<Alert[]> {
+  // `matchCount`/`lastMatchAt` saem de alert_events (o job de matching já
+  // existe e corre em .github/workflows/alerts.yml); estavam escritos a zero à
+  // mão e o badge da UI nunca aparecia. `left join` porque um alerta sem
+  // eventos continua a ser um alerta.
   const rows = await db
-    .select()
+    .select({
+      id: alerts.id,
+      name: alerts.name,
+      criteria: alerts.criteria,
+      countries: alerts.countries,
+      active: alerts.active,
+      createdAt: alerts.createdAt,
+      matchCount: count(alertEvents.id),
+      // `max()` do drizzle e não um `sql` cru: leva o mapeador da coluna atrás e
+      // devolve um Date. Em cru vinha a string do driver e o `.toISOString()`
+      // rebentava só em runtime.
+      lastMatchAt: max(alertEvents.sentAt),
+    })
     .from(alerts)
+    .leftJoin(alertEvents, eq(alertEvents.alertId, alerts.id))
     .where(eq(alerts.standId, standId))
+    .groupBy(alerts.id)
     .orderBy(desc(alerts.createdAt));
+
   return rows.map((a) => {
     const criteria = (a.criteria ?? {}) as AlertCriteria;
-    // Sem summary (não devia acontecer nos caminhos de criação atuais, mas o
-    // JSONB não obriga), tenta reconstruir a partir de marca/modelo antes de
-    // cair no nome do alerta.
-    const fromMakeModel = [criteria.make, criteria.model].filter(Boolean).join(" ");
+    const family = alertModelKeys(criteria);
+    // Sem summary (o JSONB não obriga), reconstrói-se: a família normalizada
+    // primeiro, depois o texto cru, e só em último caso o nome do alerta.
+    const fallback = family
+      ? familyLabel(family)
+      : [criteria.make, criteria.model].filter(Boolean).join(" ");
     return {
       id: a.id,
       name: a.name,
-      criteria: criteria.summary ?? (fromMakeModel || a.name),
+      criteria: criteria.summary ?? (fallback || a.name),
       countries: (a.countries ?? []) as CountryCode[],
       active: a.active,
-      matchCount: 0, // preenchido quando o job de matching de alertas existir
-      lastMatchAt: undefined,
+      matchCount: a.matchCount,
+      lastMatchAt: a.lastMatchAt?.toISOString(),
+      matchable: family !== null,
     };
   });
+}
+
+/**
+ * As famílias de modelos que existem mesmo na montra. É a lista que o
+ * formulário de /alertas oferece: aceitar texto livre era prometer um alerta
+ * que ninguém conseguia casar.
+ */
+export async function alertModelsQuery(): Promise<AlertModelOption[]> {
+  const rows = await db
+    .selectDistinct({ makeKey: vehicleModels.make, modelKey: vehicleModels.model })
+    .from(vehicleModels)
+    .innerJoin(listings, and(eq(listings.modelId, vehicleModels.id), isNull(listings.deletedAt)))
+    .orderBy(asc(vehicleModels.make), asc(vehicleModels.model));
+  return rows.map((r) => ({ ...r, label: familyLabel(r) }));
 }
 
 export async function createAlertMutation(
@@ -582,8 +625,14 @@ export async function createAlertMutation(
     maxPrice?: number;
     make?: string;
     model?: string;
+    makeKey?: string;
+    modelKey?: string;
   },
 ): Promise<void> {
+  // A família é resolvida AQUI, no servidor: o formulário da ficha do anúncio
+  // manda marca/modelo em texto cru ("VOLKSWAGEN"/"Golf VII") e é este passo
+  // que os transforma no que o matching sabe comparar.
+  const family = alertModelKeys(draft);
   await db.insert(alerts).values({
     standId,
     name: draft.name,
@@ -592,6 +641,8 @@ export async function createAlertMutation(
       maxPrice: draft.maxPrice,
       make: draft.make,
       model: draft.model,
+      makeKey: family?.makeKey,
+      modelKey: family?.modelKey,
     } satisfies AlertCriteria,
     countries: draft.countries,
     active: true,
@@ -607,6 +658,15 @@ export async function toggleAlertMutation(
     .update(alerts)
     .set({ active })
     .where(and(eq(alerts.id, alertId), eq(alerts.standId, standId)));
+}
+
+/**
+ * Apaga um alerta do stand. O `stand_id` no WHERE é o da SESSÃO (resolvido em
+ * lib/data.ts) — sem ele, um id adivinhado apagava o alerta de outro stand.
+ * Os `alert_events` vão atrás pelo `on delete cascade` do FK (db/schema.ts).
+ */
+export async function deleteAlertMutation(standId: string, alertId: string): Promise<void> {
+  await db.delete(alerts).where(and(eq(alerts.id, alertId), eq(alerts.standId, standId)));
 }
 
 // ── Notificações ────────────────────────────────────────────────
