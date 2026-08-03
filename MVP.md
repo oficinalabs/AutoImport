@@ -149,14 +149,39 @@ tem página onde aterrar.
 ### P1-3 · "Km por verificar" em 100% dos anúncios
 
 `kmTrust` é `l.vin ? "disponivel" : "por_verificar"`
-([`lib/queries.ts:159`](lib/queries.ts:159)). **Nenhum dos 39 759 anúncios da
-montra tem VIN** — verifiquei. Logo o aviso laranja aparece em todos os cartões,
-sempre. Um aviso que nunca varia deixa de ser informação e passa a ruído; e o
-utilizador aprende a ignorá-lo, que é o oposto do que se quer num sinal de
-fraude.
+([`lib/queries.ts:196`](lib/queries.ts:196)). **Nenhum dos 39 759 anúncios da
+montra tem VIN** — verifiquei. Logo o aviso laranja aparecia em todos os
+cartões, sempre. Um aviso que nunca varia deixa de ser informação e passa a
+ruído; e o utilizador aprende a ignorá-lo, que é o oposto do que se quer num
+sinal de fraude.
 
-- [ ] Ou extrair VIN onde as fontes o dão, ou integrar carVertical/autoDNA, ou
-      tirar o badge e passar a mensagem uma vez só (não por cartão)
+**Medido (3 ago), no conjunto da montra — `exato` + `pt_confidence normal`:**
+
+| | |
+|---|---|
+| anúncios | 39 759 |
+| com coluna `vin` | **0** |
+| linhas com `vin` em todo o warehouse | 3 908 — **todas PT** (Caetano 2 372, CarPlus 1 023, OLX 513), i.e. a amostra de comparação, nunca a montra |
+| `detail_url` que casam com o regex de VIN de 17 chars | 1 158 — e **nenhum é um VIN** |
+
+O fallback "VIN no URL" do [`lib/engine/car-identity.ts`](lib/engine/car-identity.ts)
+**não serve aqui**: dos 1 158, 1 032 são hashes SHA-1 do meinauto.de
+(`/fahrzeugsuche/detail/007f59b2f834ed69caf…`), 78 são ids de slug do Quoka,
+47 URLs de tracking do Trovit e 1 do Ooyyo. Como chave de dedupe um hash estável
+por anúncio é inofensivo; como sinal de confiança faria o cartão anunciar
+"Histórico disponível · VIN" sobre um carro sem VIN nenhum — mentir é pior do que
+o ruído. **Não foi escrito código para isto, de propósito.**
+
+- [x] Badge fora do cartão. [`components/car-card.tsx:87`](components/car-card.tsx:87)
+      só mostra o `KmTrustBadge` quando o nível **não** é `por_verificar` — hoje
+      não aparece em nenhum cartão, e volta sozinho no dia em que houver
+      informação real, sem ser preciso re-adicionar código. A mensagem completa
+      continua dita **uma vez**, no bloco "Confiança" da ficha do anúncio
+      ([`app/(app)/(gated)/anuncio/[id]/page.tsx:193`](app/\(app\)/\(gated\)/anuncio/[id]/page.tsx:193)),
+      onde vem com a explicação e não a competir com mais 23 cartões
+- [ ] VIN a sério: só de uma fonte que o publique, ou de carVertical/autoDNA.
+      O nível `"verificado"` do tipo `KmTrust` continua sem ser produzido por
+      código nenhum
 
 ### P1-4 · Os alertas não dizem quantas vezes dispararam
 
@@ -217,7 +242,66 @@ importação não é a mesma.
 - [ ] **Sem Sentry e sem PostHog.** Estão na stack fixa
       (`docs/00-GERAL.md`) e no `.env.example`; não estão no código. Sem eles não
       se sabe o que rebenta a um cliente. A UI já mostra o `digest` do erro para
-      cruzar com logs — falta o sítio onde cruzar
+      cruzar com logs — falta o sítio onde cruzar.
+
+      **Decisão (3 ago): não instalar ainda — instalar com o DSN à mão, antes do
+      primeiro piloto.** Não é preguiça, é a regra do `CLAUDE.md`: *CI verde ≠
+      produção OK*. Não há DSN, nem `SENTRY_ORG`, nem `SENTRY_AUTH_TOKEN` nesta
+      máquina, portanto **nada do que se instalasse podia ser verificado**: não
+      se veria um único evento chegar. O que se mergia era um plugin de webpack a
+      envolver o `next.config.mjs` (que acabou de receber a CSP), a ligar geração
+      e upload de source maps no build da Vercel — o mesmo build que já partiu
+      produção uma vez — e ~20–50 kB de JS no cliente, tudo a correr pela
+      primeira vez em produção. Um Sentry que ninguém viu funcionar é pior do que
+      não ter Sentry: dá a sensação de estar coberto.
+
+      Escrever à mão um POST para o endpoint de envelopes (a alternativa (ii))
+      tem o mesmo problema — sem DSN não se confirma que o envelope é aceite (um
+      envelope malformado leva 400 em silêncio) — e ainda deixava código morto no
+      repositório enquanto o DSN não existisse.
+
+      **O que se perde entretanto, exatamente:** os erros de *servidor* já são
+      observáveis — o Next escreve o digest nos logs da Vercel, e é com esse
+      digest que o `ErrorState` deixa o cliente falar connosco. O buraco real são
+      os erros de **cliente**: o `console.error` de
+      [`app/error.tsx:20`](app/error.tsx:20), [`app/(app)/error.tsx:21`](app/\(app\)/error.tsx:21)
+      e [`app/global-error.tsx:27`](app/global-error.tsx:27) fica no browser do
+      utilizador e não chega a ninguém.
+
+      **Receita, para quem tiver o DSN** (investigada a 3 ago, `@sentry/nextjs`
+      v10, Next 15 App Router — [manual setup](https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup)):
+
+      1. `instrumentation.ts` na raiz: `register()` importa
+         `sentry.server.config.ts` / `sentry.edge.config.ts` conforme
+         `NEXT_RUNTIME`, e `export const onRequestError = Sentry.captureRequestError`
+         — é isto que apanha erros de Server Component, que é a classe de erro
+         que já partiu produção aqui
+      2. `instrumentation-client.ts` para o browser, **com init condicional**:
+         `if (process.env.NEXT_PUBLIC_SENTRY_DSN) Sentry.init({…})`. Um
+         `Sentry.init` com DSN vazio não envia nada, mas continua a instalar
+         handlers globais e a embrulhar o `fetch`; a app tem de ficar exatamente
+         como está hoje quando a variável não existir
+      3. Só erros: **sem** `browserTracingIntegration` e **sem** Session Replay
+         (o Replay ainda obrigaria a abrir `worker-src blob:` na CSP, e não
+         combina com a postura de privacidade do projeto)
+      4. `tunnelRoute: "/monitoring"` no `withSentryConfig` — o browser passa a
+         POSTar para a nossa própria origem, portanto **o `connect-src 'self'`
+         do `next.config.mjs` fica intocado**: não é preciso abrir
+         `*.ingest.sentry.io` a ninguém. O matcher do `middleware.ts` já não
+         apanha `/monitoring`
+      5. Nos 3 boundaries: acrescentar `Sentry.captureException(error)` dentro do
+         `useEffect` que já existe. **Não** adotar o `global-error.tsx` de
+         exemplo da Sentry — substitui o ecrã por `NextError` e deitava fora o
+         nosso, que é de propósito auto-suficiente (sem fontes, sem tema)
+      6. Env: `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` na Vercel (e no
+         `.env.example`). Sem token o build **passa na mesma**, só não
+         simboliza os stack traces
+      7. Verificar depois: `pnpm test:smoke` — o `distDir` é dinâmico
+         (`NEXT_DIST_DIR`, `next.config.mjs:108`) e o plugin da Sentry assume o
+         standard
+      8. Com Sentry no ar, a CSP ganha finalmente um `report-uri` para onde
+         apontar — é o que falta para a passar de `Report-Only` a header a sério
+         (item seguinte)
 - [ ] **`Content-Security-Policy` ainda em `Report-Only`.** A política está
       escrita no `next.config.mjs` e não bloqueia nada — só reporta. Falta
       observar produção durante um tempo e, se estiver limpa, passar ao header
@@ -236,7 +320,13 @@ importação não é a mesma.
       mas mesmo assim) em vez de 404~~ Feito: as páginas validam o formato antes
       de ir à base de dados (`/anuncio` → 404, `/comparar` → ignora os ids
       malformados)
-- [ ] Em mobile, a etiqueta "Comparar" sobrepõe o badge "Compensa" no cartão
+- [x] ~~Em mobile, a etiqueta "Comparar" sobrepõe o badge "Compensa" no cartão~~
+      Feito: acontecia nas duas larguras, não só em mobile — os dois ocupavam
+      `left-2 top-2`. A etiqueta passou para `top-9`
+      ([`components/search-view.tsx:328`](components/search-view.tsx:328)),
+      debaixo do veredito, sem tocar no `CarCard` (que é o mesmo dos favoritos,
+      onde não há "Comparar"). Verificado a 1440 e a 375: sem interseção de
+      caixas
 - [ ] A poupança aparece como **"−95 958 €"**. O sinal negativo lê-se como
       prejuízo; é poupança. Confirmar que é mesmo a leitura pretendida
 

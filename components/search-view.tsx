@@ -321,8 +321,11 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map((l) => (
             <div key={l.id} className="relative" data-testid="resultado">
-              {/* z-20: acima do badge de veredito do cartão, que ocupa o mesmo canto */}
-              <label className="absolute left-2 top-2 z-20 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
+              {/* Debaixo do badge de veredito do cartão (`left-2 top-2`, altura 20px),
+                  que ocupava este mesmo canto e ficava tapado — "Compensa" é a
+                  informação central do cartão e não pode desaparecer atrás de um
+                  controlo. z-20 para ficar acima da imagem em qualquer caso. */}
+              <label className="absolute left-2 top-9 z-20 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
                 <input
                   type="checkbox"
                   checked={selected.includes(l.id)}
