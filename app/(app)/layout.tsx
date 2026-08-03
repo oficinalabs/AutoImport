@@ -2,6 +2,7 @@ import { TopBar } from "@/components/top-bar";
 import { auth } from "@/lib/auth";
 import { getNotifications, getStand } from "@/lib/data";
 import { formatDate } from "@/lib/format";
+import type { SubscriptionStatus } from "@/lib/types";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
@@ -14,6 +15,23 @@ export const metadata: Metadata = {
 // renderizar por pedido, nunca pré-renderar no build.
 export const dynamic = "force-dynamic";
 
+/**
+ * Etiqueta da barra de topo, por estado. Cada uma diz a verdade sobre a data
+ * que a acompanha: "renova" só quando renova mesmo — quem cancelou tem acesso
+ * até lá e mais nada, e dizer-lhe "renova" era prometer uma cobrança que não
+ * vai acontecer.
+ *
+ * O gate está em components/subscription-gate.tsx, montado por segmento — ver
+ * lá porque é que não pode viver neste layout.
+ */
+const ETIQUETA: Record<SubscriptionStatus, (data: string) => string> = {
+  trial: (data) => `Trial · termina ${data}`,
+  ativa: (data) => `Ativa · renova ${data}`,
+  cancelada: (data) => `Cancelada · acesso até ${data}`,
+  em_atraso: (data) => `Pagamento em atraso · acesso até ${data}`,
+  expirada: () => "Subscrição expirada",
+};
+
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const [stand, notifications, session] = await Promise.all([
     getStand(),
@@ -22,13 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
 
   const sub = stand?.subscription;
-  const subscriptionLabel = !sub
-    ? ""
-    : sub.status === "trial"
-      ? `Trial · termina ${formatDate(sub.renewsAt)}`
-      : sub.status === "ativa"
-        ? `Ativa · renova ${formatDate(sub.renewsAt)}`
-        : "Subscrição expirada";
+  const subscriptionLabel = sub ? ETIQUETA[sub.status](formatDate(sub.renewsAt)) : "";
 
   return (
     <div className="flex min-h-screen flex-col">

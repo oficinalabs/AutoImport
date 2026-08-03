@@ -200,7 +200,18 @@ export interface Member {
   role: MemberRole;
 }
 
-export type SubscriptionStatus = "trial" | "ativa" | "expirada";
+/**
+ * Estado da subscrição do stand. Cinco, não três: com a Polar ligada há estados
+ * que existem de facto e que a UI não pode confundir uns com os outros —
+ * "cancelada" ainda dá acesso até ao fim do período pago (e não se lhe pode
+ * dizer "renova a X"), e "em_atraso" é um pagamento que falhou, que os Termos
+ * tratam como conta **suspensa**, não eliminada (ver /legal/subscricao).
+ *
+ * `trial` é nosso, não da Polar: o 1.º mês grátis não pede cartão, portanto não
+ * existe do lado deles. `expirada` é o único que fecha o acesso — ver
+ * `temAcesso` em lib/subscription.ts.
+ */
+export type SubscriptionStatus = "trial" | "ativa" | "cancelada" | "em_atraso" | "expirada";
 
 /** Um match que um alerta do stand disparou — o que o sino mostra. */
 export interface Notification {
@@ -224,7 +235,7 @@ export interface Stand {
   subscription: {
     status: SubscriptionStatus;
     pricePerMonth: number;
-    /** ISO — fim do trial ou próxima renovação */
+    /** ISO — fim do trial, do período pago, ou próxima renovação */
     renewsAt: string;
   };
 }

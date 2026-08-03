@@ -30,5 +30,5 @@
     "next-env.d.ts",
     ".next-smoke/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "engine", "tools", "design"]
+  "exclude": ["node_modules", "engine", "tools", "design", ".next-smoke"]
 }

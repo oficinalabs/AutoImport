@@ -273,10 +273,23 @@ export async function getDeal(_id: string): Promise<Deal | null> {
 }
 
 // ── Stand / conta ───────────────────────────────────────────────
-/** O stand da sessão, ou null se não houver sessão/organização. */
-export async function getStand(): Promise<Stand | null> {
+/**
+ * ⚠️ Memoizado por pedido, como o `activeStandId`: o gate da subscrição
+ * (components/subscription-gate.tsx) precisa do estado em todas as rotas da
+ * app, e o layout já o tinha pedido para a etiqueta da barra de topo. Sem o
+ * `cache()` eram duas queries por render em vez de uma.
+ *
+ * A memoização não pode ficar no export — num módulo "use server" só podem sair
+ * funções `async`, e o `cache()` devolve uma função normal.
+ */
+const standCached = cache(async (): Promise<Stand | null> => {
   const standId = await activeStandId();
   return standId ? q.getStandQuery(standId) : null;
+});
+
+/** O stand da sessão, ou null se não houver sessão/organização. */
+export async function getStand(): Promise<Stand | null> {
+  return standCached();
 }
 
 // ── Notificações ────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import {
   opportunities,
   organization,
   sources,
+  subscriptions,
   usModels,
   usVersions,
   user,
@@ -37,6 +38,8 @@ import { co2Norm } from "./cost-engine";
 import type { SearchFilters, SearchPage } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
+import { CONDICOES } from "./legal";
+import { estadoEfetivo } from "./subscription";
 import type {
   Alert,
   CostBreakdown,
@@ -47,6 +50,7 @@ import type {
   Notification,
   PtMarket,
   Stand,
+  SubscriptionStatus,
   Transmission,
   Verdict,
 } from "./types";
@@ -639,24 +643,32 @@ export async function notificationsQuery(standId: string, limit = 8): Promise<No
 }
 
 // ── Stand / conta ───────────────────────────────────────────────
-/** Duração do 1.º mês grátis, em dias. */
-const TRIAL_DAYS = 30;
 
 export async function getStandQuery(standId: string): Promise<Stand | null> {
   const [org] = await db.select().from(organization).where(eq(organization.id, standId)).limit(1);
   if (!org) return null;
 
-  const rows = await db
-    .select({ id: user.id, name: user.name, email: user.email, role: member.role })
-    .from(member)
-    .innerJoin(user, eq(user.id, member.userId))
-    .where(eq(member.organizationId, standId))
-    .orderBy(desc(member.role)); // owner antes de member
+  const [rows, [sub]] = await Promise.all([
+    db
+      .select({ id: user.id, name: user.name, email: user.email, role: member.role })
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .where(eq(member.organizationId, standId))
+      .orderBy(desc(member.role)), // owner antes de member
+    db.select().from(subscriptions).where(eq(subscriptions.standId, standId)).limit(1),
+  ]);
 
-  // Sem Polar ligado, a subscrição deriva da data de criação: 1.º mês grátis
-  // a contar do registo. É o que é verdade hoje — não inventamos "ativa".
-  const renewsAt = new Date(org.createdAt);
-  renewsAt.setDate(renewsAt.getDate() + TRIAL_DAYS);
+  // Sem linha de subscrição, o stand está no 1.º mês grátis derivado da data de
+  // registo — o trial não passa pela Polar (não pedimos cartão), portanto não
+  // há lá nada para gravar. Isto NÃO é um fallback de emergência: é o caminho
+  // normal de todos os stands até alguém pagar.
+  const fimDoTrial = new Date(org.createdAt);
+  fimDoTrial.setDate(fimDoTrial.getDate() + CONDICOES.trialDias);
+
+  const fimDoPeriodo = sub ? (sub.currentPeriodEnd ?? fimDoTrial) : fimDoTrial;
+  const estado = sub
+    ? estadoEfetivo(sub.status as SubscriptionStatus, sub.currentPeriodEnd)
+    : estadoEfetivo("trial", fimDoTrial);
 
   return {
     id: org.id,
@@ -671,9 +683,12 @@ export async function getStandQuery(standId: string): Promise<Stand | null> {
       role: r.role === "owner" ? "owner" : "member",
     })),
     subscription: {
-      status: renewsAt.getTime() > Date.now() ? "trial" : "expirada",
-      pricePerMonth: 100, // euros (formatEuroCents não divide — só mostra cêntimos)
-      renewsAt: renewsAt.toISOString(),
+      status: estado,
+      // euros (formatEuroCents não divide — só mostra cêntimos). O valor
+      // canónico está em lib/legal.ts, onde os Termos e o marketing o leem:
+      // escrevê-lo aqui outra vez era como divergiam.
+      pricePerMonth: CONDICOES.precoMensalEuros,
+      renewsAt: fimDoPeriodo.toISOString(),
     },
   };
 }
