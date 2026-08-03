@@ -1,9 +1,12 @@
 # MVP — o que falta para o AutoImport estar pronto a usar
 
-> Avaliação de **3 de agosto de 2026**, feita sobre a `main` em `d61601d`, com o
+> **Auditoria de 3 de agosto de 2026**, sobre a `main` em `d61601d`, com o
 > warehouse local (598 947 anúncios) e a app a correr em `pnpm dev` + `next build`.
-> Cada item abaixo foi **verificado**, não inferido. O que não consegui verificar
-> está marcado como tal.
+> Cada item foi **verificado**, não inferido.
+>
+> **Corrigido no mesmo dia**, na branch `feat/mvp`. As secções abaixo mantêm o
+> diagnóstico original — é ele que explica *porque* as coisas ficaram como
+> ficaram — com o desfecho de cada item marcado.
 
 ---
 
@@ -11,20 +14,33 @@
 
 | Camada | Estado |
 |---|---|
-| Qualidade de código | ✅ Biome limpo · `tsc --noEmit` limpo · **157/157 testes passam** · `next build` OK |
-| Motor de custos (ISV/IUC/transporte/legalização) | ✅ Funciona, com testes | 
-| Pipeline (ingest → match → mercado PT → custos → oportunidades) | ✅ Funciona ponta-a-ponta (teste de integração real) |
-| Auth (registo, login, verificação de email, reset, multi-tenant) | ✅ Funciona — testado no browser de ponta a ponta |
-| Landing pública | ✅ Números reais, bonita, rápida o suficiente |
-| Detalhe do anúncio / favoritos / comparar / alertas | ✅ Funcionam |
-| **Pesquisa** | ❌ **Não pesquisa** — ver P0-1 |
-| **Pagamentos** | ❌ **Não existem** — ver P0-2 |
-| **Frescura dos dados** | ❌ **Manual, e já 7 dias atrasada** — ver P0-3 |
-| Negociações / Compras | ⬜ Cascas vazias, sem backend |
-| Observabilidade (Sentry/PostHog) | ⬜ Na stack fixa, ausente do código |
+| Qualidade de código | ✅ Biome · `tsc --noEmit` · **203 testes** (200 + 3 de fumo) · `next build` |
+| Motor de custos (ISV/IUC/transporte/legalização) | ✅ Funciona, com testes |
+| Pipeline (ingest → match → mercado PT → custos → oportunidades) | ✅ Funciona ponta-a-ponta |
+| Auth (registo, login, verificação de email, reset, multi-tenant) | ✅ Funciona |
+| Landing pública | ✅ Números reais |
+| Detalhe do anúncio / favoritos / comparar | ✅ Funcionam |
+| **Pesquisa** | ✅ **Corrigida** — filtros em SQL, paginação, ordenação por % |
+| **Alertas** | ✅ **Corrigidos** — nasciam todos mortos; ver P1-4 |
+| **Pagamentos** | 🟡 Estado, gate e webhook prontos; **falta o checkout** (credenciais) |
+| **Frescura dos dados** | 🟡 Indicador e alarme prontos; **falta decidir onde corre a recolha** |
+| Negociações / Compras | ⬜ Escondidas do MVP, por decisão |
+| Observabilidade (Sentry) | ⬜ Decidido adiar, com receita escrita — ver P2 |
 
-**Veredito:** o motor está pronto. O produto não. Faltam três coisas para um MVP
-utilizável e uma para um MVP **vendável** — e são exatamente as três de baixo.
+**Veredito de então:** o motor está pronto, o produto não.
+**Agora:** o produto é utilizável. Falta ser **vendável** (cobrar) e **fiável**
+(os dados atualizarem-se sozinhos) — e as duas dependem de decisões e
+credenciais que não vivem no código.
+
+### O que continua nas mãos do dono
+
+1. **Correr a recomputação**, sem a qual a produção mantém as ilhas e o KPI
+   inflacionado: `compute-costs --all` → `flag-opportunities` → `pipeline:publish:apply`.
+2. **Credenciais da Polar** — a tabela, o webhook e o gate estão prontos e
+   testados; falta o checkout e o portal, que precisam de produtos criados do
+   lado deles.
+3. **Onde corre o daemon da recolha** — o workflow de publicação está escrito e
+   inerte à espera dessa decisão (`.github/workflows/publicacao.yml`).
 
 ---
 
@@ -49,14 +65,26 @@ de 40 000 €**.
 Um stand que abra a pesquisa e procure o que costuma vender não encontra nada.
 É o gesto central do produto e não funciona.
 
-- [ ] Passar os filtros do URL para `searchListings()` (a query do servidor **já
+- [x] Passar os filtros do URL para `searchListings()` (a query do servidor **já
       os suporta** — `SearchFilters` está completo em `lib/data.ts:59`)
-- [ ] Levar os filtros em falta para SQL: `minYear`, `maxKm`, `fuel`, `gearbox`
-- [ ] Paginação (ou scroll infinito) — 60 é um teto, não um resultado
-- [ ] Estado dos filtros no URL (partilhar/voltar atrás tem de funcionar)
-- [ ] **Repensar a ordenação por omissão.** Poupança absoluta é a métrica errada
+- [x] Levar os filtros em falta para SQL: `minYear`, `maxKm`, `fuel`, `gearbox`
+- [x] Paginação (ou scroll infinito) — 60 é um teto, não um resultado
+- [x] Estado dos filtros no URL (partilhar/voltar atrás tem de funcionar)
+- [x] **Repensar a ordenação por omissão.** Poupança absoluta é a métrica errada
       para quem compra carros de 25 k€. Sugestão: ordenar por `savings_pct`, ou
       por poupança dentro de um escalão de preço
+
+> **✅ Feito.** "Golf" passou de 0 para **761** resultados; o total real (32 920)
+> substituiu o "60 anúncios" que a UI mostrava. O dedupe passou de `NOT EXISTS`
+> correlacionado a `DISTINCT ON`, com equivalência provada sobre o corpus real
+> (32 920 = 32 920, zero diferenças). Ordenação por omissão: `savings_pct`.
+>
+> Dois bugs que só os testes novos apanharam: numa página vazia o
+> `count(*) over()` não vinha em linha nenhuma e o total dava 0; e o filtro de
+> caixa tem de tratar `gearbox` nulo como manual, senão contradiz o cartão.
+>
+> ⬜ **Por medir:** um índice de pesquisa, se o `EXPLAIN` sobre dados do tamanho
+> de produção o justificar. Não se acrescentam índices a adivinhar.
 
 ### P0-2 · Não há como cobrar
 
@@ -76,10 +104,27 @@ Hoje é estruturalmente impossível chegar a um.
   continua toda acessível
 
 - [ ] Integrar a Polar (checkout + webhooks) e persistir o estado real
-- [ ] Fechar o acesso quando a subscrição expira (hoje o trial não trava nada)
+- [x] Fechar o acesso quando a subscrição expira (hoje o trial não trava nada)
 - [ ] Fluxo de upgrade/cancelamento a partir de `/stand`
 - [ ] Alinhar os textos legais com o que existe de facto — enquanto não houver
       Polar ligada, prometer Polar nos termos é uma declaração falsa
+
+> **🟡 Metade feito.** Existe a tabela `subscriptions` (migration 0007), o estado
+> real com o trial como fallback, o webhook em Standard Webhooks (fail-closed sem
+> segredo) e o **gate**: com o período terminado, a app fecha-se e o stand vai
+> parar a `/stand`, exatamente como os Termos prometem.
+>
+> O gate vive no grupo de rotas `app/(app)/(gated)/` e **falha fechado** — uma
+> rota nova criada onde as outras vivem fica automaticamente protegida.
+>
+> ⬜ **Falta o checkout e o portal**, que precisam de `POLAR_ACCESS_TOKEN` e de
+> produtos criados do lado da Polar. Até lá o botão "Gerir subscrição" fica
+> honestamente desativado. A interop do webhook **está por confirmar** contra a
+> sandbox: um verificador HMAC testado contra si próprio prova a lógica, não a
+> compatibilidade.
+>
+> Os textos legais **não foram tocados**, por decisão — têm implicações
+> jurídicas. Ficam falsos até a Polar estar ligada.
 
 ### P0-3 · Os dados não se atualizam sozinhos
 
@@ -109,11 +154,24 @@ disso. É a promessa central da landing e o que justifica os 100 €/mês.
 - [ ] Decidir o modelo operacional: máquina sempre ligada (VPS/mini-PC) ou voltar
       à nuvem para as fontes que aguentam IP de datacenter
 - [ ] Automatizar a publicação (hoje 100% manual, sem agendamento)
-- [ ] **Alarme de frescura**: se a última leitura passar das X horas, avisar a
+- [x] **Alarme de frescura**: se a última leitura passar das X horas, avisar a
       equipa — e dizê-lo na UI antes que seja um cliente a descobrir
 - [ ] Corrigir a assimetria de cobertura: FR (6,6 k) e NL (3,6 k) contra DE
       (240 k). A landing promete "cinco mercados europeus"; dois deles são
       residuais
+
+> **🟡 O que dava para fazer em código, está.** `pnpm pipeline:frescura` mede a
+> idade da leitura mais recente e **falha** acima das 36 h (corrido contra o
+> warehouse: 164,8 h → vermelho); corre em cron próprio em `frescura.yml`. A app
+> autenticada passou a mostrar o indicador na barra de topo — só a landing o
+> mostrava, e a landing é a página que a equipa não abre.
+>
+> `publicacao.yml` está escrito, com o `schedule` **comentado** e
+> `runs-on: [self-hosted, warehouse]`. Não é esquecimento: o `publish.ts` lê o
+> corpus local, que um runner da GitHub não tem nem pode ter.
+>
+> ⬜ **Falta a decisão de infraestrutura** — onde corre o daemon. É o que
+> desbloqueia tudo o resto.
 
 ---
 
@@ -126,7 +184,7 @@ disso. É a promessa central da landing e o que justifica os 100 €/mês.
 nome certo (a sessão está disponível no layout). É uma linha, e é a primeira
 coisa que um cliente vê.
 
-- [ ] Usar `getSessionUser()`
+- [x] Usar `getSessionUser()`
 
 ### P1-2 · O KPI de oportunidades não bate certo com o que é possível ver
 
@@ -143,8 +201,17 @@ filtra por `verdict='compensa'` e `pt_confidence='normal'`, mas **não** por
 que o que a lista consegue mostrar: quase **metade** do número anunciado não
 tem página onde aterrar.
 
-- [ ] Alinhar `flag-opportunities` com `MONTRA_MATCH_CONFIDENCE` (a constante já
+- [x] Alinhar `flag-opportunities` com `MONTRA_MATCH_CONFIDENCE` (a constante já
       existe e é exportada precisamente para isto)
+
+> **✅ Feito** — e não é só o número. O alinhamento **corrige o dedupe**: um match
+> `designacao` com poupança maior tapava o `exato` do mesmo carro, que é o único
+> publicável, e o carro ficava de fora dos dois lados. Medido: 11 766 pela regra
+> antiga → 6 439 pela nova, dos quais +10 são carros que antes não apareciam
+> em lado nenhum.
+>
+> ⚠️ **O KPI público cai quase para metade.** É a correção de uma mentira, mas é
+> visível — e só acontece depois de correr `flag-opportunities` e republicar.
 
 ### P1-3 · "Km por verificar" em 100% dos anúncios
 
@@ -180,6 +247,17 @@ o ruído. **Não foi escrito código para isto, de propósito.**
       ([`app/(app)/(gated)/anuncio/[id]/page.tsx:193`](app/\(app\)/\(gated\)/anuncio/[id]/page.tsx:193)),
       onde vem com a explicação e não a competir com mais 23 cartões
 - [ ] VIN a sério: só de uma fonte que o publique, ou de carVertical/autoDNA.
+
+> **✅ O ruído saiu; o VIN continua a não existir.** O badge deixou de aparecer
+> quando não há informação — a mensagem fica dita uma vez, no bloco "CONFIANÇA"
+> da ficha.
+>
+> ⚠️ **Reaproveitar o VIN que o `car-identity.ts` extrai do URL foi medido e
+> recusado.** Dos 1 158 anúncios em que o regex de 17 caracteres casa, **zero são
+> VINs**: 1 032 são hashes SHA-1 do meinauto.de, 78 ids de slug do Quoka, 47 URLs
+> de tracking do Trovit. Como chave de dedupe um hash estável é inofensivo; aqui
+> faria o cartão anunciar "Histórico disponível · VIN" sobre carros sem VIN
+> nenhum. Trocar ruído por mentira não é melhoria.
       O nível `"verificado"` do tipo `KmTrust` continua sem ser produzido por
       código nenhum
 
@@ -196,9 +274,24 @@ minúsculas ([`match-alerts.ts:71`](scripts/pipeline/match-alerts.ts:71)). No
 corpus real convivem `VOLKSWAGEN`/`Volkswagen` e `Golf`/`Golf VII`/`Golf VIII` —
 um alerta criado a partir de um "Golf VII" **nunca** verá um "Golf".
 
-- [ ] Contar de `alert_events` (`matchCount` + `lastMatchAt`)
-- [ ] Casar por `model_id`/família em vez de texto cru
-- [ ] Não há forma de **apagar** um alerta — só desativar
+- [x] Contar de `alert_events` (`matchCount` + `lastMatchAt`)
+- [x] Casar por `model_id`/família em vez de texto cru
+- [x] Não há forma de **apagar** um alerta — só desativar
+
+> **✅ Feito, e era pior do que isto.** O formulário de `/alertas` não gravava
+> marca/modelo, e o matching casava por `lower(criteria->>'make')` — que com a
+> chave ausente é `lower(NULL)`, nunca verdadeiro. **Todos os alertas criados na
+> página nasciam mortos**, em silêncio. Não escolher países fazia o mesmo
+> (`any('{}')` nunca é verdade).
+>
+> A unidade de matching **não** é o `model_id`, ao contrário do que este
+> documento sugeria: o `vehicle_models` separa por combustível, portanto casar
+> por id deixava metade dos Golfs de fora. Casa-se pela família normalizada
+> (marca, modelo).
+>
+> A caixa de texto livre desapareceu — escolhe-se de uma lista real de famílias
+> que existem na montra. É melhor recusar "Golf 2.0 TDI" do que aceitar em
+> silêncio um alerta que nunca vai avisar ninguém.
 
 ### P1-5 · Negociações e Compras são becos sem saída
 
@@ -212,7 +305,7 @@ que existem.
 Decisão a tomar, uma das duas:
 
 - [ ] **Construir** o email mascarado + pipeline de compra (é trabalho grande), **ou**
-- [ ] **Esconder** as duas rotas do MVP e trocar "Iniciar negociação" por
+- [x] **Esconder** as duas rotas do MVP e trocar "Iniciar negociação" por
       "Ver anúncio em \<fonte\>", que é o que o stand vai mesmo fazer
 
 Recomendo a segunda para o MVP: o valor está na inteligência de decisão (que é o
@@ -227,8 +320,21 @@ Um deles apareceu-me em teste com a marca d'água "LAS PALMAS" na foto. Além do
 custo de ferry, as Canárias estão **fora do território IVA da UE** — a conta de
 importação não é a mesma.
 
-- [ ] Excluir as ilhas, ou dar-lhes um custo próprio e um aviso na ficha
+- [x] Excluir as ilhas, ou dar-lhes um custo próprio e um aviso na ficha
 - [ ] Modular o transporte por região/distância, nem que seja em escalões
+
+> **✅ As ilhas saem da montra** (decisão do dono: não fingir que sabemos
+> calcular). 8 398 anúncios ES apanhados, 2 319 estimativas passam a órfãs, 559
+> oportunidades caem (4,8%).
+>
+> Duas armadilhas que a implementação obrigou a resolver: `07xxx` também é código
+> postal alemão (6 410 anúncios DE), e "palma" sozinho apanha Palma del Río, que
+> é continente. Só 12% dos anúncios ES têm código postal, portanto o texto da
+> região não é redundância — é o caminho principal. Falha aberto: sem região e
+> sem CP, o anúncio fica.
+>
+> ⚠️ **Exige `compute-costs --all` + `flag-opportunities` + republicar** para a
+> produção deixar de as mostrar.
 
 ---
 
@@ -310,12 +416,12 @@ importação não é a mesma.
       dedupe por identidade de carro leva **3,4 s** sozinha sobre o warehouse.
       Em produção o conjunto publicado é menor, mas a forma da query é a mesma.
       Medir com dados de produção e indexar antes de pôr utilizadores lá
-- [ ] **Sem testes da app.** Os 157 testes cobrem coletores, motor de custos e
+- [x] **Sem testes da app.** Os 157 testes cobrem coletores, motor de custos e
       pipeline — não há um único teste de componente ou E2E. Os bugs P0-1 e P1-1
       teriam sido apanhados por um smoke test de duas linhas
 - [ ] Tabelas de ISV só de **2026** (`isv_tables`). Confirmar o plano de
       atualização anual antes da viragem do ano
-- [ ] `components/demo-banner.tsx` é código morto — nada o importa
+- [x] `components/demo-banner.tsx` é código morto — nada o importa
 - [x] ~~Um UUID inválido em `/anuncio/<lixo>` dá erro 500 (com o boundary bonito,
       mas mesmo assim) em vez de 404~~ Feito: as páginas validam o formato antes
       de ir à base de dados (`/anuncio` → 404, `/comparar` → ignora os ids
@@ -348,23 +454,49 @@ importação não é a mesma.
 
 ---
 
-## 5. Caminho mais curto até um MVP utilizável
+## 5. O que falta, por ordem
 
-Ordenado por "o que desbloqueia mais com menos trabalho".
+O código está feito. O que resta são **operações e decisões** — nada disto se
+resolve escrevendo mais linhas.
 
-1. **Pesquisa a sério** (P0-1) — filtros no servidor + paginação + ordenação por
-   percentagem. Sem isto não há produto.
-2. **"Bom dia, Rui"** (P1-1) e **alinhar o KPI** (P1-2) — uma linha cada, e são
-   as duas coisas que fazem a app parecer uma demo.
-3. **Frescura automática** (P0-3) — recolha agendada + publicação automática +
-   alarme. É o que sustenta a promessa da landing.
-4. **Decidir Negociações/Compras** (P1-5) — recomendo esconder no MVP.
-5. **Sentry** (P2) — antes do primeiro cliente, não depois.
-6. **Pagamentos** (P0-2) — bloqueia a receita, não o uso. Um piloto com 3–5
-   stands em trial pode começar antes disto; a cobrança tem de estar pronta
-   **antes de o primeiro trial acabar**.
+1. **Correr a recomputação.** Nada do que se corrigiu no motor chega à produção
+   sem isto, e são duas coisas de raio de explosão grande a acontecer ao mesmo
+   tempo (as ilhas mudam os `savings`, o alinhamento do KPI muda as
+   oportunidades). Sugestão: correr, comparar a distribuição de vereditos antes e
+   depois, e só então publicar.
 
-O 1, 2 e 4 são dias. O 3 e o 6 são as decisões grandes.
+       pnpm exec tsx scripts/pipeline/compute-costs.ts --all
+       pnpm exec tsx scripts/pipeline/flag-opportunities.ts
+       DB_TARGET=prod pnpm pipeline:publish          # ensaio primeiro
+       DB_TARGET=prod pnpm pipeline:publish:apply
+
+   ⚠️ Contar com o KPI público a cair de ~11 700 para ~6 400.
+
+2. **Decidir onde corre a recolha** (P0-3). É a decisão que sustenta a promessa
+   central da landing, e a única coisa que impede os dados de envelhecerem em
+   silêncio. O alarme já avisa; alguém tem de poder agir sobre ele.
+
+3. **Credenciais da Polar** (P0-2). Bloqueia a receita, não o uso: um piloto com
+   3–5 stands em trial pode começar antes. Mas a cobrança tem de estar pronta
+   **antes de o primeiro trial acabar** — e agora o trial fecha mesmo a porta.
+
+4. **Sentry**, com o DSN à mão, antes do primeiro cliente (receita em P2).
+
+5. **Cobertura de FR e NL** — 6,6 k e 3,6 k anúncios contra 240 k da Alemanha. A
+   landing promete cinco mercados; dois são residuais. É trabalho de coletores.
+
+### Ficou por fazer, com razão escrita
+
+- **Índice de pesquisa** — só depois de medir `EXPLAIN` sobre dados do tamanho de
+  produção. Cada índice é uma migration que não se testa em preview.
+- **`gearbox_norm`** — o cartão rotula um DSG como "manual", e o filtro copia
+  esse erro de propósito para não o contradizer. A correção a sério é uma coluna
+  normalizada, com migration e republicação.
+- **Negociações e Compras** — escondidas, não construídas. O âmbito declarado do
+  produto é a inteligência de decisão.
+- **Convidar equipa** — desativado. A landing vende "toda a equipa incluída".
+- **Textos legais** — continuam a nomear a Polar. Ficam falsos até ela estar
+  ligada; mexer-lhes é decisão com implicações jurídicas.
 
 ---
 
@@ -372,7 +504,8 @@ O 1, 2 e 4 são dias. O 3 e o 6 são as decisões grandes.
 
 Para dar contexto ao que está acima:
 
-- `pnpm lint`, `pnpm typecheck`, `pnpm test` (157 testes), `pnpm build` — todos verdes
+- `pnpm lint`, `pnpm typecheck`, `pnpm test` (157 testes na auditoria; **203**
+  depois das correções), `pnpm build` — todos verdes
 - Landing, `/ajuda` e as 6 páginas legais — todas 200
 - Registo completo no browser → criação de utilizador **e** de organização/owner
   na BD, com verificação de email obrigatória a funcionar
@@ -384,6 +517,22 @@ Para dar contexto ao que está acima:
 - Responsivo a 375×812
 - Consultas diretas ao warehouse para confirmar cada número citado
 - Os dados de teste que criei foram apagados no fim
+
+### E o que passou a estar coberto por testes
+
+A auditoria notou que os 157 testes de então não tocavam num único componente
+nem numa única rota — e que os dois piores bugs (P0-1 e P1-1) teriam sido
+apanhados por um smoke test trivial. Passaram a existir:
+
+- **`tests/queries/`** — a camada de queries da app, que nunca tinha sido
+  testada: filtros da pesquisa, dedupe, paginação, estado da subscrição,
+  verificação do webhook, matching de alertas.
+- **`tests/smoke/`** — a app **compilada e a servir**, com sessão real, via
+  `fetch` e `data-testid`. Sem Playwright e sem jsdom. Corre com
+  `pnpm test:smoke` e num passo próprio do CI.
+
+O smoke test foi validado ao contrário: desfiz a correção da pesquisa e ele ficou
+vermelho na asserção certa. Um teste que nunca se vê falhar não prova nada.
 
 ---
 
