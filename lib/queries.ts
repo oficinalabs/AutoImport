@@ -779,6 +779,28 @@ export async function updateStandMutation(
     .where(eq(organization.id, standId));
 }
 
+// ── Frescura ────────────────────────────────────────────────────
+/**
+ * Quando foi a última vez que o pipeline viu os anúncios que estamos a servir.
+ *
+ * A landing já mostrava isto; a app autenticada não mostrava nada, e foi assim
+ * que a produção esteve **sete dias** desatualizada sem ninguém reparar — quem
+ * está lá dentro todos os dias é quem tinha de ver primeiro.
+ *
+ * ⚠️ Devolve **string, não Date**: vem de um `sql` cru, e o Drizzle só converte
+ * para Date o que passa pelo mapeamento de uma coluna. Anotar `Date` compila e
+ * rebenta em runtime (a mesma armadilha do `landingStatsQuery`).
+ */
+export async function dataFreshnessQuery(): Promise<string | null> {
+  const [row] = await db
+    .select({
+      lastSeenAt: sql<string | null>`max(${listings.lastSeenAt})::text`,
+    })
+    .from(listings)
+    .where(isNull(listings.deletedAt));
+  return row?.lastSeenAt ?? null;
+}
+
 // ── Landing (números públicos) ──────────────────────────────────
 /**
  * Os números que a landing mostra. Públicos e agregados — nada por stand.

@@ -1,5 +1,6 @@
 "use client";
 
+import { FreshnessBadge } from "@/components/freshness-badge";
 import { NavLink } from "@/components/nav-link";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -39,9 +40,17 @@ export interface TopBarProps {
   /** rótulo da subscrição, ex.: "Trial · termina 9 ago" */
   subscriptionLabel: string;
   notifications: Notification[];
+  /** ISO da última leitura do pipeline; null se ainda não correu. */
+  lastSeenAt: string | null;
 }
 
-export function TopBar({ standName, userName, subscriptionLabel, notifications }: TopBarProps) {
+export function TopBar({
+  standName,
+  userName,
+  subscriptionLabel,
+  notifications,
+  lastSeenAt,
+}: TopBarProps) {
   const pathname = usePathname();
 
   return (
@@ -77,6 +86,7 @@ export function TopBar({ standName, userName, subscriptionLabel, notifications }
             mais do que sobra para a navegação, por isso passa para dentro do
             menu da conta. */}
         <div className="flex shrink-0 items-center gap-1.5">
+          <FreshnessBadge lastSeenAt={lastSeenAt} />
           <CountryMenu />
           <ThemeToggle className="hidden sm:flex" />
           <NotificationsMenu items={notifications} />

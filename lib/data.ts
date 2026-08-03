@@ -313,6 +313,21 @@ export async function getStand(): Promise<Stand | null> {
   return standCached();
 }
 
+// ── Frescura ────────────────────────────────────────────────────
+/**
+ * Quando o pipeline leu os anúncios pela última vez. Público (nada por stand).
+ * Devolve null se a leitura falhar — a barra de topo não é sítio para rebentar
+ * por causa de um indicador.
+ */
+export async function getDataFreshness(): Promise<string | null> {
+  try {
+    return await q.dataFreshnessQuery();
+  } catch (error) {
+    console.error("[frescura] falha ao ler:", error);
+    return null;
+  }
+}
+
 // ── Notificações ────────────────────────────────────────────────
 /**
  * Matches que os alertas do stand dispararam. Sem BD, ou enquanto o job de
