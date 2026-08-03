@@ -6,7 +6,7 @@ import { createAlert, toggleFavorite } from "@/lib/data";
 import { formatEuro } from "@/lib/format";
 import type { CountryCode, Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { BellPlus, Check, ExternalLink, Heart, MessagesSquare, X } from "lucide-react";
+import { BellPlus, Check, ExternalLink, Heart, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -28,10 +28,26 @@ export function ListingActions({ listing }: { listing: Listing }) {
     await toggleFavorite(listing.id);
   }
 
+  /**
+   * O anúncio na fonte. Com o carro à venda é a ação PRINCIPAL: a compra faz-se
+   * com o vendedor, fora daqui — o que damos é a decisão (a conta feita), não o
+   * canal. Ocupava este lugar um "Iniciar negociação" para /negociacoes, página
+   * que não tem como contactar ninguém; enquanto o email mascarado não existir
+   * (docs/06), mandar para a fonte é o passo honesto. Já indisponível, fica
+   * secundário — aí o CTA é o alerta.
+   */
+  const fonte = listing.sourceUrl && (
+    <Button asChild variant={indisponivel ? "outline" : "accent"} size={indisponivel ? "md" : "lg"}>
+      <a href={listing.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
+        <ExternalLink className="size-4" /> Ver anúncio em {listing.source}
+      </a>
+    </Button>
+  );
+
   return (
     <div className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-4">
-      {/* Não convidamos ninguém a negociar um carro que já não está à
-          venda — o alerta é que faz sentido, para apanhar outro igual. */}
+      {/* Não mandamos ninguém a um anúncio que já não está à venda — o alerta é
+          que faz sentido, para apanhar outro igual. */}
       {indisponivel ? (
         <>
           <Button asChild variant="accent" size="lg">
@@ -42,14 +58,11 @@ export function ListingActions({ listing }: { listing: Listing }) {
           <Button variant="outline">
             <Heart className="size-4" /> Tirar dos favoritos
           </Button>
+          {fonte}
         </>
       ) : (
         <>
-          <Button asChild variant="accent" size="lg">
-            <Link href="/negociacoes">
-              <MessagesSquare className="size-4" /> Iniciar negociação
-            </Link>
-          </Button>
+          {fonte}
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
@@ -73,17 +86,6 @@ export function ListingActions({ listing }: { listing: Listing }) {
           </div>
           {showAlertForm && <AlertForm listing={listing} onClose={() => setShowAlertForm(false)} />}
         </>
-      )}
-
-      {/* O anúncio na fonte, para confirmar fotos e detalhes que não guardamos.
-          Ação secundária de propósito: a negociação pela plataforma é que mantém
-          o email do vendedor privado (docs/06). */}
-      {listing.sourceUrl && (
-        <Button asChild variant="outline">
-          <a href={listing.sourceUrl} target="_blank" rel="noopener noreferrer nofollow">
-            <ExternalLink className="size-4" /> Ver anúncio em {listing.source}
-          </a>
-        </Button>
       )}
     </div>
   );

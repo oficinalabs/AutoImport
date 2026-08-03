@@ -36,7 +36,7 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
         return { ...a, active: next };
       }),
     );
-    await toggleAlert(id, next); // optimistic — stub até haver backend
+    await toggleAlert(id, next); // otimista: a UI move-se já, o servidor confirma depois
   }
 
   async function onCreate(e: React.FormEvent) {
@@ -67,7 +67,7 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
     setMaxPrice("");
     setCountries([]);
     setShowForm(false);
-    await createAlert(draft); // stub — persiste quando o backend ligar
+    await createAlert(draft); // persiste na BD (lib/data.ts)
   }
 
   return (
@@ -160,7 +160,8 @@ export function AlertsView({ initialAlerts }: { initialAlerts: Alert[] }) {
 
           <div className="flex items-center justify-between gap-3 border-t border-line pt-3">
             <p className="text-xs text-ink-soft">
-              Guardado localmente por agora — a persistência e o matching chegam com o backend.
+              Guardamos o alerta e avisamos-te por email quando aparecer um carro que bata os
+              critérios.
             </p>
             <Button type="submit" variant="accent">
               Criar alerta

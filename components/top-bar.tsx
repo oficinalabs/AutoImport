@@ -13,19 +13,20 @@ import {
   Heart,
   LayoutDashboard,
   LogOut,
-  MessagesSquare,
   Search,
   Store,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+// Negociações e Compras saíram da navegação: as rotas existem e continuam a
+// abrir (um link guardado não pode dar 404), mas não têm backend — dar-lhes
+// destaque igual ao das funcionalidades que existem era prometer um inbox.
+// O `Car` fica: é o ícone do logo aqui em baixo.
 const NAV = [
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/pesquisar", label: "Pesquisar", icon: Search },
   { href: "/favoritos", label: "Favoritos", icon: Heart },
-  { href: "/negociacoes", label: "Negociações", icon: MessagesSquare },
-  { href: "/compras", label: "Compras", icon: Car },
 ];
 
 function isActive(pathname: string, href: string) {

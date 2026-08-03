@@ -83,6 +83,26 @@ test(
 
     await cleanup(); // estado limpo mesmo depois de um run falhado
 
+    // 0. Catálogo sintético do T900. É o que faz o match-models resolver os
+    //    anúncios da fixture em tier `exato` — e sem `exato` não há oportunidade
+    //    nenhuma a marcar, porque é a regra da MONTRA (MONTRA_MATCH_CONFIDENCE,
+    //    lib/queries.ts) que o flag-opportunities aplica: o KPI não pode contar
+    //    carros que a montra não consegue mostrar.
+    //    `co2_wltp` = 132, o mesmo que os anúncios trazem: com `exato` o CO₂
+    //    efetivo passa a vir do catálogo, e os vereditos da fixture (compensa /
+    //    marginal / nao_compensa) estão calibrados para este valor.
+    await db.execute(sql`
+      insert into us_models (mid, make, model, slug, model_year, url) values
+        ('TG-T900', 'Testmarke', 'T900', 'T900-1', 2021, 'https://example.test/t900')
+    `);
+    await db.execute(sql`
+      insert into us_versions
+        (version_id, mid, name, url, fuel_section, fuel, year, power_hp, displacement_cc, co2_wltp)
+      values
+        ('V-T900D', 'TG-T900', 'T900 2.0d', 'https://example.test/vt900d', 'diesel', 'Diesel',
+         2021, 190, 1995, 132)
+    `);
+
     // 1. ingest da fixture (processo separado — o script gere a própria ligação)
     execFileSync(
       "pnpm",

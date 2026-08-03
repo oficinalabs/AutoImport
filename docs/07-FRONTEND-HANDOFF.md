@@ -86,8 +86,6 @@ de ISV mudam por ano) e vir já preenchidos em `Listing.cost` / `savings` / `ver
    `components/alerts-view.tsx`), chamando `createAlert`/`toggleAlert` em `lib/data.ts`
    (no-ops). Falta persistir e o job que dispara emails quando há match (Inngest ou engine).
 5. **Subscrição** — "Gerir subscrição" deve ligar ao Polar (checkout/portal).
-6. **Banner de demonstração** — `components/demo-banner.tsx` está fixo no layout da app;
-   remover (ou condicionar a uma flag) quando os dados forem reais.
 
 ## Imagens dos carros
 

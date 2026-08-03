@@ -1,28 +1,41 @@
 import { CarCard } from "@/components/car-card";
-import { CountryFlag } from "@/components/country-flag";
 import { CountryInsights } from "@/components/country-insights";
-import { DealProgress } from "@/components/deal-stepper";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCountryInsights, getDashboardStats, getDeals, getTopOpportunities } from "@/lib/data";
+import {
+  getCountryInsights,
+  getDashboardStats,
+  getSessionUser,
+  getTopOpportunities,
+} from "@/lib/data";
 import { formatEuro } from "@/lib/format";
 import { Award, BellRing, PiggyBank, Sparkles, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
+/**
+ * Só o primeiro nome — "Bom dia, Rui Costa" não é como se cumprimenta alguém.
+ * Sem sessão não inventamos um nome: a saudação fica sem vocativo (o `getSessionUser`
+ * devolve null quando a sessão é inválida, e a rota já é protegida).
+ */
+function saudacao(name: string | undefined): string {
+  const first = name?.trim().split(/\s+/)[0];
+  return first ? `Bom dia, ${first} 👋` : "Bom dia 👋";
+}
+
 export default async function PainelPage() {
-  const [stats, opportunities, insights, deals] = await Promise.all([
+  const [stats, opportunities, insights, utilizador] = await Promise.all([
     getDashboardStats(),
     getTopOpportunities(3),
     getCountryInsights(),
-    getDeals(),
+    getSessionUser(),
   ]);
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Bom dia, Rui 👋</h1>
+          <h1 className="text-2xl font-bold">{saudacao(utilizador?.name)}</h1>
           <p className="mt-1 text-sm text-ink-soft">Aqui está o que compensa importar hoje.</p>
         </div>
         <Button asChild variant="accent">
@@ -76,52 +89,18 @@ export default async function PainelPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        {/* Pipeline */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>As tuas compras</CardTitle>
-            <Link href="/compras" className="text-sm font-medium text-petrol-ink hover:underline">
-              Ver pipeline
-            </Link>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {deals.length === 0 && (
-              <p className="py-4 text-center text-sm text-ink-soft">
-                Ainda sem compras a decorrer.
-              </p>
-            )}
-            {deals.slice(0, 4).map((d) => (
-              <Link
-                key={d.id}
-                href="/compras"
-                className="flex items-center gap-3 rounded-[8px] p-1 hover:bg-surface-2"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{d.title}</span>
-                    <CountryFlag code={d.country} showName={false} />
-                  </div>
-                  <div className="mt-2">
-                    <DealProgress stage={d.stage} />
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Países */}
-        <Card>
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>Melhores países agora</CardTitle>
-            <BellRing className="size-4 text-ink-soft" />
-          </CardHeader>
-          <CardContent>
-            <CountryInsights insights={insights} />
-          </CardContent>
-        </Card>
-      </div>
+      {/* Países. Ficou sozinho quando o cartão "As tuas compras" saiu (mostrava
+          sempre o vazio, porque /compras não tem backend) — daí não haver aqui
+          grelha nenhuma: a largura toda é do gráfico, e as barras agradecem. */}
+      <Card>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>Melhores países agora</CardTitle>
+          <BellRing className="size-4 text-ink-soft" />
+        </CardHeader>
+        <CardContent>
+          <CountryInsights insights={insights} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
