@@ -1,0 +1,57 @@
+# Alarme de frescura: falha quando os dados que a app SERVE ficam velhos.
+#
+# PORQUÊ. A landing promete "todos os dias recalculamos" e mostra a data da
+# última leitura. Em 3 ago 2026 dizia "atualizado a 27 de julho" — sete dias de
+# atraso — e ninguém deu por isso até alguém ir ver à mão. A recolha vive num
+# daemon na máquina do operador e a publicação é um comando corrido à mão
+# (ver publicacao.yml), portanto basta ninguém ligar o portátil para a produção
+# envelhecer em silêncio.
+#
+# Este workflow não corrige nada. Só faz barulho — que é exatamente o que
+# faltava. Corre DEPOIS da hora habitual da publicação e dos alertas.
+#
+# ⚠️ É de LEITURA. Não chama `assertWritable`, não escreve uma linha, e por isso
+# não precisa de `DB_TARGET`.
+name: Frescura dos dados
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC — três horas depois dos alertas
+  workflow_dispatch:
+    inputs:
+      horas:
+        description: "Limiar em horas (default 36)"
+        required: false
+        default: ""
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  frescura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Medir a idade da última leitura
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::secret DATABASE_URL ausente — sem base de dados não há frescura para medir."
+            exit 1
+          fi
+          if [ -n "${{ github.event.inputs.horas }}" ]; then
+            pnpm pipeline:frescura --horas "${{ github.event.inputs.horas }}"
+          else
+            pnpm pipeline:frescura
+          fi

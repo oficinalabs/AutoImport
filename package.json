@@ -23,6 +23,9 @@
     "pipeline:daily": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/run-daily.ts",
     "pipeline:alerts": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/match-alerts.ts",
     "pipeline:ingest": "tsx scripts/pipeline/ingest.ts",
+    "pipeline:publish": "tsx scripts/pipeline/publish.ts",
+    "pipeline:publish:apply": "tsx scripts/pipeline/publish.ts --apply",
+    "pipeline:frescura": "tsx scripts/pipeline/check-freshness.ts",
     "db:migrate:deploy": "tsx scripts/db/migrate-deploy.ts"
   },
   "dependencies": {
