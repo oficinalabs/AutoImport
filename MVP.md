@@ -35,8 +35,12 @@ credenciais que não vivem no código.
 
 ### O que continua nas mãos do dono
 
-1. **Correr a recomputação**, sem a qual a produção mantém as ilhas e o KPI
-   inflacionado: `compute-costs --all` → `flag-opportunities` → `pipeline:publish:apply`.
+1. **Publicar.** A recomputação já foi corrida no warehouse a 6 ago (ilhas fora,
+   KPI alinhado, FR/NL recolhidos). Falta levá-la à produção — e **só depois do
+   deploy**, que é quem aplica as migrations `0007` e `0008`:
+
+       DB_TARGET=prod pnpm pipeline:publish        # ensaio
+       DB_TARGET=prod pnpm pipeline:publish:apply
 2. **Credenciais da Polar** — a tabela, o webhook e o gate estão prontos e
    testados; falta o checkout e o portal, que precisam de produtos criados do
    lado deles.
@@ -181,9 +185,39 @@ disso. É a promessa central da landing e o que justifica os 100 €/mês.
 - [ ] Automatizar a publicação (hoje 100% manual, sem agendamento)
 - [x] **Alarme de frescura**: se a última leitura passar das X horas, avisar a
       equipa — e dizê-lo na UI antes que seja um cliente a descobrir
-- [ ] Corrigir a assimetria de cobertura: FR (6,6 k) e NL (3,6 k) contra DE
+- [x] ~~Corrigir a assimetria de cobertura: FR (6,6 k) e NL (3,6 k) contra DE
       (240 k). A landing promete "cinco mercados europeus"; dois deles são
-      residuais
+      residuais~~
+
+      **Recolhido a 6 ago — e o resultado mudou o diagnóstico.**
+
+      A causa não era "faltou correr os coletores". O **AutoTrader.nl está
+      partido** (HTTP 404 no URL de listagem — o site mudou de estrutura), o que
+      explica os zero anúncios dele. Mas o **AutoScout24 funciona e nunca tinha
+      sido corrido para FR/NL**: está na matriz do `daily-batch.yml`, e esse
+      workflow não tem cron.
+
+      | | antes | depois |
+      |---|---|---|
+      | FR anúncios vivos | 6 665 | **34 385** |
+      | NL anúncios vivos | 3 604 | **41 201** |
+      | FR com match exato | 850 | **9 721** |
+      | NL com match exato | 343 | **16 667** |
+      | FR na montra | 308 | 423 |
+      | NL na montra | 36 | 184 |
+
+      ⚠️ **Repare-se na última linha.** 26 388 matches exatos deram 607 anúncios
+      na montra. O estrangulamento **não é a oferta estrangeira** — é a **amostra
+      portuguesa**: para um carro entrar na montra é preciso um comparável em
+      Portugal do mesmo modelo, ano, escalão de km e potência. Dos 491 modelos
+      que ficaram sem estimativa, **409 até existem** no `pt_price_observations`;
+      o que falta é a fatia fina.
+
+      Ou seja: o item seguinte para FR e NL **não é recolher mais lá fora, é
+      aprofundar o corpus PT** — e o corpus PT está parado desde 27 de julho.
+
+      A recolha foi interrompida com o corpus a meio (65 317 anúncios em ~50 min,
+      `--full --max-pages 25`). Há checkpoint: `--resume` continua de onde ficou.
 
 > **🟡 O que dava para fazer em código, está.** `pnpm pipeline:frescura` mede a
 > idade da leitura mais recente e **falha** acima das 36 h (corrido contra o
@@ -358,7 +392,7 @@ importação não é a mesma.
 > região não é redundância — é o caminho principal. Falha aberto: sem região e
 > sem CP, o anúncio fica.
 >
-> ⚠️ **Exige `compute-costs --all` + `flag-opportunities` + republicar** para a
+> ⚠️ **Exige `compute-costs` + `flag-opportunities` + republicar** para a
 > produção deixar de as mostrar.
 
 ---
@@ -498,7 +532,7 @@ resolve escrevendo mais linhas.
    oportunidades). Sugestão: correr, comparar a distribuição de vereditos antes e
    depois, e só então publicar.
 
-       pnpm exec tsx scripts/pipeline/compute-costs.ts --all
+       pnpm exec tsx scripts/pipeline/compute-costs.ts
        pnpm exec tsx scripts/pipeline/flag-opportunities.ts
        DB_TARGET=prod pnpm pipeline:publish          # ensaio primeiro
        DB_TARGET=prod pnpm pipeline:publish:apply
