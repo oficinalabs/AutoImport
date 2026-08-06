@@ -50,7 +50,7 @@ type Row = Record<string, unknown>;
 
 const LISTING_KEY = ["source_site", "external_id"];
 const LISTING_DATA = (
-  "source_id model_id make_raw model_raw variant year km fuel_raw fuel gearbox engine_raw " +
+  "source_id model_id make_raw model_raw variant year km fuel_raw fuel gearbox gearbox_norm engine_raw " +
   "displacement_cc color doors category price currency country region postal_code detail_url " +
   "image_url co2 power_hp first_registration seller_name seller_type price_evaluation " +
   "is_damaged vin us_version_id match_confidence designation_facts first_seen_at last_seen_at " +

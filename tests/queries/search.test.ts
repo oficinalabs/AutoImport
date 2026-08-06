@@ -17,6 +17,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import postgres from "postgres";
 import { dbUrl } from "../../lib/db-url";
+import { normGearbox } from "../../lib/engine/us-catalog";
 import {
   dropDatabases,
   migrate,
@@ -48,7 +49,9 @@ const VM_ASTRA = "33333333-3333-3333-3333-333333333312";
  */
 const FIXTURE = [
   // ext        país  ano    km      caixa       combustível  totalPt  savings  pct   verdict         vin
-  ["golf-de", "DE", 2022, 40_000, "Automatik", "diesel", 25_000, 5_000, 20, "compensa", null],
+  // "DSG" é a armadilha: não tem a palavra "auto" no texto. O mapper antigo
+  // (`/auto/i`) chamava-lhe manual — 76 anúncios da montra assim.
+  ["golf-de", "DE", 2022, 40_000, "DSG", "diesel", 25_000, 5_000, 20, "compensa", null],
   ["golf-fr", "FR", 2019, 120_000, "Manuelle", "gasolina", 12_000, 400, 3, "marginal", null],
   ["astra-de", "DE", 2023, 10_000, null, "elétrico", 30_000, 9_000, 30, "compensa", null],
   ["astra-es", "ES", 2021, 80_000, "Manual", "diesel", 18_000, 1_000, 5, "marginal", null],
@@ -123,12 +126,12 @@ async function seedFixture(sql: ReturnType<typeof postgres>) {
     const [row] = await sql`
       insert into listings (
         source_site, external_id, source_id, model_id, make_raw, model_raw, variant,
-        year, km, gearbox, fuel, country, price, detail_url, vin,
+        year, km, gearbox, gearbox_norm, fuel, country, price, detail_url, vin,
         match_confidence, first_seen_at, last_seen_at
       ) values (
         'testsearch.de', ${`search-${ext}`}, ${SOURCE}, ${modelId},
         'Testsearch', ${ext.startsWith("golf") ? "Golf" : "Astra"}, ${`${ext} 2.0 TDI`},
-        ${year}, ${km}, ${gearbox}, ${fuel}, ${country}, ${totalPt - 5000},
+        ${year}, ${km}, ${gearbox}, ${normGearbox(gearbox)}, ${fuel}, ${country}, ${totalPt - 5000},
         ${`https://testsearch.de/${ext}`}, ${vin},
         'exato', now(), now()
       ) returning id`;
@@ -233,18 +236,43 @@ test("ano, km e combustível filtram em SQL", { skip }, async () => {
   assert.equal((await procurar({ fuel: "diesel" })).total, 3);
 });
 
-test("caixa: 'manual' inclui os anúncios sem caixa conhecida", { skip }, async () => {
-  // A armadilha. `transmissionOf` (o que decide o CARTÃO) trata gearbox null
-  // como "manual"; um `not ilike '%auto%'` cru excluía-o e o filtro passava a
-  // contradizer o cartão. `astra-de` tem gearbox null.
+test("caixa: só entra quem tem caixa PROVADA — o desconhecido fica de fora", { skip }, async () => {
+  // O filtro e a ficha lêem a MESMA coluna (`gearbox_norm`), por isso não podem
+  // contradizer-se — era esse o medo que fazia o SQL copiar o erro do mapper.
+  // `astra-de` não tem gearbox: já não conta como manual, porque não sabemos.
   const paises = [...PRINCIPAIS];
   const manual = await procurar({ gearbox: "manual", countries: paises });
-  assert.ok(manual.ids.includes("astra-de"), "sem caixa conhecida conta como manual");
-  assert.deepEqual(manual.ids.sort(), ["astra-de", "astra-es", "dup-alto", "golf-fr"]);
+  assert.ok(!manual.ids.includes("astra-de"), "sem caixa conhecida não é 'manual'");
+  assert.deepEqual(manual.ids.sort(), ["astra-es", "dup-alto", "golf-fr"]);
 
   const auto = await procurar({ gearbox: "automática", countries: paises });
-  assert.deepEqual(auto.ids, ["golf-de"], "só o Automatik");
-  assert.equal(manual.total + auto.total, 5, "as duas caixas somam a montra toda");
+  assert.deepEqual(auto.ids, ["golf-de"], "o DSG é automática");
+  assert.equal(manual.total + auto.total, 4, "os 5 da montra menos o de caixa desconhecida");
+
+  // Coerência com o que o produto AFIRMA: o que sai de cada filtro tem de trazer
+  // exatamente a caixa pedida na ficha — nada de nulos disfarçados.
+  const { searchListingsQuery } = await import("../../lib/queries");
+  for (const caixa of ["manual", "automática"] as const) {
+    const page = await searchListingsQuery({ gearbox: caixa, countries: paises }, null);
+    assert.deepEqual(
+      [...new Set(page.items.map((l) => l.model.transmission))],
+      [caixa],
+      `filtrar por ${caixa} só pode devolver carros que a ficha diz serem ${caixa}`,
+    );
+  }
+});
+
+test("um DSG não é 'manual' — e sem caixa não é nada", { skip }, async () => {
+  // O regex antigo (`/auto/i` sobre o texto cru) chamava manual a tudo o que não
+  // trouxesse "auto" no nome: DSG, S-tronic, PDK, CVT. E chamava manual ao vazio.
+  const { searchListingsQuery } = await import("../../lib/queries");
+  const { items } = await searchListingsQuery({ countries: [...PRINCIPAIS] }, null);
+  const caixaDe = (ext: string) =>
+    items.find((l) => l.sourceUrl?.endsWith(`/${ext}`))?.model.transmission;
+
+  assert.equal(caixaDe("golf-de"), "automática", "gearbox 'DSG' — sem a palavra 'auto'");
+  assert.equal(caixaDe("golf-fr"), "manual", "gearbox 'Manuelle'");
+  assert.equal(caixaDe("astra-de"), null, "sem gearbox: null, não 'manual'");
 });
 
 test("filtros combinam-se (AND), não se substituem", { skip }, async () => {

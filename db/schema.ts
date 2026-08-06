@@ -280,6 +280,13 @@ export const listings = pgTable(
     /** normalizado (FuelType); null até o match-models correr */
     fuel: text("fuel"),
     gearbox: text("gearbox"),
+    /** caixa classificada pelo `normGearbox` (lib/engine/us-catalog.ts) a partir do
+     * `gearbox` cru: "manual" | "auto" | null. É esta coluna — e não um regex sobre o
+     * texto livre — que decide o que a ficha mostra e o que o filtro da pesquisa
+     * devolve. `null` significa NÃO SABEMOS (a fonte não diz, ou diz algo ambíguo
+     * como "semi-automática"); nunca é o mesmo que "manual". Escrita pelo
+     * scripts/pipeline/match-models.ts, que a recalcula em cada corrida. */
+    gearboxNorm: text("gearbox_norm"),
     engineRaw: text("engine_raw"),
     displacementCc: integer("displacement_cc"),
     color: text("color"),

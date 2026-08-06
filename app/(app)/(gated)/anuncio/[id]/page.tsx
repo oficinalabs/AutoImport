@@ -45,7 +45,10 @@ function specs(l: Listing): { label: string; value: string }[] {
     { label: "Ano", value: String(l.year) },
     { label: "Quilómetros", value: formatKm(l.km) },
     { label: "Combustível", value: cap(m.fuel) },
-    { label: "Caixa", value: cap(m.transmission) },
+    // Sem caixa classificada (a fonte não a diz, ou diz "semi-automática", que é
+    // ambígua) a ficha diz que não sabe. Escrever "Manual" por omissão — o que
+    // acontecia a 291 anúncios da montra — é inventar um facto sobre o carro.
+    { label: "Caixa", value: m.transmission ? cap(m.transmission) : "Não indicada" },
   ];
   if (m.displacementCc) out.push({ label: "Cilindrada", value: formatCc(m.displacementCc) });
   if (m.powerHp) out.push({ label: "Potência", value: `${m.powerHp} cv` });

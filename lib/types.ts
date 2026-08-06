@@ -18,6 +18,11 @@ export interface Country {
 }
 
 export type FuelType = "gasolina" | "diesel" | "híbrido" | "phev" | "elétrico";
+/**
+ * Caixa — só o que se pode AFIRMAR (e, por isso, filtrar). Quando não se sabe, o
+ * campo que a transporta é `null` (ver VehicleModel.transmission): "não sabemos"
+ * não é um valor de caixa, é a ausência dela, e não há filtro para o vazio.
+ */
 export type Transmission = "manual" | "automática";
 
 /** Veredito de negócio — cor semântica, ver docs/01-DESIGN.md. */
@@ -37,7 +42,11 @@ export interface VehicleModel {
   model: string;
   variant?: string;
   fuel: FuelType;
-  transmission: Transmission;
+  /** `null` = a fonte não diz qual é (ou diz algo ambíguo, como "semi-automática").
+   *  Antes isto era sempre "manual" por omissão — 291 dos 39 759 anúncios da montra
+   *  eram um palpite apresentado como facto. Quem mostra o campo tem de dizer que
+   *  não sabe (ver a ficha em app/(app)/(gated)/anuncio/[id]/page.tsx). */
+  transmission: Transmission | null;
   /** cilindrada em cm³ (undefined em elétricos) */
   displacementCc?: number;
   co2?: number;
@@ -215,6 +224,26 @@ export interface Member {
   email: string;
   role: MemberRole;
 }
+
+/** Convite por aceitar, listado em /stand para o dono poder cancelá-lo. */
+export interface PendingInvite {
+  id: string;
+  email: string;
+  /** ISO */
+  createdAt: string;
+  /** ISO */
+  expiresAt: string;
+}
+
+/**
+ * O que a página do convite (`/convite/[id]`) sabe sobre ele. Só o estado
+ * `pendente` traz dados — nos outros não há nada que valha a pena mostrar, e
+ * o motivo é a informação toda: um convite expirado tem de o dizer, não pode
+ * rebentar nem fingir que não existe.
+ */
+export type InviteView =
+  | { status: "pendente"; id: string; email: string; standName: string }
+  | { status: "expirado" | "cancelado" | "aceite" | "inexistente" };
 
 /**
  * Estado da subscrição do stand. Cinco, não três: com a Polar ligada há estados

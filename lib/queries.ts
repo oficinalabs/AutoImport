@@ -76,10 +76,6 @@ type ModelRow = typeof vehicleModels.$inferSelect;
 type VersionRow = typeof usVersions.$inferSelect;
 type UsModelRow = typeof usModels.$inferSelect;
 
-function transmissionOf(gearbox: string | null): Transmission {
-  return gearbox && /auto/i.test(gearbox) ? "automática" : "manual";
-}
-
 /** Nome do modelo do catálogo sem o ruído de slug — "208 II (2023)" → "208 II". */
 function cleanCatalogModel(model: string): string {
   return model.replace(/\s*\([^)]*\)/g, "").trim();
@@ -138,7 +134,11 @@ function rowToListing(
       model: l.modelRaw ?? vm.model,
       variant: l.variant ?? undefined,
       fuel: (l.fuel ?? vm.fuel) as FuelType,
-      transmission: transmissionOf(l.gearbox),
+      // A caixa vem já classificada da coluna `gearbox_norm` (normGearbox, escrita
+      // pelo match-models) — não de um regex sobre o texto livre da fonte. `null`
+      // é "não sabemos", e vai como null até à ficha, que o diz.
+      transmission:
+        l.gearboxNorm === "auto" ? "automática" : l.gearboxNorm === "manual" ? "manual" : null,
       displacementCc:
         l.displacementCc ??
         ver?.displacementCc ??
@@ -352,18 +352,24 @@ function textoSql(query: string): SQL | undefined {
 }
 
 /**
- * Caixa em SQL, fiel ao `transmissionOf` que decide o que o CARTÃO mostra —
- * incluindo a parte errada: `gearbox` nulo conta como manual. Não é a
- * classificação certa (um DSG cai em "manual"), mas nesta fase o filtro não pode
- * contradizer o cartão: filtrar "Manual" e receber um cartão a dizer "Automática"
- * destrói a confiança no produto todo. A correção a sério é uma coluna
- * `gearbox_norm` escrita pelo `normGearbox` (lib/engine/us-catalog.ts), que
- * arruma o cartão e o filtro de uma vez — fica para uma migration própria.
+ * Caixa em SQL, pela mesma coluna que a ficha mostra (`gearbox_norm`, escrita
+ * pelo `normGearbox` em lib/engine/us-catalog.ts) — o filtro e o que o produto
+ * afirma sobre o carro não podem divergir, e agora não podem MESMO: é o mesmo
+ * dado, sem regex nenhum a meio.
+ *
+ * Antes isto replicava de propósito o erro do mapper (`gearbox ilike '%auto%'`,
+ * tudo o resto manual). Custava 376 anúncios mal rotulados na montra: 76 DSG/PDK
+ * anunciados como manuais e 291 sem caixa conhecida apresentados como manuais.
+ *
+ * DESCONHECIDOS (`gearbox_norm is null`) NÃO ENTRAM em nenhum dos dois. Antes
+ * caíam todos em "manual", porque tudo caía. Pôr um carro que não sabemos se é
+ * manual numa lista pedida como "Manual" é a mesma afirmação inventada que a
+ * ficha deixou de fazer — e quem filtra por caixa está a filtrar por certeza.
+ * Preço medido: 291 anúncios (0,7% da montra) deixam de ser alcançáveis COM o
+ * filtro de caixa; sem filtro — o default — continuam todos lá.
  */
 function caixaSql(gearbox: Transmission): SQL {
-  return gearbox === "automática"
-    ? sql`${listings.gearbox} ilike '%auto%'`
-    : sql`(${listings.gearbox} is null or ${listings.gearbox} not ilike '%auto%')`;
+  return sql`${listings.gearboxNorm} = ${gearbox === "automática" ? "auto" : "manual"}`;
 }
 
 /**
@@ -451,6 +457,9 @@ export async function getListingsByIdsQuery(
 export async function topOpportunitiesQuery(
   limit: number,
   standId: string | null,
+  /** `savings` para a landing, que precisa de leque largo de valores absolutos
+   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). */
+  sort: "percentagem" | "savings" = "percentagem",
 ): Promise<Listing[]> {
   const rows = await baseSelect(standId)
     .innerJoin(
@@ -458,7 +467,20 @@ export async function topOpportunitiesQuery(
       and(eq(opportunities.listingId, listings.id), isNull(opportunities.deletedAt)),
     )
     .where(and(isNull(listings.deletedAt), COM_CATALOGO))
-    .orderBy(desc(opportunities.savings))
+    // Por omissão, percentagem — pela mesma razão que a pesquisa: ordenar por
+    // poupança absoluta enche o topo de supercarros, e o painel é a primeira
+    // coisa que um stand de usados vê de manhã. Os KPIs em euros ao lado
+    // continuam a apontar para `ordenar=savings`, que é o que os explica.
+    //
+    // A percentagem vem de `import_cost_estimates`, não da cópia em
+    // `opportunities`: é o mesmo valor por que a pesquisa ordena, e o painel e a
+    // pesquisa a discordarem sobre qual é o melhor negócio do dia seria pior do
+    // que qualquer das duas ordens. A cópia em `opportunities` é um instantâneo
+    // do último `flag-opportunities` e envelhece entre corridas.
+    .orderBy(
+      sort === "savings" ? desc(opportunities.savings) : desc(importCostEstimates.savingsPct),
+      asc(listings.id),
+    )
     .limit(limit);
   return rows.map((r) => toListing(r));
 }
