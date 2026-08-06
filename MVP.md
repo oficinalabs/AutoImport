@@ -81,7 +81,9 @@ Um stand que abra a pesquisa e procure o que costuma vender não encontra nada.
 >
 > Dois bugs que só os testes novos apanharam: numa página vazia o
 > `count(*) over()` não vinha em linha nenhuma e o total dava 0; e o filtro de
-> caixa tem de tratar `gearbox` nulo como manual, senão contradiz o cartão.
+> caixa tinha de tratar `gearbox` nulo como manual, senão contradizia o cartão —
+> uma cópia deliberada de um erro, que a coluna `gearbox_norm` veio depois
+> resolver na origem (ver a secção 5).
 >
 > **Medido depois** (publiquei a montra para uma base descartável — 39 759
 > anúncios, 86 MB, o tamanho da produção — e cronometrei a app compilada):
@@ -441,8 +443,16 @@ importação não é a mesma.
 - [x] **Sem testes da app.** Os 157 testes cobrem coletores, motor de custos e
       pipeline — não há um único teste de componente ou E2E. Os bugs P0-1 e P1-1
       teriam sido apanhados por um smoke test de duas linhas
-- [ ] Tabelas de ISV só de **2026** (`isv_tables`). Confirmar o plano de
-      atualização anual antes da viragem do ano
+- [x] ~~Tabelas de ISV só de **2026** (`isv_tables`). Confirmar o plano de
+      atualização anual antes da viragem do ano~~
+
+      **Feito, e era pior do que "confirmar o plano".** O `ISV_YEAR` estava
+      escrito à mão como `2026`. A 1 de janeiro de 2027 continuaria a dizer 2026,
+      encontraria as tabelas de 2026 na base e publicaria **impostos do ano
+      errado em silêncio** — com dinheiro pelo meio. Passa a derivar de `now()`,
+      e o que acontece na viragem do ano é o oposto: o pipeline **pára**, com uma
+      mensagem que diz como semear o ano novo. Parar não apaga o que já foi
+      calculado, e o alarme de frescura avisa ao fim de 36 h.
 - [x] `components/demo-banner.tsx` é código morto — nada o importa
 - [x] ~~Um UUID inválido em `/anuncio/<lixo>` dá erro 500 (com o boundary bonito,
       mas mesmo assim) em vez de 404~~ Feito: as páginas validam o formato antes
@@ -511,12 +521,22 @@ resolve escrevendo mais linhas.
 
 - **Índice de pesquisa** — só depois de medir `EXPLAIN` sobre dados do tamanho de
   produção. Cada índice é uma migration que não se testa em preview.
-- **`gearbox_norm`** — o cartão rotula um DSG como "manual", e o filtro copia
-  esse erro de propósito para não o contradizer. A correção a sério é uma coluna
-  normalizada, com migration e republicação.
+- ~~**`gearbox_norm`**~~ **Feito** (migration `0008`). O cartão rotulava um DSG
+  como "manual" e `gearbox` nulo também — afirmava o que não sabia. Passa a haver
+  coluna normalizada, escrita pelo `match-models` com o `normGearbox` que o
+  matcher já usava, e o `caixaSql` filtra por igualdade, sem regex em SQL.
+  Recuperados **76** automáticos mal rotulados; **300** passam a "Não indicada"
+  em vez de "manual" inventado. Os desconhecidos deixam de entrar em qualquer
+  dos dois filtros: quem filtra por caixa está a filtrar por certeza.
+
+  ⚠️ **ORDEM DE DEPLOY.** A coluna nasce vazia em produção. Entre o deploy (que
+  aplica a migration) e a primeira republicação, o filtro de caixa devolve zero
+  e as fichas dizem "Não indicada" em todos os carros. O `publish` **recusa-se a
+  correr** contra uma base sem a coluna, portanto a ordem é forçada e falha alto
+  — mas a janela existe: publicar **logo a seguir** ao deploy.
 - **Negociações e Compras** — escondidas, não construídas. O âmbito declarado do
   produto é a inteligência de decisão.
-- **Convidar equipa** — desativado. A landing vende "toda a equipa incluída".
+- **Convidar equipa** — ver a secção 5; deixou de estar desativado.
 - **Textos legais** — continuam a nomear a Polar. Ficam falsos até ela estar
   ligada; mexer-lhes é decisão com implicações jurídicas.
 
