@@ -50,6 +50,10 @@ before(async () => {
   // O `db` é importado dinamicamente dentro dos testes e resolve a URL no import
   // — definir aqui basta para ele (e para os subprocessos) ligarem à base de teste.
   process.env.WAREHOUSE_URL = ACTIVE_URL;
+  // O ISV_YEAR do compute-costs deriva de `now()` de propósito (ver lá porquê).
+  // Aqui fixa-se: o seed só traz as tabelas de 2026, e um teste que começasse a
+  // falhar a 1 de janeiro seria um teste a medir o calendário, não o código.
+  process.env.ISV_YEAR = "2026";
 });
 
 async function cleanup() {

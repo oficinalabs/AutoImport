@@ -31,7 +31,32 @@ try {
 }
 
 const FOREIGN: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
-const ISV_YEAR = 2026;
+
+/**
+ * Ano das tabelas fiscais a aplicar. **Deriva da data de hoje**, não é uma
+ * constante — e isso é o ponto.
+ *
+ * Estava escrito `2026` à mão. As tabelas de ISV e IUC mudam todos os anos com o
+ * Orçamento do Estado, e a 1 de janeiro de 2027 este número continuaria a dizer
+ * 2026: o `loadTaxTables` encontrava as tabelas de 2026 na base, não se queixava
+ * de nada, e o pipeline passava a publicar impostos do ano errado — em silêncio,
+ * com dinheiro pelo meio, num produto cuja única promessa é a conta estar certa.
+ *
+ * Derivado de `now()`, o que acontece a 1 de janeiro é o oposto: as tabelas do
+ * ano novo ainda não estão semeadas, o `loadTaxTables` **rebenta** com o ano e o
+ * `kind` em falta, e o pipeline pára. É deliberado — é a mesma escolha do
+ * `migrate-deploy` (migration a falhar falha o build de propósito) e do
+ * `daily-batch` (vermelho honesto em vez de verde a mentir).
+ *
+ * Parar não apaga nada: as estimativas já calculadas ficam, com o
+ * `isv_table_year` que lhes corresponde. O que deixa de haver são estimativas
+ * NOVAS — e o alarme de frescura (`pnpm pipeline:frescura`) grita por isso ao
+ * fim de 36 h, portanto ninguém fica sem saber.
+ *
+ * `ISV_YEAR=2026` no ambiente força um ano — serve para os testes não
+ * dependerem da data e para recalcular um ano fechado.
+ */
+const ISV_YEAR = Number(process.env.ISV_YEAR) || new Date().getFullYear();
 
 export async function computeCosts() {
   assertWritable(dbUrl());

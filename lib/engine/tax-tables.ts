@@ -15,7 +15,18 @@ export async function loadTaxTables(db: typeof Db, year: number): Promise<TaxTab
   const need = (kind: string): unknown => {
     const payload = byKind.get(kind);
     if (payload == null) {
-      throw new Error(`isv_tables: falta (year=${year}, kind=${kind}) — correr pnpm db:seed`);
+      // Rebentar aqui é de propósito. A alternativa — cair para o ano anterior —
+      // publicaria impostos do ano errado sem ninguém dar por isso, que é o pior
+      // desfecho possível num produto cuja promessa é a conta estar certa. Ver o
+      // comentário do ISV_YEAR em scripts/pipeline/compute-costs.ts.
+      throw new Error(
+        `isv_tables: falta (year=${year}, kind=${kind}).\n` +
+          `As tabelas de ISV/IUC de ${year} não estão na base. Enquanto não estiverem, ` +
+          "não se calculam custos novos — publicar com as do ano anterior seria mentir.\n" +
+          `Para resolver: criar db/seed/isv-${year}.ts a partir do Orçamento do Estado, ` +
+          "ligá-lo ao scripts/db/seed.ts e correr `pnpm db:seed`.\n" +
+          `Para recalcular um ano já fechado, forçar com ISV_YEAR=${year}.`,
+      );
     }
     return payload;
   };
