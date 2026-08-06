@@ -24,6 +24,7 @@
 | **Alertas** | ✅ **Corrigidos** — nasciam todos mortos; ver P1-4 |
 | **Pagamentos** | 🟡 Estado, gate e webhook prontos; **falta o checkout** (credenciais) |
 | **Frescura dos dados** | 🟡 Indicador e alarme prontos; **falta decidir onde corre a recolha** |
+| Equipa (convidar colaboradores) | ✅ **Feito** — o botão estava desativado e a landing prometia |
 | Negociações / Compras | ⬜ Escondidas do MVP, por decisão |
 | Observabilidade (Sentry) | ⬜ Decidido adiar, com receita escrita — ver P2 |
 
@@ -517,6 +518,18 @@ resolve escrevendo mais linhas.
 5. **Cobertura de FR e NL** — 6,6 k e 3,6 k anúncios contra 240 k da Alemanha. A
    landing promete cinco mercados; dois são residuais. É trabalho de coletores.
 
+### Também resolvido depois da auditoria
+
+- **Ano das tabelas fiscais** — era uma constante `2026`. Ver o P2.
+- **Caixa dos anúncios** (`gearbox_norm`) — ver a lista abaixo.
+- **Menus da barra de topo** — os três (países, sino, conta) não fechavam com
+  Escape nem ao clicar fora, e ficavam abertos por cima da página seguinte.
+  Passaram a um componente partilhado; corrigir três vezes é garantir que uma
+  fica para trás.
+- **Ordem do painel** — mostrava supercarros a quem vende usados, o mesmo
+  problema da pesquisa. Passa a ordenar por percentagem, pelo mesmo valor por que
+  a pesquisa ordena.
+
 ### Ficou por fazer, com razão escrita
 
 - **Índice de pesquisa** — só depois de medir `EXPLAIN` sobre dados do tamanho de
@@ -536,7 +549,21 @@ resolve escrevendo mais linhas.
   — mas a janela existe: publicar **logo a seguir** ao deploy.
 - **Negociações e Compras** — escondidas, não construídas. O âmbito declarado do
   produto é a inteligência de decisão.
-- **Convidar equipa** — ver a secção 5; deixou de estar desativado.
+- ~~**Convidar equipa**~~ **Feito.** O dono convida por email, o convidado entra
+  como colaborador, sem limite de lugares — é o que a landing vende. Não foi
+  preciso migration: o plugin `organization()` do Better Auth já traz os convites
+  e a tabela `invitation` já existia.
+
+  Três coisas que exigiram cuidado: a página de aceitação vive em `(auth)`,
+  porque em `(app)` o middleware atirava o convidado sem conta para `/entrar`
+  antes de ele ver o convite; o `databaseHook` deixou de criar um stand fantasma
+  a quem se regista por convite (o `activeStandId` cai na primeira organização, e
+  aterrava no stand errado); e o convite de um email não pode ser aceite por
+  outro — quem o recusa é o próprio plugin, não código nosso.
+
+  ⬜ Fica de fora: reenviar convite (só cancelar e voltar a convidar), e um
+  seletor de stand para quem seja dono de um e convidado de outro. Nenhum é
+  bloqueador.
 - **Textos legais** — continuam a nomear a Polar. Ficam falsos até ela estar
   ligada; mexer-lhes é decisão com implicações jurídicas.
 
