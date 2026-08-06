@@ -79,7 +79,16 @@ function FormError({ message }: { message: string }) {
   );
 }
 
-export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+export function SignInForm({
+  googleEnabled = false,
+  next,
+}: {
+  googleEnabled?: boolean;
+  /** Rota interna para onde voltar depois de entrar (ex.: um convite). Já
+   *  validada no servidor — ver app/(auth)/entrar/page.tsx. */
+  next?: string;
+}) {
+  const destino = next ?? "/painel";
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,19 +114,25 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
       setLoading(false);
       return;
     }
-    router.push("/painel");
+    router.push(destino);
     router.refresh();
   }
 
   if (unverified) {
-    return <ResendVerification email={unverified} onBack={() => setUnverified(null)} />;
+    return (
+      <ResendVerification
+        email={unverified}
+        callbackURL={destino}
+        onBack={() => setUnverified(null)}
+      />
+    );
   }
 
   return (
     <div className="flex flex-col gap-4">
       {googleEnabled && (
         <>
-          <GoogleButton label="Entrar com Google" />
+          <GoogleButton label="Entrar com Google" callbackURL={destino} />
           <Separator />
         </>
       )}
@@ -150,27 +165,44 @@ export function SignInForm({ googleEnabled = false }: { googleEnabled?: boolean 
   );
 }
 
-export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
+export function SignUpForm({
+  googleEnabled = false,
+  invite,
+}: {
+  googleEnabled?: boolean;
+  /**
+   * Registo a partir de um convite: não se pergunta o nome do stand (vai ser
+   * o de quem convidou) e o email é o do convite — trocá-lo dava uma conta que
+   * nunca poderia aceitar o convite.
+   */
+  invite?: { id: string; email: string; standName: string };
+}) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [password, setPassword] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   const passwordOk = checkPassword(password).valid;
+  // Depois de confirmar o email, a sessão abre-se logo
+  // (autoSignInAfterVerification) e aterra no convite, pronto a aceitar.
+  const callbackURL = invite ? `/convite/${invite.id}` : "/painel";
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const email = String(fd.get("email"));
+    const email = invite ? invite.email : String(fd.get("email"));
     setLoading(true);
     setError(null);
 
-    // O stand é criado no servidor (databaseHook), a partir de standName.
+    // O stand é criado no servidor (databaseHook), a partir de standName. Num
+    // registo por convite não se manda nenhum: o servidor vê o convite por
+    // aceitar e não cria stand fantasma nenhum (ver lib/auth.ts).
     const { error: signUpError } = await signUp.email({
       name: String(fd.get("nome")),
       email,
       password: String(fd.get("password")),
-      standName: String(fd.get("stand")),
+      callbackURL,
+      ...(invite ? {} : { standName: String(fd.get("stand")) }),
     } as Parameters<typeof signUp.email>[0]);
 
     setLoading(false);
@@ -183,33 +215,47 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
   }
 
   if (sentTo) {
-    return <CheckInbox email={sentTo} />;
+    return <CheckInbox email={sentTo} callbackURL={callbackURL} />;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {googleEnabled && (
+      {googleEnabled && !invite && (
         <>
-          <GoogleButton label="Continuar com Google" />
+          <GoogleButton label="Continuar com Google" callbackURL={callbackURL} />
           <Separator />
         </>
       )}
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         {error && <FormError message={error} />}
-        <Field
-          label="Nome do stand"
-          id="stand"
-          placeholder="Stand Costa & Filhos"
-          autoComplete="organization"
-        />
+        {!invite && (
+          <Field
+            label="Nome do stand"
+            id="stand"
+            placeholder="Stand Costa & Filhos"
+            autoComplete="organization"
+          />
+        )}
         <Field label="O teu nome" id="nome" placeholder="Rui Costa" autoComplete="name" />
-        <Field
-          label="Email"
-          id="email"
-          type="email"
-          placeholder="tu@stand.pt"
-          autoComplete="email"
-        />
+        {invite ? (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">Email</span>
+            <p className="flex h-10 items-center rounded-[6px] border border-line bg-surface-2 px-3 text-sm text-ink-soft">
+              {invite.email}
+            </p>
+            <p className="text-xs text-ink-soft">
+              É o email do convite para o {invite.standName}. A conta tem de ser criada com ele.
+            </p>
+          </div>
+        ) : (
+          <Field
+            label="Email"
+            id="email"
+            type="email"
+            placeholder="tu@stand.pt"
+            autoComplete="email"
+          />
+        )}
         <div className="flex flex-col gap-2">
           <Field
             label="Password"
@@ -223,7 +269,7 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
           <PasswordRequirements password={password} />
         </div>
         <Button type="submit" variant="accent" size="lg" loading={loading} disabled={!passwordOk}>
-          {loading ? "A criar conta…" : "Criar conta — 1.º mês grátis"}
+          {loading ? "A criar conta…" : invite ? "Criar conta" : "Criar conta — 1.º mês grátis"}
         </Button>
       </form>
     </div>
@@ -231,13 +277,13 @@ export function SignUpForm({ googleEnabled = false }: { googleEnabled?: boolean 
 }
 
 /** Ecrã pós-registo: confirmar o email. */
-function CheckInbox({ email }: { email: string }) {
+function CheckInbox({ email, callbackURL = "/painel" }: { email: string; callbackURL?: string }) {
   const [resent, setResent] = useState(false);
   const [sending, setSending] = useState(false);
 
   async function resend() {
     setSending(true);
-    await authClient.sendVerificationEmail({ email, callbackURL: "/painel" });
+    await authClient.sendVerificationEmail({ email, callbackURL });
     setSending(false);
     setResent(true);
   }
@@ -271,13 +317,21 @@ function CheckInbox({ email }: { email: string }) {
 }
 
 /** Login bloqueado por email não verificado. */
-function ResendVerification({ email, onBack }: { email: string; onBack: () => void }) {
+function ResendVerification({
+  email,
+  onBack,
+  callbackURL = "/painel",
+}: {
+  email: string;
+  onBack: () => void;
+  callbackURL?: string;
+}) {
   const [resent, setResent] = useState(false);
   const [sending, setSending] = useState(false);
 
   async function resend() {
     setSending(true);
-    await authClient.sendVerificationEmail({ email, callbackURL: "/painel" });
+    await authClient.sendVerificationEmail({ email, callbackURL });
     setSending(false);
     setResent(true);
   }
@@ -305,7 +359,7 @@ function ResendVerification({ email, onBack }: { email: string; onBack: () => vo
   );
 }
 
-function GoogleButton({ label }: { label: string }) {
+function GoogleButton({ label, callbackURL = "/painel" }: { label: string; callbackURL?: string }) {
   const [loading, setLoading] = useState(false);
   return (
     <Button
@@ -315,7 +369,7 @@ function GoogleButton({ label }: { label: string }) {
       loading={loading}
       onClick={() => {
         setLoading(true);
-        signIn.social({ provider: "google", callbackURL: "/painel" });
+        signIn.social({ provider: "google", callbackURL });
       }}
     >
       <GoogleIcon />

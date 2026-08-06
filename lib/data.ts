@@ -17,6 +17,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "./auth";
+import * as inv from "./invites";
 import * as q from "./queries";
 import { checkStandFields } from "./stand-fields";
 import type {
@@ -28,8 +29,10 @@ import type {
   DashboardStats,
   Deal,
   FuelType,
+  InviteView,
   Listing,
   Notification,
+  PendingInvite,
   Stand,
   Transmission,
 } from "./types";
@@ -184,7 +187,12 @@ export async function getLandingData(): Promise<LandingData> {
     // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
     // largo porque os carros com imposto alto estão em baixo desta lista (é
     // ordenada por poupança) — ver `escolherExemploIsv`.
-    q.topOpportunitiesQuery(48, null),
+    //
+    // Por poupança ABSOLUTA, ao contrário do painel: a landing usa esta lista
+    // para escolher o carro que ilustra a conta do ISV, e esse critério assenta
+    // no peso do imposto em euros. Ordená-la por percentagem trocava o leque de
+    // valores absolutos por um de margens, e o exemplo do ISV ficava pior.
+    q.topOpportunitiesQuery(48, null, "savings"),
   ]);
   return {
     ...stats,
@@ -311,6 +319,66 @@ const standCached = cache(async (): Promise<Stand | null> => {
 /** O stand da sessão, ou null se não houver sessão/organização. */
 export async function getStand(): Promise<Stand | null> {
   return standCached();
+}
+
+// ── Equipa / convites ───────────────────────────────────────────
+/**
+ * Convites por aceitar do stand da sessão. Um convite enviado que não aparece
+ * em lado nenhum é um convite que ninguém sabe se saiu — por isso /stand
+ * lista-os, com forma de cancelar.
+ */
+export async function getPendingInvites(): Promise<PendingInvite[]> {
+  try {
+    const standId = await activeStandId();
+    return standId ? await inv.pendingInvites(standId) : [];
+  } catch (error) {
+    console.error("[convites] falha a listar:", error);
+    return [];
+  }
+}
+
+/**
+ * Convida um email para a equipa do stand. Server Action — o standId vem da
+ * SESSÃO, nunca do cliente, e o papel de dono é revalidado no servidor
+ * (mesmo padrão de `updateStand`).
+ */
+export async function inviteMember(email: string): Promise<inv.InviteResult> {
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  const result = await inv.createInvite(await headers(), standId, email);
+  if (result.ok) revalidatePath("/stand");
+  return result;
+}
+
+/** Cancela um convite por aceitar. Só o dono, e só do stand da sessão. */
+export async function cancelInvite(invitationId: string): Promise<inv.InviteResult> {
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  const result = await inv.cancelInvite(await headers(), standId, invitationId);
+  if (result.ok) revalidatePath("/stand");
+  return result;
+}
+
+/**
+ * O convite que a página /convite/[id] mostra. **Sem sessão** — quem é
+ * convidado pode ainda não ter conta.
+ */
+export async function getInvite(id: string): Promise<InviteView> {
+  try {
+    return await inv.readInvite(id);
+  } catch (error) {
+    console.error("[convites] falha a ler:", error);
+    return { status: "inexistente" };
+  }
+}
+
+/** Aceita o convite com a sessão atual. Ver lib/invites.ts para as recusas. */
+export async function acceptInvite(id: string): Promise<inv.InviteResult> {
+  const result = await inv.acceptInvite(await headers(), id);
+  if (result.ok) revalidatePath("/stand");
+  return result;
 }
 
 // ── Frescura ────────────────────────────────────────────────────

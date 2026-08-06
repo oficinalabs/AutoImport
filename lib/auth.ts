@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { ChangeEmailVerification } from "@/emails/change-email";
+import { InviteMemberEmail } from "@/emails/invite-member";
 import { ResetPasswordEmail } from "@/emails/reset-password";
 import { VerifyEmail } from "@/emails/verify-email";
 import { sendEmail } from "@/lib/email";
@@ -10,6 +11,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError, createAuthMiddleware } from "better-auth/api";
 import { nextCookies } from "better-auth/next-js";
 import { organization } from "better-auth/plugins";
+import { and, eq, gt, sql } from "drizzle-orm";
 
 /** Só ativamos o Google se as credenciais existirem (ver docs/06). */
 const googleEnabled = Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
@@ -24,6 +26,28 @@ function slugify(value: string): string {
     .replace(/(^-|-$)/g, "")
     .slice(0, 32);
   return `${base || "stand"}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
+/** Base do link do convite. Fora da Vercel cai no localhost do `pnpm dev`. */
+const appUrl = () =>
+  (process.env.BETTER_AUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000")
+    .trim()
+    .replace(/\/$/, "");
+
+/** Há convite por aceitar (e dentro da validade) para este email? */
+async function hasPendingInvite(email: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: schema.invitation.id })
+    .from(schema.invitation)
+    .where(
+      and(
+        eq(schema.invitation.email, email.toLowerCase()),
+        eq(schema.invitation.status, "pending"),
+        gt(schema.invitation.expiresAt, sql`now()`),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /**
@@ -121,8 +145,17 @@ export const auth = betterAuth({
         // Cria o stand (organização) + membership de owner no servidor,
         // logo a seguir ao utilizador. Não depende de haver sessão.
         after: async (user) => {
-          const name = (user as { standName?: string }).standName?.trim() || user.name || "Stand";
+          const standName = (user as { standName?: string }).standName?.trim();
+          const name = standName || user.name || "Stand";
           try {
+            // Quem se regista a partir de um convite não escolhe nome de stand
+            // (o formulário nem o pergunta) e vai ser MEMBRO do stand de outra
+            // pessoa. Criar-lhe aqui um stand só dele deixava-o dono de um
+            // stand fantasma — e o `activeStandId` (lib/data.ts) cai na
+            // primeira organização do utilizador, portanto aterrava no stand
+            // errado. Sem nome de stand e com convite por aceitar: não cria.
+            if (!standName && (await hasPendingInvite(user.email))) return;
+
             const [org] = await db
               .insert(schema.organization)
               .values({
@@ -216,5 +249,28 @@ export const auth = betterAuth({
       ? [process.env.BETTER_AUTH_URL].filter((o): o is string => Boolean(o))
       : ["http://localhost:*", "http://127.0.0.1:*"],
 
-  plugins: [organization(), nextCookies()],
+  plugins: [
+    organization({
+      // 7 dias: um convite de trabalho é lido quando o colega chega ao stand,
+      // não no minuto seguinte. O default (48h) apanhava um fim de semana.
+      invitationExpiresIn: 60 * 60 * 24 * 7,
+      sendInvitationEmail: async ({ id, email, organization: org, inviter }) => {
+        const url = `${appUrl()}/convite/${id}`;
+        if (!process.env.RESEND_API_KEY) {
+          console.info(`[auth] link de convite para ${email}: ${url}`);
+        }
+        await sendEmail({
+          to: email,
+          subject: `Convite para a equipa do ${org.name} no AutoImport`,
+          react: InviteMemberEmail({
+            url,
+            standName: org.name,
+            inviterName: inviter.user.name,
+          }),
+          text: `${inviter.user.name} convidou-o para a equipa do ${org.name} no AutoImport.\n\nAceite o convite aqui: ${url}\n\nO link expira dentro de 7 dias. Se não esperava este convite, ignore este email.`,
+        });
+      },
+    }),
+    nextCookies(),
+  ],
 });

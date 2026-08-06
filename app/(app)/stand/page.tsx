@@ -1,11 +1,11 @@
 import { AccountForm } from "@/components/account-form";
 import { StandForm } from "@/components/stand-form";
+import { TeamCard } from "@/components/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSessionUser, getStand, getStandRole } from "@/lib/data";
+import { getPendingInvites, getSessionUser, getStand, getStandRole } from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
 import type { SubscriptionStatus } from "@/lib/types";
-import { Mail } from "lucide-react";
 
 /**
  * Etiqueta e frase da data, por estado. A frase acompanha a etiqueta porque a
@@ -38,10 +38,11 @@ const SUB_LABEL: Record<SubscriptionStatus, { label: string; className: string; 
 };
 
 export default async function StandPage() {
-  const [stand, role, utilizador] = await Promise.all([
+  const [stand, role, utilizador, invites] = await Promise.all([
     getStand(),
     getStandRole(),
     getSessionUser(),
+    getPendingInvites(),
   ]);
 
   // Só acontece com sessão inválida (a rota é protegida) — estado honesto.
@@ -83,38 +84,7 @@ export default async function StandPage() {
           </Card>
 
           {/* Equipa */}
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>Equipa</CardTitle>
-              {isOwner && (
-                <Button variant="outline" size="sm" disabled title="Ainda não disponível">
-                  Convidar
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {stand.members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-[8px] border border-line p-3"
-                >
-                  <span className="flex size-9 items-center justify-center rounded-full bg-steel/20 text-sm font-semibold text-steel">
-                    {initials(m.name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{m.name}</div>
-                    <div className="flex items-center gap-1 text-xs text-ink-soft">
-                      <Mail className="size-3" />
-                      {m.email}
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-soft">
-                    {m.role === "owner" ? "Dono" : "Colaborador"}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <TeamCard members={stand.members} invites={invites} isOwner={isOwner} />
         </div>
 
         {/* Subscrição */}
@@ -154,13 +124,4 @@ export default async function StandPage() {
       </div>
     </div>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
