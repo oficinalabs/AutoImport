@@ -4,6 +4,7 @@ import { FreshnessBadge } from "@/components/freshness-badge";
 import { NavLink } from "@/components/nav-link";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Dropdown } from "@/components/ui/dropdown";
 import { signOut } from "@/lib/auth-client";
 import { COUNTRY_LIST } from "@/lib/countries";
 import type { Notification } from "@/lib/types";
@@ -103,25 +104,30 @@ export function TopBar({
 
 function CountryMenu() {
   return (
-    <details className="group relative hidden sm:block">
-      <summary className="flex h-9 cursor-pointer list-none items-center gap-1 rounded-full border border-line px-2.5 text-sm text-ink-soft hover:text-ink [&::-webkit-details-marker]:hidden">
-        <span aria-hidden>🌍</span>
-        <span className="hidden lg:inline">Países</span>
-        <ChevronDown className="size-3.5" />
-      </summary>
-      <div className="absolute right-0 mt-1 w-44 rounded-[8px] border border-line bg-surface p-1 shadow-lg">
-        {COUNTRY_LIST.map((c) => (
-          <Link
-            key={c.code}
-            href={`/pesquisar?pais=${c.code}`}
-            className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm hover:bg-surface-2"
-          >
-            <span aria-hidden>{c.flag}</span>
-            {c.name}
-          </Link>
-        ))}
-      </div>
-    </details>
+    <Dropdown
+      className="hidden sm:block"
+      triggerLabel="Filtrar por país"
+      triggerClassName="flex h-9 items-center gap-1 rounded-full border border-line px-2.5 text-sm text-ink-soft hover:text-ink"
+      panelClassName="w-44"
+      trigger={
+        <>
+          <span aria-hidden>🌍</span>
+          <span className="hidden lg:inline">Países</span>
+          <ChevronDown className="size-3.5" />
+        </>
+      }
+    >
+      {COUNTRY_LIST.map((c) => (
+        <Link
+          key={c.code}
+          href={`/pesquisar?pais=${c.code}`}
+          className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm hover:bg-surface-2"
+        >
+          <span aria-hidden>{c.flag}</span>
+          {c.name}
+        </Link>
+      ))}
+    </Dropdown>
   );
 }
 
@@ -155,50 +161,52 @@ function AvatarMenu({
   }
 
   return (
-    <details className="group relative">
-      <summary
-        aria-label={`Conta de ${userName}`}
-        className="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden"
-      >
-        <span className="flex size-8 items-center justify-center rounded-full bg-steel/20 text-sm font-semibold text-steel">
-          {initials(userName)}
-        </span>
-        <ChevronDown className="size-3.5 text-ink-soft" />
-      </summary>
-      <div className="absolute right-0 mt-1 w-56 rounded-[8px] border border-line bg-surface p-1 shadow-lg">
-        <div className="px-2.5 py-2">
-          <div className="truncate text-sm font-semibold" title={standName}>
-            {standName}
-          </div>
-          <div className="text-xs text-ink-soft">{subscriptionLabel}</div>
+    <Dropdown
+      triggerLabel={`Conta de ${userName}`}
+      triggerClassName="flex items-center gap-1"
+      panelClassName="w-56"
+      trigger={
+        <>
+          <span className="flex size-8 items-center justify-center rounded-full bg-steel/20 text-sm font-semibold text-steel">
+            {initials(userName)}
+          </span>
+          <ChevronDown className="size-3.5 text-ink-soft" />
+        </>
+      }
+    >
+      <div className="px-2.5 py-2">
+        <div className="truncate text-sm font-semibold" title={standName}>
+          {standName}
         </div>
-        <div className="my-1 h-px bg-line" />
-        {/* Em ecrãs estreitos o tema não cabe na barra — vive aqui. */}
-        <div className="flex items-center justify-between px-2.5 py-1.5 sm:hidden">
-          <span className="text-sm text-ink-soft">Tema</span>
-          <ThemeToggle />
-        </div>
-        <div className="my-1 h-px bg-line sm:hidden" />
-        {AVATAR_MENU.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm hover:bg-surface-2"
-          >
-            <Icon className="size-4 text-ink-soft" />
-            {label}
-          </Link>
-        ))}
-        <div className="my-1 h-px bg-line" />
-        <button
-          type="button"
-          onClick={handleSignOut}
-          className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
-        >
-          <LogOut className="size-4" />
-          Terminar sessão
-        </button>
+        <div className="text-xs text-ink-soft">{subscriptionLabel}</div>
       </div>
-    </details>
+      <div className="my-1 h-px bg-line" />
+      {/* Em ecrãs estreitos o tema não cabe na barra — vive aqui. */}
+      <div className="flex items-center justify-between px-2.5 py-1.5 sm:hidden">
+        <span className="text-sm text-ink-soft">Tema</span>
+        <ThemeToggle />
+      </div>
+      <div className="my-1 h-px bg-line sm:hidden" />
+      {AVATAR_MENU.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-sm hover:bg-surface-2"
+        >
+          <Icon className="size-4 text-ink-soft" />
+          {label}
+        </Link>
+      ))}
+      <div className="my-1 h-px bg-line" />
+      <button
+        type="button"
+        onClick={handleSignOut}
+        data-fecha
+        className="flex w-full items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-left text-sm text-ink-soft hover:bg-surface-2 hover:text-ink"
+      >
+        <LogOut className="size-4" />
+        Terminar sessão
+      </button>
+    </Dropdown>
   );
 }
