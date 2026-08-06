@@ -38,7 +38,7 @@ import {
 } from "../db/schema";
 import { type AlertCriteria, alertModelKeys, familyLabel } from "./alert-criteria";
 import { co2Norm } from "./cost-engine";
-import type { SearchFilters, SearchPage } from "./data";
+import type { SearchFilters, SearchResults } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
 import { CONDICOES } from "./legal";
@@ -318,37 +318,35 @@ const MONTRA_REPRESENTANTES = sql`(
 const E_REPRESENTANTE = sql`${listings.id} in ${MONTRA_REPRESENTANTES}`;
 
 /**
- * Texto livre → SQL. Cada token tem de aparecer em ALGUM campo (AND entre tokens,
- * OR entre campos).
- *
- * Duas correções face ao `ilike '%<query inteira>%'` de antes:
- *
- *  1. **Tokens.** "bmw 220d" procurava a string inteira numa só coluna e não
- *     casava com nada — a marca está em `make_raw` e o "220d" na `variant`.
- *  2. **O catálogo entra.** O servidor procurava só no texto CRU do anúncio, mas
- *     o título que o cartão mostra é construído do ultimatespecs (ver
- *     `rowToListing`). Procurar "Gran Coupe", que aparece em dezenas de cartões,
- *     dava zero. O `baseSelect` já faz left join a `us_models`/`us_versions` —
- *     é só incluí-los.
- *
- * Teto de 6 tokens: além disso é ruído, e cada token são 6 `ilike`.
+ * Os campos por onde a pesquisa de texto passa, concatenados uma vez. Vem da
+ * implementação da main (PR #40) e é melhor do que os 6 `ilike` por token que eu
+ * tinha: um só `concat_ws` por linha em vez de seis comparações.
  */
-function textoSql(query: string): SQL | undefined {
-  const tokens = query.trim().split(/\s+/).filter(Boolean).slice(0, 6);
-  if (!tokens.length) return undefined;
-  return and(
-    ...tokens.map((token) => {
-      const q = `%${token}%`;
-      return or(
-        ilike(listings.makeRaw, q),
-        ilike(listings.modelRaw, q),
-        ilike(listings.variant, q),
-        ilike(usModels.make, q),
-        ilike(usModels.model, q),
-        ilike(usVersions.name, q),
-      );
-    }),
-  );
+const TEXTO_PESQUISAVEL = sql`concat_ws(' ',
+  ${usModels.make}, ${usModels.model}, ${usVersions.name},
+  ${listings.makeRaw}, ${listings.modelRaw}, ${listings.variant})`;
+
+/**
+ * O texto livre em condições — uma por PALAVRA, todas obrigatórias.
+ *
+ * Substring não chegava: o título mostrado não é substring de nada gravado. A
+ * marca vem do `us_models` e o nome do `us_versions` (colunas diferentes), e o
+ * `cleanVersionName` ainda corta o código de chassis à cabeça ("G16 8 Series…"
+ * → "8 Series…"). Por palavras, copiar o título do cartão encontra o carro, e
+ * escrever só "golf" continua a fazer o óbvio.
+ *
+ * Teto de 6 palavras: além disso é ruído, e cada uma é mais uma condição.
+ */
+function condsDoTexto(query: string): SQL[] {
+  return query
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 6)
+    .map((termo) => {
+      // `%` e `_` escritos pelo utilizador são literais, não jokers do LIKE.
+      const padrao = `%${termo.replace(/[\\%_]/g, "\\$&")}%`;
+      return sql`${TEXTO_PESQUISAVEL} ilike ${padrao}`;
+    });
 }
 
 /**
@@ -392,18 +390,20 @@ function ordemSql(sort: SearchFilters["sort"]): SQL[] {
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
-): Promise<SearchPage> {
+): Promise<SearchResults> {
   const conds = [isNull(listings.deletedAt), COM_CATALOGO, E_REPRESENTANTE];
-  if (filters.query) {
-    const texto = textoSql(filters.query);
-    if (texto) conds.push(texto);
-  }
+  if (filters.query) conds.push(...condsDoTexto(filters.query));
   if (filters.countries?.length) conds.push(inArray(listings.country, filters.countries));
   if (filters.onlyOpportunities) conds.push(eq(importCostEstimates.verdict, "compensa"));
   if (filters.maxPrice) conds.push(lte(importCostEstimates.totalPt, filters.maxPrice));
   if (filters.minYear) conds.push(gte(listings.year, filters.minYear));
   if (filters.maxKm) conds.push(lte(listings.km, filters.maxKm));
-  if (filters.fuel) conds.push(eq(listings.fuel, filters.fuel));
+  // O combustível do cartão é o do anúncio com o do modelo canónico em fallback
+  // (ver `rowToListing`) — filtrar só por listings.fuel escondia os que só o
+  // vehicle_models sabe. Vem da implementação da main (PR #40).
+  if (filters.fuel) {
+    conds.push(sql`coalesce(${listings.fuel}, ${vehicleModels.fuel}) = ${filters.fuel}`);
+  }
   if (filters.gearbox) conds.push(caixaSql(filters.gearbox));
 
   const page = Math.min(Math.max(filters.page ?? 1, 1), MAX_PAGE);
@@ -423,7 +423,7 @@ export async function searchListingsQuery(
     (page > 1 ? (await searchListingsQuery({ ...filters, page: 1 }, standId)).total : 0);
 
   return {
-    items: rows.map((r) => toListing(r)),
+    listings: rows.map((r) => toListing(r)),
     total,
     page,
     pageSize: PAGE_SIZE,

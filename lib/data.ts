@@ -62,44 +62,48 @@ const activeStandId = cache(async (): Promise<string | null> => {
 });
 
 // ── Pesquisa / anúncios ─────────────────────────────────────────
-
 /**
- * Ordenação da pesquisa. `percentagem` é o default e é uma decisão de produto:
- * ordenar por poupança ABSOLUTA enchia o topo de Lamborghinis (preço médio dos
- * primeiros 60: 147 169 €) quando 87% das oportunidades reais estão abaixo dos
- * 40 000 € e o público-alvo são stands de usados. `savings` continua a existir
- * porque os KPIs do painel são em euros e têm de aterrar na mesma ordem.
+ * Os filtros da pesquisa — TODOS eles. Até aqui cinco (minYear, maxKm, fuel,
+ * gearbox e a semântica do texto livre) só existiam no cliente e corriam sobre a
+ * janela de 60 que o servidor mandava: filtrar por diesel procurava diesel
+ * dentro dos 60 melhores negócios em euros, não na montra.
  */
-export type SearchSort = "percentagem" | "savings" | "recent" | "price";
-
 export interface SearchFilters {
+  /** Texto livre — marca, modelo, versão; procura no anúncio cru E no catálogo. */
   query?: string;
   countries?: CountryCode[];
   onlyOpportunities?: boolean;
-  maxPrice?: number;
+  /** Ano de matrícula mínimo (inclusive). */
   minYear?: number;
+  /** Quilómetros máximos (inclusive). */
   maxKm?: number;
+  /** Teto do custo FINAL em Portugal (`cost.totalPt`), não do preço na origem. */
+  maxPrice?: number;
   fuel?: FuelType;
   gearbox?: Transmission;
-  sort?: SearchSort;
-  /** 1-based. Acima do teto (lib/queries.ts MAX_PAGE) fica preso ao teto. */
+  sort?: "savings" | "savingsPct" | "recent" | "price";
+  /** 1-based. Acima do teto (`MAX_PAGE` em lib/queries.ts) fica preso ao teto. */
   page?: number;
 }
 
 /**
- * Uma página de resultados. Devolver `Listing[]` era o contrato antigo, mas sem
- * `total` a UI não tem como dizer a verdade: mostrava o tamanho do array como se
- * fosse o número de anúncios que existem ("60 anúncios" quando havia 6 402).
+ * O que a pesquisa devolve. `total` NÃO é `listings.length`: a montra tem
+ * dezenas de milhares e o servidor manda uma página. Sem ele a UI dizia "60
+ * anúncios" — verdade sobre o que recebeu, mentira sobre o que existe.
+ *
+ * `page`/`pageSize`/`hasMore` são o passo seguinte ao `total`: saber que existem
+ * 32 920 e só conseguir ver os primeiros 60 é melhor do que a mentira, mas
+ * continua a ser um teto. Ver `searchListingsQuery`.
  */
-export interface SearchPage {
-  items: Listing[];
+export interface SearchResults {
+  listings: Listing[];
   total: number;
   page: number;
   pageSize: number;
   hasMore: boolean;
 }
 
-export async function searchListings(filters: SearchFilters = {}): Promise<SearchPage> {
+export async function searchListings(filters: SearchFilters = {}): Promise<SearchResults> {
   return q.searchListingsQuery(filters, await activeStandId());
 }
 

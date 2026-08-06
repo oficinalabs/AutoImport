@@ -1,101 +1,114 @@
 "use client";
 
+import { searchFiltersToQuery } from "@/app/(app)/(gated)/pesquisar/filters";
 import { CarCard } from "@/components/car-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_LIST } from "@/lib/countries";
-import type { SearchFilters, SearchPage } from "@/lib/data";
-import type { CountryCode } from "@/lib/types";
+import type { SearchFilters, SearchResults } from "@/lib/data";
+import { formatNumber } from "@/lib/format";
+import type { CountryCode, FuelType, Listing, Transmission } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
+
+type Sort = NonNullable<SearchFilters["sort"]>;
 
 /**
- * A vista da pesquisa. **Não filtra nada** — só desenha o que o servidor mandou e
- * escreve os filtros no URL, que é a fonte de verdade.
- *
- * Antes filtrava em memória as 60 linhas que o servidor devolvia sempre iguais,
- * o que dava zero resultados para tudo o que não estivesse no top-60 por poupança.
- * Agora cada mexida num filtro é uma navegação: o servidor volta a consultar a
- * base, o URL fica partilhável e o botão "voltar atrás" funciona de graça.
+ * Quanto tempo o campo de texto espera pela tecla seguinte antes de escrever no
+ * URL. 400 ms é a pausa entre palavras de quem escreve depressa: quem escreve
+ * "golf gti" de seguida faz uma navegação, não nove.
  */
+const DEBOUNCE_TEXTO_MS = 400;
 
-/** Os filtros como aparecem no URL. A ordem é estável para o URL não dançar. */
-function toQuery(f: SearchFilters): string {
-  const p = new URLSearchParams();
-  if (f.query) p.set("q", f.query);
-  if (f.countries?.length) p.set("pais", f.countries.join(","));
-  if (f.onlyOpportunities) p.set("oportunidades", "1");
-  if (f.minYear) p.set("ano", String(f.minYear));
-  if (f.maxKm) p.set("km", String(f.maxKm));
-  if (f.maxPrice) p.set("preco", String(f.maxPrice));
-  if (f.fuel) p.set("combustivel", f.fuel);
-  if (f.gearbox) p.set("caixa", f.gearbox);
-  // `percentagem` é o default do servidor — não suja o URL.
-  if (f.sort && f.sort !== "percentagem") p.set("ordenar", f.sort);
-  if (f.page && f.page > 1) p.set("pagina", String(f.page));
-  return p.toString();
-}
-
-const AVANCADOS = ["minYear", "maxKm", "maxPrice", "fuel", "gearbox"] as const;
-
-export function SearchView({ results, filters }: { results: SearchPage; filters: SearchFilters }) {
+export function SearchView({
+  results,
+  filters,
+}: {
+  /** A página que o servidor mandou, já filtrada e ordenada, com o total real. */
+  results: SearchResults;
+  /** O que o URL diz. É a fonte de verdade; os controlos são o espelho dele. */
+  filters: SearchFilters;
+}) {
+  const { listings, total, page, pageSize, hasMore } = results;
   const router = useRouter();
-  const pathname = usePathname();
-
-  // Estado local SÓ para o que não pode esperar por uma ida ao servidor: o texto
-  // enquanto é escrito, e a seleção para comparar (que é UI, não filtro).
-  const [query, setQuery] = useState(filters.query ?? "");
+  const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
-  const [showMore, setShowMore] = useState(AVANCADOS.some((k) => filters[k] !== undefined));
 
-  /** O último `q` que nós próprios empurrámos. Sem isto, a resposta do servidor a
-   *  uma tecla antiga podia sobrepor-se ao que a pessoa já escreveu a seguir. */
-  const empurrado = useRef(filters.query ?? "");
+  // Espelho local do URL: os controlos respondem à primeira, sem esperar pela
+  // ida ao servidor (a página é force-dynamic — cada filtro é uma query nova).
+  // Quem manda continua a ser o URL: quando uma navegação assenta — incluindo o
+  // voltar do browser ou um link do painel — o espelho é reposto.
+  const [f, setF] = useState(filters);
+  const [texto, setTexto] = useState(filters.query ?? "");
+  const urlAtual = searchFiltersToQuery(filters);
+  const [urlEspelhado, setUrlEspelhado] = useState(urlAtual);
+  if (urlEspelhado !== urlAtual) {
+    setUrlEspelhado(urlAtual);
+    setF(filters);
+    // O texto cru só se repõe se o URL discordar do que já lá está: o servidor
+    // devolve-o aparado, e repor às cegas comia o espaço a meio de "golf gti".
+    if ((filters.query ?? "") !== texto.trim()) setTexto(filters.query ?? "");
+  }
 
-  useEffect(() => {
-    if (filters.query !== empurrado.current) {
-      // Veio de fora (voltar atrás, link) — acompanhar.
-      empurrado.current = filters.query ?? "";
-      setQuery(filters.query ?? "");
-    }
-  }, [filters.query]);
+  const timerTexto = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(timerTexto.current), []);
 
-  /** Os filtros mais recentes, para o `navegar` os ler sem se recriar a cada
-   *  navegação. Não é micro-otimização: sem isto, o timer do texto guardava os
-   *  filtros de quando a tecla foi carregada e desfazia um país escolhido
-   *  entretanto. */
-  const atuais = useRef(filters);
-  atuais.current = filters;
+  /**
+   * Escreve os filtros no URL. `replace` para o texto — não vale a pena encher o
+   * histórico com meia palavra; `push` para os cliques, e assim o voltar desfaz
+   * um filtro em vez de sair da pesquisa. `scroll: false` porque mudar um filtro
+   * não é mudar de página: a grelha fica onde está.
+   */
+  function navegar(next: SearchFilters, replace = false) {
+    const qs = searchFiltersToQuery(next);
+    const url = qs ? `/pesquisar?${qs}` : "/pesquisar";
+    startTransition(() => {
+      if (replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    });
+  }
 
-  /** Muda filtros e navega. Qualquer mexida volta à página 1: continuar na 7
-   *  depois de estreitar a pesquisa mostrava um vazio que parecia avaria. */
-  const navegar = useCallback(
-    (patch: Partial<SearchFilters>) => {
-      const qs = toQuery({ ...atuais.current, ...patch, page: patch.page ?? 1 });
-      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    },
-    [router, pathname],
-  );
+  /** O URL de outra página, com os filtros que lá estão. */
+  function hrefDaPagina(n: number) {
+    const qs = searchFiltersToQuery({ ...f, page: n });
+    return qs ? `/pesquisar?${qs}` : "/pesquisar";
+  }
 
-  // O texto espera 350 ms para não fazer uma ida ao servidor por tecla.
-  useEffect(() => {
-    if (query === (atuais.current.query ?? "")) return;
-    const t = setTimeout(() => {
-      empurrado.current = query;
-      navegar({ query: query || undefined });
-    }, 350);
-    return () => clearTimeout(t);
-  }, [query, navegar]);
+  /** Um controlo mexeu: espelho já, URL a seguir. */
+  function aplicar(patch: Partial<SearchFilters>) {
+    clearTimeout(timerTexto.current);
+    // Volta à página 1: continuar na 7 depois de estreitar a pesquisa mostrava
+    // um vazio que parecia avaria.
+    const next = { ...f, ...patch, page: undefined };
+    setF(next);
+    navegar(next);
+  }
+
+  /**
+   * O texto é a exceção: agora quem filtra é o servidor, e escrever no URL é
+   * navegar. Sem espera, "golf" eram quatro navegações e quatro varreduras da
+   * montra. O campo responde à tecla; o URL só 400 ms depois da última.
+   */
+  function escreverTexto(value: string) {
+    setTexto(value);
+    const next = { ...f, query: value.trim() || undefined, page: undefined };
+    setF(next);
+    clearTimeout(timerTexto.current);
+    timerTexto.current = setTimeout(() => navegar(next, true), DEBOUNCE_TEXTO_MS);
+  }
+
+  // Filtros avançados ("Mais filtros") — abertos à partida se o link já os trouxer,
+  // senão um `?km=60000` partilhado filtrava com os controlos escondidos.
+  const avancados = [f.minYear, f.maxKm, f.maxPrice, f.fuel, f.gearbox].filter(Boolean).length;
+  const [showMore, setShowMore] = useState(avancados > 0);
 
   function toggleCountry(code: CountryCode) {
-    const escolhidos = filters.countries ?? [];
-    const next = escolhidos.includes(code)
-      ? escolhidos.filter((c) => c !== code)
-      : [...escolhidos, code];
-    navegar({ countries: next.length ? next : undefined });
+    const atuais = f.countries ?? [];
+    const next = atuais.includes(code) ? atuais.filter((c) => c !== code) : [...atuais, code];
+    aplicar({ countries: next.length ? next : undefined });
   }
 
   function toggleSelect(id: string) {
@@ -104,30 +117,27 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
     );
   }
 
-  const avancados = AVANCADOS.filter((k) => filters[k] !== undefined).length;
-  const { items, total, page, pageSize, hasMore } = results;
-  const primeiro = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const ultimo = (page - 1) * pageSize + items.length;
-
-  const paginaHref = (n: number) => {
-    const qs = toQuery({ ...filters, page: n });
-    return qs ? `${pathname}?${qs}` : pathname;
-  };
+  const countries = f.countries ?? [];
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Pesquisar</h1>
+          {/* O que se vê é uma janela sobre a montra — dizer só "60 anúncios" era
+              verdade sobre o que chegou e mentira sobre o que existe. */}
           <p className="mt-1 text-sm text-ink-soft" data-testid="total">
-            <span className="tnum">{total.toLocaleString("pt-PT")}</span>{" "}
-            {total === 1 ? "anúncio" : "anúncios"}
-            {total > pageSize && (
+            {listings.length < total ? (
               <>
-                {" · "}
                 <span className="tnum">
-                  {primeiro}–{ultimo}
-                </span>
+                  {formatNumber((page - 1) * pageSize + 1)}–
+                  {formatNumber((page - 1) * pageSize + listings.length)}
+                </span>{" "}
+                de <span className="tnum">{formatNumber(total)}</span> anúncios
+              </>
+            ) : (
+              <>
+                <span className="tnum">{formatNumber(total)}</span> anúncios
               </>
             )}{" "}
             · custo final já com ISV
@@ -139,24 +149,24 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={texto}
+            onChange={(e) => escreverTexto(e.target.value)}
             placeholder="Marca ou modelo (ex.: Golf, BMW…)"
-            className="max-w-xs"
             data-testid="pesquisa"
+            className="max-w-xs"
           />
           <label
             className={cn(
               "flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border px-3 text-sm font-medium transition-colors",
-              filters.onlyOpportunities
+              f.onlyOpportunities
                 ? "border-good bg-good-soft text-good"
                 : "border-line-strong text-ink-soft hover:text-ink",
             )}
           >
             <input
               type="checkbox"
-              checked={filters.onlyOpportunities ?? false}
-              onChange={(e) => navegar({ onlyOpportunities: e.target.checked || undefined })}
+              checked={Boolean(f.onlyOpportunities)}
+              onChange={(e) => aplicar({ onlyOpportunities: e.target.checked })}
               className="sr-only"
             />
             Só oportunidades
@@ -181,13 +191,13 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
           </button>
           <div className="ml-auto">
             <select
-              value={filters.sort ?? "percentagem"}
-              onChange={(e) => navegar({ sort: e.target.value as SearchFilters["sort"] })}
+              value={f.sort ?? "savings"}
+              onChange={(e) => aplicar({ sort: e.target.value as Sort })}
               className="h-10 rounded-[6px] border border-line-strong bg-surface px-3 text-sm"
               aria-label="Ordenar"
             >
-              <option value="percentagem">Melhor negócio (%)</option>
-              <option value="savings">Maior poupança (€)</option>
+              <option value="savings">Maior poupança</option>
+              <option value="savingsPct">Maior poupança (%)</option>
               <option value="recent">Mais recentes</option>
               <option value="price">Preço mais baixo</option>
             </select>
@@ -199,8 +209,8 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
           <div className="grid gap-3 rounded-[8px] border border-line bg-surface p-3 sm:grid-cols-3 lg:grid-cols-6">
             <Sel
               label="Ano mínimo"
-              value={filters.minYear ? String(filters.minYear) : ""}
-              onChange={(v) => navegar({ minYear: v ? Number(v) : undefined })}
+              value={f.minYear ? String(f.minYear) : ""}
+              onChange={(v) => aplicar({ minYear: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["2020", "2020+"],
@@ -212,8 +222,8 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
             />
             <Sel
               label="Km máximos"
-              value={filters.maxKm ? String(filters.maxKm) : ""}
-              onChange={(v) => navegar({ maxKm: v ? Number(v) : undefined })}
+              value={f.maxKm ? String(f.maxKm) : ""}
+              onChange={(v) => aplicar({ maxKm: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["30000", "até 30 000"],
@@ -224,8 +234,8 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
             />
             <Sel
               label="Preço final máx."
-              value={filters.maxPrice ? String(filters.maxPrice) : ""}
-              onChange={(v) => navegar({ maxPrice: v ? Number(v) : undefined })}
+              value={f.maxPrice ? String(f.maxPrice) : ""}
+              onChange={(v) => aplicar({ maxPrice: v ? Number(v) : undefined })}
               options={[
                 ["", "Qualquer"],
                 ["20000", "até 20 000 €"],
@@ -234,10 +244,10 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
                 ["50000", "até 50 000 €"],
               ]}
             />
-            <Sel
+            <Sel<FuelType>
               label="Combustível"
-              value={filters.fuel ?? ""}
-              onChange={(v) => navegar({ fuel: (v || undefined) as SearchFilters["fuel"] })}
+              value={f.fuel ?? ""}
+              onChange={(v) => aplicar({ fuel: v || undefined })}
               options={[
                 ["", "Todos"],
                 ["gasolina", "Gasolina"],
@@ -247,10 +257,10 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
                 ["elétrico", "Elétrico"],
               ]}
             />
-            <Sel
+            <Sel<Transmission>
               label="Caixa"
-              value={filters.gearbox ?? ""}
-              onChange={(v) => navegar({ gearbox: (v || undefined) as SearchFilters["gearbox"] })}
+              value={f.gearbox ?? ""}
+              onChange={(v) => aplicar({ gearbox: v || undefined })}
               options={[
                 ["", "Todas"],
                 ["manual", "Manual"],
@@ -261,7 +271,7 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
               <button
                 type="button"
                 onClick={() =>
-                  navegar({
+                  aplicar({
                     minYear: undefined,
                     maxKm: undefined,
                     maxPrice: undefined,
@@ -281,7 +291,7 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
         {/* Chips de país */}
         <div className="flex flex-wrap gap-2">
           {COUNTRY_LIST.map((c) => {
-            const active = filters.countries?.includes(c.code) ?? false;
+            const active = countries.includes(c.code);
             return (
               <button
                 key={c.code}
@@ -300,31 +310,36 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
               </button>
             );
           })}
-          {filters.countries?.length ? (
+          {countries.length > 0 && (
             <button
               type="button"
-              onClick={() => navegar({ countries: undefined })}
+              onClick={() => aplicar({ countries: undefined })}
               className="flex items-center gap-1 rounded-full px-2 py-1.5 text-sm text-ink-soft hover:text-ink"
             >
               <X className="size-3.5" /> limpar
             </button>
-          ) : null}
+          )}
         </div>
       </div>
 
       {/* Resultados */}
-      {items.length === 0 ? (
+      {listings.length === 0 ? (
         <div className="rounded-[10px] border border-dashed border-line-strong py-16 text-center text-sm text-ink-soft">
           Nenhum anúncio com estes filtros.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map((l) => (
+        <div
+          className={cn(
+            "grid gap-4 transition-opacity sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+            // Enquanto o servidor refaz a pesquisa, a grelha ainda mostra a
+            // anterior — sem isto parecia que o filtro não fez nada.
+            pending && "opacity-50",
+          )}
+        >
+          {listings.map((l) => (
             <div key={l.id} className="relative" data-testid="resultado">
-              {/* Debaixo do badge de veredito do cartão (`left-2 top-2`, altura 20px),
-                  que ocupava este mesmo canto e ficava tapado — "Compensa" é a
-                  informação central do cartão e não pode desaparecer atrás de um
-                  controlo. z-20 para ficar acima da imagem em qualquer caso. */}
+              {/* top-9, não top-2: o badge de veredito do cartão ocupa o mesmo
+                  canto, e a etiqueta tapava-o em todas as larguras. */}
               <label className="absolute left-2 top-9 z-20 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
                 <input
                   type="checkbox"
@@ -340,21 +355,19 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
         </div>
       )}
 
-      {/* Paginação */}
+      {/* Paginação. `Link` (e não `router.replace`) de propósito: mudar de página
+          É navegar, e o voltar do browser tem de voltar à página anterior — ao
+          contrário de mexer num filtro, que só substitui o URL. */}
       {(page > 1 || hasMore) && (
         <div className="flex items-center justify-center gap-3">
           <Button asChild variant="outline" size="sm" disabled={page <= 1}>
-            <Link href={paginaHref(page - 1)} scroll>
-              Anterior
-            </Link>
+            <Link href={hrefDaPagina(page - 1)}>Anterior</Link>
           </Button>
           <span className="tnum text-sm text-ink-soft">
             Página {page} de {Math.max(1, Math.ceil(total / pageSize))}
           </span>
           <Button asChild variant="outline" size="sm" disabled={!hasMore}>
-            <Link href={paginaHref(page + 1)} scroll>
-              Seguinte
-            </Link>
+            <Link href={hrefDaPagina(page + 1)}>Seguinte</Link>
           </Button>
         </div>
       )}
@@ -387,23 +400,23 @@ export function SearchView({ results, filters }: { results: SearchPage; filters:
   );
 }
 
-function Sel({
+function Sel<T extends string>({
   label,
   value,
   onChange,
   options,
 }: {
   label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: [string, string][];
+  value: T | "";
+  onChange: (value: T | "") => void;
+  options: [T | "", string][];
 }) {
   return (
     <label className="flex flex-col gap-1 text-xs text-ink-soft">
       {label}
       <select
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value as T | "")}
         className="h-10 rounded-[6px] border border-line-strong bg-surface px-2.5 text-sm text-ink"
       >
         {options.map(([v, l]) => (

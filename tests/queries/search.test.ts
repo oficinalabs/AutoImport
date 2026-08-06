@@ -1,30 +1,26 @@
 /**
- * Testes da PESQUISA (lib/queries.ts → searchListingsQuery) contra uma base
- * descartável. É a primeira vez que a camada de queries da app é testada, e é
- * onde o bloqueador do MVP vivia: os filtros corriam em memória sobre 60 linhas
- * fixas, portanto procurar "Golf" dava zero com 900 Golfs na montra.
+ * A pesquisa do lado do SERVIDOR (`searchListingsQuery`), contra uma Postgres
+ * LOCAL descartável — mesmo padrão do publish.test.ts / pt-market.test.ts: base
+ * criada do zero, migrada com o drizzle-kit, apagada no fim.
  *
- * A fixture é toda sintética ("Testsearch") e minúscula — o que interessa aqui
- * não são vereditos, é o SQL: cada filtro reduz e nunca deixa passar algo que o
- * viole, o dedupe deixa um representante por carro, e a paginação não salta nem
- * repete.
+ * Porquê base a sério: o que aqui pode partir é SQL — o `count(*) over ()` que
+ * dá o total antes do LIMIT, o `concat_ws` do texto livre, o `~*` da caixa e a
+ * coerência com o `MONTRA_REPRESENTANTE` (o NOT EXISTS que desduplica carros).
+ * Nada disto se prova com um duplo do `db`.
  *
- * ⚠️ `process.env.WAREHOUSE_URL` tem de ser definido ANTES de qualquer
- * `await import("../../lib/queries")`: o db/index.ts congela a connection string
- * no import. Por isso os módulos são importados dentro dos testes.
+ * A fixture é sintética ("Pesqmarke"/"Enchimarke") e tem 60 anúncios de
+ * enchimento de propósito: sem passar do `PAGE_SIZE`, "o total é o total"
+ * e "o total é o tamanho da página" seriam a mesma asserção.
+ *
+ * Sem Postgres local (ou sem permissão para criar bases) o teste salta.
  */
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
+import { execFileSync } from "node:child_process";
+import { after, test } from "node:test";
 import postgres from "postgres";
-import { dbUrl } from "../../lib/db-url";
+import type { SearchFilters } from "../../lib/data";
+import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
 import { normGearbox } from "../../lib/engine/us-catalog";
-import {
-  dropDatabases,
-  migrate,
-  recreateDatabases,
-  skipUnlessLocalDb,
-  withDbName,
-} from "../helpers/db";
 
 try {
   process.loadEnvFile(".env.local");
@@ -32,301 +28,399 @@ try {
   /* CI: variáveis do ambiente */
 }
 
-const DB_URL = dbUrl();
-const skip = skipUnlessLocalDb("o teste da pesquisa");
-const TEST_DB = "autoimport_search_test";
+const LOCAL = dbUrl();
+const skip = !LOCAL
+  ? "sem base de dados — teste da pesquisa saltado"
+  : !isLocalDbUrl(LOCAL)
+    ? "base de dados não é local — este teste cria uma base de teste; só local"
+    : false;
 
-const SOURCE = "33333333-3333-3333-3333-333333333301";
-const VM_GOLF = "33333333-3333-3333-3333-333333333311";
-const VM_ASTRA = "33333333-3333-3333-3333-333333333312";
+const TEST_DB = "autoimport_search_test";
+const withDbName = (name: string) => {
+  const url = new URL(LOCAL);
+  url.pathname = `/${name}`;
+  return url.toString();
+};
+
+type Sql = ReturnType<typeof postgres>;
+
+/** Página do servidor (lib/queries.ts) — o que faz valer os 60 de enchimento. */
+const PAGE_SIZE = 24;
+const ENCHIMENTO = 60;
+
+const VM = {
+  gasolina: "44444444-4444-4444-4444-444444444401",
+  diesel: "44444444-4444-4444-4444-444444444402",
+  hibrido: "44444444-4444-4444-4444-444444444403",
+  eletrico: "44444444-4444-4444-4444-444444444404",
+  enchimento: "44444444-4444-4444-4444-444444444405",
+};
+
+/** Cross-listing: o `s-clone` é o MESMO carro físico do `s-catalogo`. */
+const VIN = "WP1AB2CD3EF456789";
+
+/** O título que o cartão mostra para o `s-catalogo` — marca do us_models +
+ *  nome da versão sem o código de chassis (`cleanVersionName`: "Q16 " sai). */
+const TITULO_DO_CATALOGO = "Pesqmarke Pquatro Gran Coupe 840d";
+
+/** Anúncio da fixture: só o que varia; o resto é o mesmo carro. */
+function carro(externalId: string, over: Record<string, unknown> = {}) {
+  const base = {
+    source_site: "autoscout24.de",
+    external_id: externalId,
+    model_id: VM.gasolina,
+    make_raw: "Pesqmarke",
+    model_raw: "P4",
+    variant: "840d xDrive",
+    year: 2023,
+    km: 20_000,
+    fuel: "gasolina",
+    gearbox: "Manual",
+    country: "DE",
+    price: 15_000,
+    vin: null,
+    detail_url: `https://ex.test/${externalId}`,
+    us_version_id: "PQ-V1",
+    match_confidence: "exato",
+    ...over,
+  };
+  // A coluna normalizada é escrita pelo `match-models` com este mesmo
+  // `normGearbox` — a fixture usa-o para não codificar uma segunda verdade
+  // sobre a caixa (ver a migration 0008).
+  return { ...base, gearbox_norm: normGearbox(base.gearbox as string | null) };
+}
+
+function estimativa(listingId: string, over: Record<string, unknown> = {}) {
+  return {
+    listing_id: listingId,
+    origin_price: 15_000,
+    transport: 900,
+    isv: 3_000,
+    iuc: 200,
+    legalization: 400,
+    total_pt: 20_000,
+    pt_estimated_price: 25_000,
+    pt_sample_size: 8,
+    pt_confidence: "normal",
+    savings: 5_000,
+    savings_pct: 25,
+    verdict: "compensa",
+    isv_table_year: 2026,
+    ...over,
+  };
+}
 
 /**
- * A fixture. Todos passam a regra da montra (`exato` + `normal`) para que o que
- * o teste mede seja o filtro, não a elegibilidade.
- *
- * Os dois `dup-` partilham VIN de propósito: são o mesmo carro cross-listado, e
- * só o de maior savings pode aparecer.
+ * Os anúncios com nome. Os quatro primeiros são a montra visível — um por
+ * combustível/caixa/país/ano/km, para cada filtro poder isolar exatamente um.
+ * Os quatro seguintes são sentinelas: têm a MAIOR poupança da fixture, portanto
+ * se algum escapar ao gate da montra aparece logo no topo da primeira página.
  */
-const FIXTURE = [
-  // ext        país  ano    km      caixa       combustível  totalPt  savings  pct   verdict         vin
-  // "DSG" é a armadilha: não tem a palavra "auto" no texto. O mapper antigo
-  // (`/auto/i`) chamava-lhe manual — 76 anúncios da montra assim.
-  ["golf-de", "DE", 2022, 40_000, "DSG", "diesel", 25_000, 5_000, 20, "compensa", null],
-  ["golf-fr", "FR", 2019, 120_000, "Manuelle", "gasolina", 12_000, 400, 3, "marginal", null],
-  ["astra-de", "DE", 2023, 10_000, null, "elétrico", 30_000, 9_000, 30, "compensa", null],
-  ["astra-es", "ES", 2021, 80_000, "Manual", "diesel", 18_000, 1_000, 5, "marginal", null],
+const CARROS: [string, Record<string, unknown>][] = [
+  ["s-catalogo", { vin: VIN }],
   [
-    "dup-alto",
-    "DE",
-    2022,
-    50_000,
-    "Manual",
-    "diesel",
-    20_000,
-    7_000,
-    35,
-    "compensa",
-    "WVWZZZ1KZAW000001",
+    "s-diesel",
+    {
+      model_id: VM.diesel,
+      model_raw: "P9",
+      variant: "P9 1.0 TDI",
+      year: 2018,
+      fuel: "diesel",
+      gearbox: "Automatik",
+      country: "FR",
+      price: 16_000,
+      us_version_id: null,
+    },
   ],
   [
-    "dup-baixo",
-    "BE",
-    2022,
-    51_000,
-    "Manual",
-    "diesel",
-    21_000,
-    2_000,
-    9,
-    "compensa",
-    "WVWZZZ1KZAW000001",
+    "s-hibrido",
+    {
+      model_id: VM.hibrido,
+      model_raw: "P7",
+      variant: "P7 hybrid",
+      km: 150_000,
+      fuel: "híbrido",
+      // sem caixa gravada: o `transmissionOf` chama-lhe manual
+      gearbox: null,
+      country: "ES",
+      price: 17_000,
+      us_version_id: null,
+    },
   ],
-] as const;
+  [
+    "s-eletrico",
+    {
+      model_id: VM.eletrico,
+      model_raw: "PE",
+      variant: "PE electric",
+      year: 2021,
+      km: 5_000,
+      // sem combustível no anúncio: só o vehicle_models sabe que é elétrico
+      fuel: null,
+      country: "NL",
+      price: 18_000,
+      us_version_id: null,
+    },
+  ],
+  ["s-morto", { price: 19_000, deleted_at: "2026-07-01 10:00:00" }],
+  ["s-alargada", { price: 20_000 }],
+  ["s-designacao", { price: 21_000, us_version_id: null, match_confidence: "designacao" }],
+  ["s-clone", { price: 22_000, vin: VIN }],
+];
 
-async function seedFixture(sql: ReturnType<typeof postgres>) {
-  await sql`insert into sources (id, slug, name, country, kind)
-            values (${SOURCE}, 'testsearch', 'TestSearch', 'DE', 'agregador')
-            on conflict do nothing`;
-  for (const [id, model] of [
-    [VM_GOLF, "golf"],
-    [VM_ASTRA, "astra"],
-  ] as const) {
-    await sql`insert into vehicle_models (id, norm_key, make, model, fuel)
-              values (${id}, ${`testsearch|${model}|diesel`}, 'testsearch', ${model}, 'diesel')
-              on conflict do nothing`;
+/** Estimativas dos anúncios com nome (o resto do default vem do `estimativa`). */
+const ESTIMATIVAS: Record<string, Record<string, unknown>> = {
+  "s-catalogo": {},
+  "s-diesel": { total_pt: 30_000, savings: 4_000, savings_pct: 13, verdict: "marginal" },
+  "s-hibrido": { total_pt: 40_000, savings: 3_000, savings_pct: 8 },
+  "s-eletrico": { total_pt: 45_000, savings: 2_000, savings_pct: 4, verdict: "marginal" },
+  "s-morto": { savings: 9_999 },
+  "s-alargada": { savings: 9_999, pt_confidence: "alargada" },
+  "s-designacao": { savings: 9_999 },
+  // o clone perde o desempate do representante (1 000 < 5 000 do s-catalogo)
+  "s-clone": { savings: 1_000 },
+};
+
+async function seed(sql: Sql): Promise<void> {
+  await sql`
+    insert into vehicle_models (id, make, model, fuel, norm_key) values
+      (${VM.gasolina}, 'pesqmarke', 'p4', 'gasolina', 'pesqmarke|p4|gasolina'),
+      (${VM.diesel}, 'pesqmarke', 'p9', 'diesel', 'pesqmarke|p9|diesel'),
+      (${VM.hibrido}, 'pesqmarke', 'p7', 'híbrido', 'pesqmarke|p7|híbrido'),
+      (${VM.eletrico}, 'pesqmarke', 'pe', 'elétrico', 'pesqmarke|pe|elétrico'),
+      (${VM.enchimento}, 'enchimarke', 'f1', 'gasolina', 'enchimarke|f1|gasolina')
+  `;
+  // Catálogo: a marca vive no us_models e o nome da versão no us_versions — é a
+  // junção dos dois que o cartão mostra, e nenhum campo cru do anúncio a contém.
+  await sql`
+    insert into us_models (mid, make, model, slug, model_year, url)
+    values ('PQ-M1', 'Pesqmarke', 'Pquatro (2022)', 'Pquatro-2022', 2022, 'https://ex.test/m1')
+  `;
+  await sql`
+    insert into us_versions (version_id, mid, name, url, power_hp, displacement_cc)
+    values ('PQ-V1', 'PQ-M1', 'Q16 Pquatro Gran Coupe 840d', 'https://ex.test/v1', 320, 2993)
+  `;
+
+  for (const [externalId, over] of CARROS) {
+    await sql`insert into listings ${sql(carro(externalId, over))}`;
   }
+  // Enchimento: 60 anúncios banais e sempre no fundo da ordenação (poupança
+  // baixa), com preço distinto para cada um ter identidade de carro própria.
+  await sql`insert into listings ${sql(
+    Array.from({ length: ENCHIMENTO }, (_, i) =>
+      carro(`fill-${String(i).padStart(2, "0")}`, {
+        model_id: VM.enchimento,
+        make_raw: "Enchimarke",
+        model_raw: "F1",
+        variant: "F1 1.0",
+        year: 2015,
+        km: 200_000,
+        country: "BE",
+        price: 9_000 + i,
+        us_version_id: null,
+      }),
+    ),
+  )}`;
 
-  // Enchimento para a paginação ser real: 30 anúncios em NL, com savings_pct
-  // entre 1,00 e 1,29 — sempre abaixo dos 3% do `golf-fr`, portanto sempre
-  // DEPOIS da fixture principal na ordenação por omissão.
-  //
-  // ⚠️ O PREÇO tem de variar. Sem VIN, a identidade de carro físico é
-  // `model_id:ano:km(milhares):preço` (lib/engine/car-identity.ts) — 30 linhas
-  // com os quatro iguais são o MESMO carro e o dedupe colapsava-as numa só.
-  // (Foi o que aconteceu à primeira: o total dava 6 em vez de 35.)
-  const enchimento = Array.from({ length: 30 }, (_, i) => [
-    `filler-${String(i).padStart(2, "0")}`,
-    "NL" as const,
-    2020,
-    90_000,
-    "Manual",
-    "gasolina",
-    9_000 + i * 10,
-    100,
-    1 + i / 100,
-    "nao_compensa",
-    null,
-  ]) as unknown as typeof FIXTURE;
-
-  for (const [ext, country, year, km, gearbox, fuel, totalPt, savings, pct, verdict, vin] of [
-    ...FIXTURE,
-    ...enchimento,
-  ]) {
-    const modelId = ext.startsWith("golf") ? VM_GOLF : VM_ASTRA;
-    const [row] = await sql`
-      insert into listings (
-        source_site, external_id, source_id, model_id, make_raw, model_raw, variant,
-        year, km, gearbox, gearbox_norm, fuel, country, price, detail_url, vin,
-        match_confidence, first_seen_at, last_seen_at
-      ) values (
-        'testsearch.de', ${`search-${ext}`}, ${SOURCE}, ${modelId},
-        'Testsearch', ${ext.startsWith("golf") ? "Golf" : "Astra"}, ${`${ext} 2.0 TDI`},
-        ${year}, ${km}, ${gearbox}, ${normGearbox(gearbox)}, ${fuel}, ${country}, ${totalPt - 5000},
-        ${`https://testsearch.de/${ext}`}, ${vin},
-        'exato', now(), now()
-      ) returning id`;
-    await sql`
-      insert into import_cost_estimates (
-        listing_id, origin_price, transport, isv, iuc, legalization, total_pt,
-        pt_estimated_price, pt_sample_size, pt_confidence, savings, savings_pct,
-        verdict, isv_table_year
-      ) values (
-        ${row.id}, ${totalPt - 5000}, 1000, 3000, 200, 355, ${totalPt},
-        ${totalPt + savings}, 8, 'normal', ${savings}, ${pct}, ${verdict}, 2026
-      )`;
+  const ids = await sql<{ id: string; external_id: string }[]>`
+    select id, external_id from listings
+  `;
+  for (const { id, external_id } of ids) {
+    const over =
+      ESTIMATIVAS[external_id] ??
+      (() => {
+        const i = Number(external_id.slice("fill-".length));
+        return {
+          total_pt: 90_000 + i,
+          savings: 10 + i,
+          savings_pct: 1,
+          verdict: "nao_compensa",
+        };
+      })();
+    await sql`insert into import_cost_estimates ${sql(estimativa(id, over))}`;
   }
 }
 
-let sql: ReturnType<typeof postgres> | null = null;
-
-before(async () => {
-  if (skip) return;
-  await recreateDatabases(DB_URL as string, TEST_DB);
-  const url = withDbName(DB_URL as string, TEST_DB);
-  migrate(url);
+async function bootstrap(): Promise<Sql> {
+  const admin = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
+  try {
+    await admin.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
+    await admin.unsafe(`create database ${TEST_DB}`).simple();
+  } finally {
+    await admin.end();
+  }
+  const url = withDbName(TEST_DB);
+  execFileSync("pnpm", ["exec", "drizzle-kit", "migrate"], {
+    stdio: "pipe",
+    env: { ...process.env, WAREHOUSE_URL: url, DATABASE_URL: url },
+  });
+  // O `db` resolve a URL no import — tem de ficar definida ANTES do import
+  // dinâmico do lib/queries (ver tests/pipeline/integration.test.ts).
   process.env.WAREHOUSE_URL = url;
-  sql = postgres(url, { prepare: false, onnotice: () => {} });
-  await seedFixture(sql);
+
+  const sql = postgres(url, { prepare: false, onnotice: () => {} });
+  await seed(sql);
+  return sql;
+}
+
+test("pesquisa no servidor: filtros, texto livre e total", async (t) => {
+  if (skip) {
+    t.skip(skip);
+    return;
+  }
+  let sql: Sql;
+  try {
+    sql = await bootstrap();
+  } catch (err) {
+    t.skip(`não deu para criar a base de teste (${(err as Error).message.slice(0, 80)})`);
+    return;
+  }
+
+  const { searchListingsQuery } = await import("../../lib/queries");
+  const porId = new Map(
+    (await sql<{ id: string; external_id: string }[]>`select id, external_id from listings`).map(
+      (r) => [r.id, r.external_id],
+    ),
+  );
+
+  /** Corre a pesquisa e devolve os external_id na ordem em que vieram. */
+  const pesquisar = async (filters: SearchFilters) => {
+    const res = await searchListingsQuery(filters, null);
+    return { ext: res.listings.map((l) => porId.get(l.id)), total: res.total, res };
+  };
+
+  try {
+    await t.test("montra completa: uma página, o total é a montra inteira", async () => {
+      const { ext, total, res } = await pesquisar({});
+      assert.equal(res.listings.length, PAGE_SIZE, "o servidor manda uma página");
+      assert.equal(total, ENCHIMENTO + 4, "o total conta os 64 visíveis, não os 24 mandados");
+      assert.equal(res.page, 1);
+      assert.equal(res.hasMore, true, "64 não cabem numa página de 24");
+      assert.equal(ext[0], "s-catalogo", "ordenado por poupança, o do catálogo primeiro");
+      // As sentinelas têm a maior poupança da fixture: se o gate cedesse, viam-se.
+      for (const fora of ["s-morto", "s-alargada", "s-designacao", "s-clone"]) {
+        assert.ok(!ext.includes(fora), `${fora} não pertence à montra`);
+      }
+    });
+
+    await t.test("o título do cartão vem do catálogo, não dos campos crus", async () => {
+      const { res } = await pesquisar({});
+      assert.equal(res.listings[0].title, TITULO_DO_CATALOGO);
+    });
+
+    await t.test("ano mínimo isola os de 2023", async () => {
+      const { ext, total } = await pesquisar({ minYear: 2023 });
+      assert.deepEqual(ext, ["s-catalogo", "s-hibrido"]);
+      assert.equal(total, 2);
+    });
+
+    await t.test("km máximos isolam os pouco rodados", async () => {
+      const { ext } = await pesquisar({ maxKm: 60_000 });
+      assert.deepEqual(ext, ["s-catalogo", "s-diesel", "s-eletrico"]);
+    });
+
+    await t.test("combustível isola o diesel", async () => {
+      const { ext } = await pesquisar({ fuel: "diesel" });
+      assert.deepEqual(ext, ["s-diesel"]);
+    });
+
+    await t.test("combustível segue o fallback do modelo canónico", async () => {
+      // O `s-eletrico` não tem combustível no anúncio — o cartão mostra o do
+      // vehicle_models, e o filtro tem de o encontrar pelo mesmo caminho.
+      const { ext } = await pesquisar({ fuel: "elétrico" });
+      assert.deepEqual(ext, ["s-eletrico"]);
+    });
+
+    await t.test("caixa automática: pela coluna normalizada, não por regex", async () => {
+      const { ext } = await pesquisar({ gearbox: "automática" });
+      assert.deepEqual(ext, ["s-diesel"]);
+    });
+
+    await t.test("caixa desconhecida não entra em nenhum dos dois filtros", async () => {
+      // Mudou com a coluna `gearbox_norm` (migration 0008): antes, `gearbox`
+      // nulo virava "manual" no cartão e o filtro copiava esse erro de
+      // propósito. Agora a ficha diz "Não indicada" e quem filtra por caixa
+      // está a filtrar por certeza — pôr os desconhecidos em "Manual" era
+      // repor a mesma mentira noutro sítio.
+      const manual = await pesquisar({ gearbox: "manual" });
+      const auto = await pesquisar({ gearbox: "automática" });
+      assert.ok(!manual.ext.includes("s-hibrido"), "sem caixa gravada não é manual");
+      assert.ok(!auto.ext.includes("s-hibrido"), "nem automática");
+      assert.ok(!manual.ext.includes("s-diesel"));
+      assert.ok(
+        manual.total + auto.total < ENCHIMENTO + 4,
+        "as duas caixas já não somam a montra toda — e é isso que se quer",
+      );
+    });
+
+    await t.test("paginação: a página 2 não repete a 1, e o total não muda", async () => {
+      const p1 = await pesquisar({});
+      const p2 = await pesquisar({ page: 2 });
+      assert.equal(p1.total, p2.total, "o total é do conjunto, não da página");
+      assert.equal(p2.res.page, 2);
+      const ids1 = new Set(p1.res.listings.map((l) => l.id));
+      assert.ok(
+        p2.res.listings.every((l) => !ids1.has(l.id)),
+        "a página 2 não pode repetir carros da 1",
+      );
+    });
+
+    await t.test("preço máximo é o custo FINAL em Portugal", async () => {
+      const { ext } = await pesquisar({ maxPrice: 30_000 });
+      assert.deepEqual(ext, ["s-catalogo", "s-diesel"]);
+    });
+
+    await t.test("país isola a origem", async () => {
+      const { ext } = await pesquisar({ countries: ["FR"] });
+      assert.deepEqual(ext, ["s-diesel"]);
+    });
+
+    await t.test("só oportunidades isola o veredito 'compensa'", async () => {
+      const { ext } = await pesquisar({ onlyOpportunities: true });
+      assert.deepEqual(ext, ["s-catalogo", "s-hibrido"]);
+    });
+
+    await t.test("os filtros somam-se", async () => {
+      const { ext } = await pesquisar({ fuel: "gasolina", minYear: 2023 });
+      assert.deepEqual(ext, ["s-catalogo"]);
+    });
+
+    await t.test("texto: copiar o título do cartão encontra o carro", async () => {
+      const { ext, total } = await pesquisar({ query: TITULO_DO_CATALOGO });
+      assert.deepEqual(ext, ["s-catalogo"]);
+      assert.equal(total, 1);
+    });
+
+    await t.test("texto: uma palavra que só existe no catálogo", async () => {
+      // "pquatro" não aparece em nenhum campo cru do anúncio — antes, procurar
+      // pelo que a UI mostra não dava nada.
+      const { ext } = await pesquisar({ query: "pquatro" });
+      assert.deepEqual(ext, ["s-catalogo"]);
+    });
+
+    await t.test("texto: uma palavra que só existe no campo cru", async () => {
+      const { ext } = await pesquisar({ query: "P9" });
+      assert.deepEqual(ext, ["s-diesel"]);
+    });
+
+    await t.test("texto: '%' do utilizador é literal, não joker", async () => {
+      const { ext, total } = await pesquisar({ query: "%" });
+      assert.deepEqual(ext, []);
+      assert.equal(total, 0);
+    });
+  } finally {
+    const { closeDb } = await import("../../db");
+    await closeDb();
+    await sql.end({ timeout: 5 });
+  }
 });
 
 after(async () => {
   if (skip) return;
-  await sql?.end();
-  const { closeDb } = await import("../../db");
-  await closeDb();
-  await dropDatabases(DB_URL as string, TEST_DB);
-});
-
-/** Os external_id (sem prefixo) devolvidos por uns filtros, por ordem. */
-async function procurar(filters: Record<string, unknown> = {}) {
-  const { searchListingsQuery } = await import("../../lib/queries");
-  const page = await searchListingsQuery(filters, null);
-  return {
-    ids: page.items.map((l) => l.sourceUrl?.replace("https://testsearch.de/", "") ?? "?"),
-    total: page.total,
-    hasMore: page.hasMore,
-    page: page.page,
-  };
-}
-
-/** Total da fixture: 6 anúncios − 1 duplicado + 30 de enchimento. */
-const TOTAL = 35;
-/** Os 4 países da fixture principal — para isolar do enchimento (NL). */
-const PRINCIPAIS = ["DE", "ES", "FR", "BE"] as const;
-
-test("sem filtros: um representante por carro, ordenado por poupança %", { skip }, async () => {
-  const r = await procurar();
-  // 36 anúncios, mas `dup-alto` e `dup-baixo` são o mesmo carro (VIN igual).
-  assert.equal(r.total, TOTAL, "o dedupe conta carros, não anúncios");
-  assert.ok(r.ids.includes("dup-alto"), "fica o de maior savings do par");
-  assert.ok(!r.ids.includes("dup-baixo"), "o duplicado de menor savings sai");
-  assert.deepEqual(
-    r.ids.slice(0, 5),
-    ["dup-alto", "astra-de", "golf-de", "astra-es", "golf-fr"],
-    "por savings_pct desc: 35, 30, 20, 5, 3 — o enchimento (≤1,3) vem depois",
-  );
-});
-
-test("ordenar por poupança absoluta é diferente de por percentagem", { skip }, async () => {
-  const { ids } = await procurar({ sort: "savings" });
-  assert.deepEqual(ids.slice(0, 5), ["astra-de", "dup-alto", "golf-de", "astra-es", "golf-fr"]);
-});
-
-test("texto: procura no anúncio e por tokens", { skip }, async () => {
-  assert.deepEqual((await procurar({ query: "golf" })).ids.sort(), ["golf-de", "golf-fr"]);
-  // Tokens: "testsearch golf" tem de casar mesmo estando em colunas diferentes
-  // (make_raw + model_raw). Com o `%frase inteira%` de antes dava zero.
-  assert.deepEqual((await procurar({ query: "testsearch golf" })).ids.sort(), [
-    "golf-de",
-    "golf-fr",
-  ]);
-  assert.equal((await procurar({ query: "naoexiste" })).total, 0);
-});
-
-test("país, veredito e preço filtram em SQL", { skip }, async () => {
-  assert.deepEqual((await procurar({ countries: ["FR"] })).ids, ["golf-fr"]);
-  assert.deepEqual((await procurar({ countries: ["FR", "ES"] })).ids.sort(), [
-    "astra-es",
-    "golf-fr",
-  ]);
-  const opp = await procurar({ onlyOpportunities: true });
-  assert.deepEqual(opp.ids.sort(), ["astra-de", "dup-alto", "golf-de"]);
-  assert.deepEqual(
-    (await procurar({ maxPrice: 18_000, countries: ["ES", "FR"] })).ids.sort(),
-    ["astra-es", "golf-fr"],
-    "o `lte` inclui o valor exato (astra-es custa 18 000)",
-  );
-});
-
-test("ano, km e combustível filtram em SQL", { skip }, async () => {
-  assert.deepEqual((await procurar({ minYear: 2023 })).ids, ["astra-de"]);
-  assert.deepEqual((await procurar({ maxKm: 30_000 })).ids, ["astra-de"]);
-  assert.deepEqual((await procurar({ fuel: "elétrico" })).ids, ["astra-de"]);
-  // Acentos: o valor da UI tem de bater byte-a-byte com o que está em BD.
-  assert.equal((await procurar({ fuel: "diesel" })).total, 3);
-});
-
-test("caixa: só entra quem tem caixa PROVADA — o desconhecido fica de fora", { skip }, async () => {
-  // O filtro e a ficha lêem a MESMA coluna (`gearbox_norm`), por isso não podem
-  // contradizer-se — era esse o medo que fazia o SQL copiar o erro do mapper.
-  // `astra-de` não tem gearbox: já não conta como manual, porque não sabemos.
-  const paises = [...PRINCIPAIS];
-  const manual = await procurar({ gearbox: "manual", countries: paises });
-  assert.ok(!manual.ids.includes("astra-de"), "sem caixa conhecida não é 'manual'");
-  assert.deepEqual(manual.ids.sort(), ["astra-es", "dup-alto", "golf-fr"]);
-
-  const auto = await procurar({ gearbox: "automática", countries: paises });
-  assert.deepEqual(auto.ids, ["golf-de"], "o DSG é automática");
-  assert.equal(manual.total + auto.total, 4, "os 5 da montra menos o de caixa desconhecida");
-
-  // Coerência com o que o produto AFIRMA: o que sai de cada filtro tem de trazer
-  // exatamente a caixa pedida na ficha — nada de nulos disfarçados.
-  const { searchListingsQuery } = await import("../../lib/queries");
-  for (const caixa of ["manual", "automática"] as const) {
-    const page = await searchListingsQuery({ gearbox: caixa, countries: paises }, null);
-    assert.deepEqual(
-      [...new Set(page.items.map((l) => l.model.transmission))],
-      [caixa],
-      `filtrar por ${caixa} só pode devolver carros que a ficha diz serem ${caixa}`,
-    );
-  }
-});
-
-test("um DSG não é 'manual' — e sem caixa não é nada", { skip }, async () => {
-  // O regex antigo (`/auto/i` sobre o texto cru) chamava manual a tudo o que não
-  // trouxesse "auto" no nome: DSG, S-tronic, PDK, CVT. E chamava manual ao vazio.
-  const { searchListingsQuery } = await import("../../lib/queries");
-  const { items } = await searchListingsQuery({ countries: [...PRINCIPAIS] }, null);
-  const caixaDe = (ext: string) =>
-    items.find((l) => l.sourceUrl?.endsWith(`/${ext}`))?.model.transmission;
-
-  assert.equal(caixaDe("golf-de"), "automática", "gearbox 'DSG' — sem a palavra 'auto'");
-  assert.equal(caixaDe("golf-fr"), "manual", "gearbox 'Manuelle'");
-  assert.equal(caixaDe("astra-de"), null, "sem gearbox: null, não 'manual'");
-});
-
-test("filtros combinam-se (AND), não se substituem", { skip }, async () => {
-  const r = await procurar({ countries: ["DE"], fuel: "diesel", minYear: 2022 });
-  assert.deepEqual(r.ids.sort(), ["dup-alto", "golf-de"]);
-});
-
-test("paginação: não salta nem repete, e o total é do conjunto todo", { skip }, async () => {
-  const { searchListingsQuery, PAGE_SIZE } = await import("../../lib/queries");
-  assert.equal(PAGE_SIZE, 24);
-
-  const p1 = await searchListingsQuery({}, null);
-  const p2 = await searchListingsQuery({ page: 2 }, null);
-
-  assert.equal(p1.items.length, PAGE_SIZE);
-  assert.equal(p2.items.length, TOTAL - PAGE_SIZE);
-  assert.equal(p1.total, TOTAL, "o total é o do conjunto, não o da página");
-  assert.equal(p2.total, TOTAL, "e não muda de página para página");
-  assert.equal(p1.hasMore, true);
-  assert.equal(p2.hasMore, false);
-
-  const ids1 = new Set(p1.items.map((l) => l.id));
-  const repetidos = p2.items.filter((l) => ids1.has(l.id));
-  assert.deepEqual(repetidos, [], "a página 2 não pode repetir carros da 1");
-  assert.equal(ids1.size + p2.items.length, TOTAL, "juntas, as duas páginas dão o conjunto todo");
-});
-
-test("páginas fora do conjunto não mentem no total", { skip }, async () => {
-  const { searchListingsQuery } = await import("../../lib/queries");
-
-  // O `count(*) over()` viaja nas linhas: numa página vazia não vinha nenhuma e
-  // o total dava 0 — quem aterrasse aqui via "0 anúncios" e ficava sem
-  // paginação com que voltar atrás.
-  const vazia = await searchListingsQuery({ page: 3 }, null);
-  assert.equal(vazia.items.length, 0);
-  assert.equal(vazia.total, TOTAL, "o total continua a ser o verdadeiro");
-
-  // Fora do teto fica presa ao teto, não rebenta nem faz um offset absurdo.
-  const fundo = await searchListingsQuery({ page: 10_000 }, null);
-  assert.equal(fundo.page, 200);
-  assert.equal(fundo.items.length, 0);
-
-  // Página 0 / negativa não vira offset negativo.
-  assert.equal((await searchListingsQuery({ page: 0 }, null)).page, 1);
-  assert.equal((await searchListingsQuery({ page: -5 }, null)).page, 1);
-});
-
-test("a ordem é total — duas corridas dão exatamente a mesma sequência", { skip }, async () => {
-  // Sem o `id` como último critério, linhas com valor igual podiam trocar de
-  // posição entre pedidos e a paginação saltava carros em silêncio. O
-  // enchimento tem 30 linhas com savings idêntico (100) — é exatamente o caso.
-  for (const sort of ["percentagem", "savings", "recent", "price"] as const) {
-    const a = await procurar({ sort });
-    const b = await procurar({ sort });
-    assert.deepEqual(a.ids, b.ids, `ordenação '${sort}' não é determinística`);
+  const admin = postgres(withDbName("postgres"), { prepare: false, max: 1, onnotice: () => {} });
+  try {
+    await admin.unsafe(`drop database if exists ${TEST_DB} with (force)`).simple();
+  } finally {
+    await admin.end();
   }
 });

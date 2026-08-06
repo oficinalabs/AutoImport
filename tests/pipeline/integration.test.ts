@@ -326,21 +326,24 @@ test(
     assert.equal(estDes.inputs.genWindow?.start, 2022);
     assert.equal(estDes.pt_sample_size, 5, "amostra só dos 5 carros da geração nova");
 
-    // 2) Prova negativa: a MESMA amostra, sem a guarda, é contaminada pela geração
-    //    velha (mediana entre os dois blocos de preço).
-    const semGuarda = await estimatePtPrice(db, modelId, 2022, 1, 130);
-    const comGuarda = await estimatePtPrice(db, modelId, 2022, 1, 130, { start: 2022, end: null });
-    assert.ok(semGuarda, "amostra sem guarda existe");
+    // 2) Prova negativa: a MESMA amostra, sem a guarda, são dois blocos de preço
+    //    (velha ~16k + nova ~30k). Isto já foi "a mediana desloca-se"; desde a
+    //    guarda de dispersão robusta (MAX_IQR_SPREAD, lib/engine/pt-market.ts) uma
+    //    amostra assim nem chega a ser mercado — p25 16.475 · mediana 23.500 ·
+    //    p75 30.525 ⇒ IQR 0,60 — e não devolve nada. A prova ficou mais forte e
+    //    continua a cair se a guarda de geração desaparecer: aí `comGuarda`
+    //    passa a ser este mesmo null.
+    const semGuarda = await estimatePtPrice(db, modelId, 2022, 30_000, 130);
+    const comGuarda = await estimatePtPrice(db, modelId, 2022, 30_000, 130, {
+      start: 2022,
+      end: null,
+    });
+    assert.equal(semGuarda, null, "sem guarda a amostra contaminada nem passa a dispersão");
     assert.ok(comGuarda, "amostra com guarda existe");
-    assert.ok(
-      semGuarda.estimatedPrice < 30000,
-      `sem guarda a mediana é contaminada (${semGuarda.estimatedPrice})`,
-    );
     assert.ok(
       comGuarda.estimatedPrice >= 30000,
       `com guarda a mediana fica limpa (${comGuarda.estimatedPrice})`,
     );
-    assert.notEqual(semGuarda.estimatedPrice, comGuarda.estimatedPrice);
   },
 );
 
@@ -444,14 +447,19 @@ test(
     );
     assert.equal(est.inputs.derivative, "", "inputs regista o derivado base ''");
 
-    // Prova direta: excluir o mid do outro derivado baixa a mediana — só APERTA.
-    const comExcl = await estimatePtPrice(db, modelId, 2022, 1, 130, undefined, ["TG-CAB"]);
-    const semExcl = await estimatePtPrice(db, modelId, 2022, 1, 130);
-    assert.ok(comExcl && semExcl, "ambas as amostras existem");
+    // Prova direta: excluir o mid do outro derivado só APERTA. Sem a exclusão a
+    // amostra são duas gamas (base ~30k + cabrio ~45k): p25 30.675 · mediana
+    // 38.100 · p75 45.438 ⇒ IQR 0,39, acima do MAX_IQR_SPREAD — deixou de haver
+    // mediana nenhuma. Se o excludeMids deixar de filtrar, `comExcl` passa a ser
+    // este mesmo null e o teste cai.
+    const comExcl = await estimatePtPrice(db, modelId, 2022, 30_000, 130, undefined, ["TG-CAB"]);
+    const semExcl = await estimatePtPrice(db, modelId, 2022, 30_000, 130);
+    assert.equal(semExcl, null, "amostra contaminada pelo cabrio nem passa a dispersão");
+    assert.ok(comExcl, "excluir o cabrio deixa uma amostra coerente");
     assert.equal(comExcl.sampleSize, 5, "excluir os cabrios deixa só os 5 base");
     assert.ok(
-      comExcl.estimatedPrice < semExcl.estimatedPrice,
-      `excluir o derivado cabrio baixa a mediana (com=${comExcl.estimatedPrice} sem=${semExcl.estimatedPrice})`,
+      comExcl.estimatedPrice < 32000,
+      `mediana dos 5 base, sem os cabrios caros (obtido ${comExcl.estimatedPrice})`,
     );
   },
 );
@@ -464,7 +472,6 @@ test(
     const { sql } = await import("drizzle-orm");
     const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
     const { estimatePtPrice } = await import("../../lib/engine/pt-market");
-    const { kmBand } = await import("../../lib/engine/normalize-vehicle");
 
     await cleanup();
 
@@ -535,7 +542,7 @@ test(
 
     await collectPtObservations();
 
-    const est = await estimatePtPrice(db, modelId, 2022, kmBand(30000), 130);
+    const est = await estimatePtPrice(db, modelId, 2022, 30_000, 130);
     assert.ok(est, "amostra existe");
     assert.equal(est.sampleSize, 5, "o cross-listing caetano/carplus conta 1× (5 carros, não 6)");
     assert.equal(est.confidence, "normal", "5 carros, preços e vendedores distintos → normal");
@@ -737,6 +744,91 @@ test(
       ["fixture-zero-de-ok"],
       "o gémeo com preço é estimado; o 'sob consulta' não gera estimativa nenhuma",
     );
+  },
+);
+
+test(
+  "preço de origem implausível (0,28 do próprio mercado ES) não gera estimativa",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+
+    await cleanup();
+
+    // O caso real (XC40 T5 Recharge a 6 900 € num mercado ES de 22 850 €): o motor
+    // tinha guardas sintáticas do preço estrangeiro e nenhuma sobre ele ser um
+    // preço de MERCADO. Aqui prova-se a LIGAÇÃO — que o compute-costs chama a
+    // guarda e larga a estimativa —, não a mediana (essa é do
+    // tests/engine/origin-market.test.ts).
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'origmodel', 'gasolina', 'testgen|origmodel|gasolina')
+      returning id
+    `)) as unknown as { id: string }[];
+
+    // Amostra PT sã (5 stands, mediana 30 600 €, 100 000 km — dentro da guarda de
+    // km face aos 116 000 dos estrangeiros).
+    for (const [i, price] of [30_000, 30_300, 30_600, 30_900, 31_200].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${`fixture-orig-pt-${i}`}, ${model.id}, 'Testgen', 'OrigModel',
+           'Gasolina', 'gasolina', 'OrigModel 1.0', 2022, 100000, 130, ${price}, 'PT',
+           ${`Stand Orig ${i}`}, ${`https://example.test/fixture-orig-pt-${i}`})
+      `);
+    }
+
+    // Mercado ES do mesmo carro: 6 comparáveis (22–27 k) + dois alvos gémeos em
+    // tudo menos o preço — 20 000 € (0,83 da mediana: negócio) e 6 900 € (0,28:
+    // indefensável). O par é o que prova que a exclusão é do PREÇO DE ORIGEM e
+    // não de outra guarda.
+    const es: [string, number][] = [
+      ["fixture-orig-es-c0", 22_000],
+      ["fixture-orig-es-c1", 23_000],
+      ["fixture-orig-es-c2", 24_000],
+      ["fixture-orig-es-c3", 25_000],
+      ["fixture-orig-es-c4", 26_000],
+      ["fixture-orig-es-c5", 27_000],
+      ["fixture-orig-es-ok", 20_000],
+      ["fixture-orig-es-barato", 6_900],
+    ];
+    for (const [id, price] of es) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, displacement_cc, co2, price, country, detail_url, first_registration)
+        values
+          ('autocasion.com', ${id}, ${model.id}, 'Testgen', 'OrigModel', 'Gasolina', 'gasolina',
+           'OrigModel 1.0', 2022, 116000, 130, 1500, 135, ${price}, 'ES',
+           ${`https://example.test/${id}`}, '2022-06-01')
+      `);
+    }
+
+    await collectPtObservations();
+    const res = await computeCosts();
+    assert.equal(res.origemImplausivel, 1, "só o gémeo barato é recusado pela guarda de origem");
+
+    const est = (await db.execute(sql`
+      select l.external_id, e.inputs
+      from import_cost_estimates e join listings l on l.id = e.listing_id
+      where l.external_id in ('fixture-orig-es-ok', 'fixture-orig-es-barato')
+    `)) as unknown as {
+      external_id: string;
+      inputs: { originMedian?: number | null; originSampleSize?: number | null };
+    }[];
+    assert.deepEqual(
+      est.map((e) => e.external_id),
+      ["fixture-orig-es-ok"],
+      "o gémeo a preço de mercado é estimado; o de 6 900 € não gera estimativa nenhuma",
+    );
+    // Proveniência auditável: a estimativa que passou grava contra o que passou.
+    assert.equal(est[0]?.inputs.originSampleSize, 7, "7 comparáveis ES (o barato inclusive)");
+    assert.equal(est[0]?.inputs.originMedian, 24_000);
   },
 );
 

@@ -198,8 +198,8 @@ const contar = (html: string, testid: string) => html.split(`data-testid="${test
 
 test("a pesquisa filtra mesmo (o bug P0-1)", { skip, timeout: 300_000 }, async () => {
   const tudo = await pagina("/pesquisar");
-  const golf = await pagina("/pesquisar?q=Golf");
-  const nada = await pagina("/pesquisar?q=xpto-que-nao-existe");
+  const golf = await pagina("/pesquisar?texto=Golf");
+  const nada = await pagina("/pesquisar?texto=xpto-que-nao-existe");
 
   const nTudo = contar(tudo, "resultado");
   const nGolf = contar(golf, "resultado");

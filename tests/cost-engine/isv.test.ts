@@ -74,6 +74,22 @@ test("BMW 520d 2021 (1995 cm³, 132 g WLTP diesel, 5–6 anos) → ISV 3.225,84 
   within(r.total, 3225.84);
 });
 
+test("Lamborghini Huracán Evo Spyder 2023 (5204 cm³, 338 g WLTP, 3–4 anos) → ISV 39.075,65 €", () => {
+  // Caso real do topo da montra (autocasion.com, 44.500 km) — os escalões do
+  // topo não têm limite superior e nenhum outro teste passava de 2,0 L / 150 g.
+  // Especificado ao euro contra a produção: a poupança daquele anúncio estava
+  // errada por causa da amostra PT, NÃO do ISV.
+  const r = calculateIsv(
+    input({ displacementCc: 5204, co2: 338, firstRegistration: new Date("2023-07-01") }),
+    T,
+  );
+  assert.equal(r.norm, "wltp");
+  assert.equal(r.reducaoPct, 35);
+  within(r.cilindrada, 5204 * 5.61 - 6194.88, 0.01);
+  within(r.ambiental, 338 * 233.81 - 41910.96, 0.01);
+  within(r.total, 39075.65, 0.01);
+});
+
 test("elétrico → ISV 0 (isento)", () => {
   const r = calculateIsv(input({ fuel: "elétrico", displacementCc: undefined, co2: undefined }), T);
   assert.equal(r.total, 0);
