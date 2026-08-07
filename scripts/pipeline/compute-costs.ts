@@ -14,6 +14,15 @@
  * face ao PRÓPRIO mercado estrangeiro (lib/engine/origin-market.ts) → também sem
  * estimativa: metade do que o mercado dele pede não é negócio, é avaria/erro.
  *
+ * Mais três razões para NÃO haver estimativa, todas contra margens infladas:
+ *  - o anúncio DECLARA que o preço não é de retalho ("-Motorschaden-", "nur an
+ *    Händler/Export") — no `elegivel` abaixo, ver lib/engine/not-retail.ts;
+ *  - carro acima de `HIGH_VALUE_EUR` com amostra PT < `MIN_SAMPLE_HIGH_VALUE`
+ *    (lib/engine/pt-market.ts): no topo da gama um model_id junta a escada de
+ *    trims toda e a potência não a separa;
+ *  - poupança ≥ `MAX_UNPROVEN_SAVINGS_PCT` SEM amostra de origem que a prove
+ *    (lib/engine/origin-market.ts).
+ *
  * Specs efetivas do catálogo (fill-only-missing) por tier do match:
  *  - `exato`: cc/CO₂/potência em falta vêm da versão canónica; a janela de
  *    geração da versão confina a mediana PT (evita contaminar com a geração
@@ -77,8 +86,13 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     ES_ISLAND_POSTAL_PREFIXES,
     ES_ISLAND_REGION_REGEX_SOURCE,
   } = await import("../../lib/cost-engine");
-  const { MIN_ORIGIN_RATIO, estimateOriginPrice } = await import("../../lib/engine/origin-market");
-  const { estimatePtPrice } = await import("../../lib/engine/pt-market");
+  const { NOT_RETAIL_REGEX_SOURCE } = await import("../../lib/engine/not-retail");
+  const { MAX_UNPROVEN_SAVINGS_PCT, MIN_ORIGIN_RATIO, estimateOriginPrice } = await import(
+    "../../lib/engine/origin-market"
+  );
+  const { HIGH_VALUE_EUR, MIN_SAMPLE_HIGH_VALUE, estimatePtPrice } = await import(
+    "../../lib/engine/pt-market"
+  );
   const { loadTaxTables } = await import("../../lib/engine/tax-tables");
   const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
   const { verdictFromSavings } = await import("../../lib/verdict");
@@ -123,6 +137,17 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     and l.is_damaged is not true -- sinistrado barato ≠ oportunidade
     and l.detail_url not like '%/leilao/%' -- leilões (autoline): o preço é a licitação corrente, não um preço de venda
     and l.price > 0 -- 0 = "sob consulta", não é um preço: sem ele a poupança seria a mediana PT inteira
+
+    -- O anúncio DECLARA que o preço não é de retalho, ou que o carro não circula
+    -- ("-Motorschaden-", "KEIN TÜV", "+nur an Händler/Export+", "Verkauf nur an
+    -- Gewerbe"). Ver lib/engine/not-retail.ts: é o sinal DIRETO dos casos que a
+    -- guarda estatística do preço de origem só apanha quando tem n≥5 comparáveis
+    -- no mesmo país — e no topo da montra 43 dos 200 primeiros passavam por falta
+    -- de amostra, precisamente por serem carros anómalos. O coalesce mantém o
+    -- fragmento estritamente booleano: sem variant o predicado dá false (não
+    -- excluir por falta de dados), nunca NULL — a limpeza das órfãs acima lê
+    -- "not coalesce(…, false)".
+    and not coalesce(l.variant ~* ${NOT_RETAIL_REGEX_SOURCE}, false)
     and l.year is not null
     and l.km is not null
     and l.fuel is not null
@@ -249,6 +274,8 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   let semDados = 0;
   let semAmostra = 0;
   let origemImplausivel = 0;
+  let amostraFracaTopo = 0;
+  let poupancaNaoProvada = 0;
   const verdicts: Record<string, number> = {};
 
   // Apaga a estimativa pré-existente de um anúncio que, ao recomputar, deixou de
@@ -368,6 +395,16 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
       continue;
     }
 
+    // Carro de alto valor com amostra PT pequena (ver HIGH_VALUE_EUR em
+    // lib/engine/pt-market.ts): no topo da gama um model_id junta a escada de
+    // trims toda (Urus 4.0 V8 / S / Performante partilham mid E potência), e é
+    // onde cada erro de margem vale mais dinheiro por anúncio.
+    if (l.price >= HIGH_VALUE_EUR && pt.sampleSize < MIN_SAMPLE_HIGH_VALUE) {
+      amostraFracaTopo++;
+      await dropStale(l.est_id);
+      continue;
+    }
+
     // Plausibilidade do preço de ORIGEM (lib/engine/origin-market.ts): metade do
     // que o próprio mercado estrangeiro pede pelo mesmo carro não é negócio — é
     // avaria não declarada, erro de digitação ou venda só a profissionais.
@@ -403,6 +440,19 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
 
     const savings = pt.estimatedPrice - breakdown.totalPt;
     const savingsPct = Math.round((savings / pt.estimatedPrice) * 1000) / 10;
+
+    // Poupança extrema que NINGUÉM pôde provar: o `origin` é null (n<5 no próprio
+    // mercado) e a margem é grande demais para se publicar sem medição por trás.
+    // Ver MAX_UNPROVEN_SAVINGS_PCT em lib/engine/origin-market.ts — não é um tecto
+    // cego à margem: quem está acima do limiar MAS tem amostra de origem que o
+    // valida passa. Tem de vir aqui (e não junto do MIN_ORIGIN_RATIO acima) porque
+    // depende do savingsPct, que só existe depois do breakdown.
+    if (!origin && savingsPct >= MAX_UNPROVEN_SAVINGS_PCT) {
+      poupancaNaoProvada++;
+      await dropStale(l.est_id);
+      continue;
+    }
+
     const verdict = verdictFromSavings(savingsPct);
     verdicts[verdict] = (verdicts[verdict] ?? 0) + 1;
 
@@ -463,9 +513,18 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   }
 
   console.log(
-    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · preço de origem implausível ${origemImplausivel} · vereditos ${JSON.stringify(verdicts)}`,
+    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · preço de origem implausível ${origemImplausivel} · amostra fraca no topo ${amostraFracaTopo} · poupança não provada ${poupancaNaoProvada} · vereditos ${JSON.stringify(verdicts)}`,
   );
-  return { pending: pending.length, computed, semDados, semAmostra, origemImplausivel, verdicts };
+  return {
+    pending: pending.length,
+    computed,
+    semDados,
+    semAmostra,
+    origemImplausivel,
+    amostraFracaTopo,
+    poupancaNaoProvada,
+    verdicts,
+  };
 }
 
 if (process.argv[1]?.endsWith("compute-costs.ts")) {
