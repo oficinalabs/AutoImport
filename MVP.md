@@ -219,6 +219,18 @@ disso. É a promessa central da landing e o que justifica os 100 €/mês.
       A recolha foi interrompida com o corpus a meio (65 317 anúncios em ~50 min,
       `--full --max-pages 25`). Há checkpoint: `--resume` continua de onde ficou.
 
+      **O AutoTrader.nl foi reparado a 7 ago.** Era um segmento de URL: o site
+      largou o `occasions`, o coletor levava 404, esgotava as tentativas e
+      terminava com "✓ 0 anúncios" — verde, e vazio. O payload nunca mudou.
+      Verificado a devolver 37/37 anúncios com todos os campos; o site anuncia
+      **230 393** disponíveis, contra os 3 604 que a Holanda tinha. Falta correr
+      uma passagem `--full`, que pertence ao daemon.
+
+      ⚠️ **A lição maior do que o bug:** um coletor a devolver zero terminava com
+      ✓ e ninguém dava por isso durante meses. O `frescura.yml` mede a idade dos
+      dados, não a cobertura por fonte — uma fonte que emudece não acende luz
+      nenhuma. Vale a pena um alarme por fonte.
+
 > **🟡 O que dava para fazer em código, está.** `pnpm pipeline:frescura` mede a
 > idade da leitura mais recente e **falha** acima das 36 h (corrido contra o
 > warehouse: 164,8 h → vermelho); corre em cron próprio em `frescura.yml`. A app
@@ -553,6 +565,14 @@ resolve escrevendo mais linhas.
    landing promete cinco mercados; dois são residuais. É trabalho de coletores.
 
 ### Também resolvido depois da auditoria
+
+- **Previews de PR deixam de rebentar com migrations.** A landing é
+  pré-renderizada, portanto a query dela corria no `next build` — e os previews
+  não migram. Qualquer PR com uma migration fazia falhar o build de **todos** os
+  previews, e o preview é a única forma de a equipa rever trabalho. Agora degrada
+  só em preview; em produção e local continua a rebentar, porque lá o
+  `db:migrate:deploy` corre antes do build e uma falha é real.
+- **Coletor do AutoTrader.nl** — ver a secção do FR/NL.
 
 - **Ano das tabelas fiscais** — era uma constante `2026`. Ver o P2.
 - **Caixa dos anúncios** (`gearbox_norm`) — ver a lista abaixo.
