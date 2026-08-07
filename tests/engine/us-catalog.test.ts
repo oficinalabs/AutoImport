@@ -12,6 +12,7 @@ import {
   genKeyOf,
   normEngineCode,
   normGearbox,
+  isNoiseToken,
   resolveFamily,
   resolveVersionFuel,
 } from "../../lib/engine/us-catalog";
@@ -392,4 +393,43 @@ test("genKey: funde variantes de carroçaria e LCI do mesmo stem", () => {
   assert.equal(genKeyOf("Golf-7"), genKeyOf("Golf-7-Variant"));
   assert.equal(genKeyOf("E46-3-Series-Sedan"), genKeyOf("E46-LCI-3-Series-Coupe"));
   assert.notEqual(genKeyOf("Golf-7"), genKeyOf("Golf-2017"));
+});
+
+// ── Ruído: chassis numérico vs derivado numérico ─────────────────
+// Ver docs/10-DERIVADO-VS-GERACAO.md. A regra é POR MARCA de propósito: não existe
+// regra ao nível do token que separe um chassis de um derivado, ambos numéricos.
+
+test("chassis numérico da Porsche é ruído; a própria família não", () => {
+  const ctx = { makeSlug: "porsche", family: "911" };
+  for (const t of ["992", "9921", "9922", "991", "997"]) {
+    assert.equal(isNoiseToken(t, ctx), true, t);
+  }
+  // O "911" é o NOME da família — nunca pode ser apagado.
+  assert.equal(isNoiseToken("911", ctx), false);
+  // E a carroçaria continua a ser o derivado.
+  assert.equal(isNoiseToken("dakar", ctx), false);
+});
+
+test("derivados NUMÉRICOS de outras marcas continuam intactos", () => {
+  // O contra-exemplo que proíbe a regra genérica: aqui o número É a designação.
+  assert.equal(isNoiseToken("110", { makeSlug: "land-rover", family: "defender" }), false);
+  assert.equal(isNoiseToken("130", { makeSlug: "land-rover", family: "defender" }), false);
+  assert.equal(isNoiseToken("200", { makeSlug: "toyota", family: "land-cruiser" }), false);
+  assert.equal(isNoiseToken("1600", { makeSlug: "alfa-romeo", family: "giulia" }), false);
+  assert.equal(isNoiseToken("2107", { makeSlug: "vaz", family: "lada" }), false);
+  // 110 e 992 têm 3 dígitos; 1600 e 9921 têm 4 — nenhuma regra de dígitos os separa.
+  assert.equal(isNoiseToken("110", { makeSlug: "porsche", family: "911" }), true);
+});
+
+test("'series' é filler do nome, como 'classe'", () => {
+  // Sem isto a correção do chassis ficava a meio: uns slugs trazem "series" e
+  // outros não, e ele sobrevivia como distintivo a partir a mesma carroçaria.
+  assert.equal(isNoiseToken("series"), true);
+  assert.equal(isNoiseToken("classe"), true);
+});
+
+test("sem ctx o comportamento é o de sempre", () => {
+  assert.equal(isNoiseToken("992"), false);
+  assert.equal(isNoiseToken("2019"), true);
+  assert.equal(isNoiseToken("g20"), true);
 });

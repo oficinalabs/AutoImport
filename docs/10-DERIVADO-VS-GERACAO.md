@@ -1,9 +1,24 @@
-# 🔧 Proposta: o derivado está a engolir a geração
+# 🔧 O derivado estava a engolir a geração
 
-> **Estado: PROPOSTA — diagnosticado e medido, nada implementado.** Escrita para o
-> dono da engine rever. A análise e as opções estão aqui; a decisão é dele.
-> Números medidos em 07/ago/2026, no armazém local (664 264 anúncios, catálogo de
-> 6 330 mids).
+> **Estado: OPÇÃO A IMPLEMENTADA** (07/ago/2026). O diagnóstico abaixo mantém-se
+> como registo; a opção **B continua em aberto** e é a correção certa a prazo — o
+> que está feito resolve as marcas de família numérica, não a classe do problema.
+> Números medidos no armazém local (664 264 anúncios, catálogo de 6 330 mids).
+>
+> **O que mudou:** `NUMERIC_CHASSIS_MAKES` em `lib/engine/us-catalog.ts` (hoje só
+> `porsche`) + `series` tratado como filler do nome, ambos no `isNoiseToken`, que
+> passou a receber contexto de marca/família. Efeito medido: **123 dos 6 330 mids**
+> mudaram de derivado — Porsche 911 (28) e Boxster (3), e de lado
+> **BMW série 3/5/7 (70)**, onde o sedan tinha derivado `"series"` em vez de `""`
+> e portanto a família não tinha modelo BASE para o guard recolher.
+> As gerações de `porsche|911` passaram de **29 abertas em 29** para **5 em 28** —
+> a guarda de janela deixou de ser inerte na marca.
+>
+> Validado: golden de 273 casos com 0 violações, property test sobre 655 286
+> anúncios, orçamento de exceções de mids intacto, e 4 testes de regressão novos
+> (`tests/engine/match-version.test.ts`) + 4 ao `isNoiseToken`
+> (`tests/engine/us-catalog.test.ts`) — incluindo o contra-exemplo que proíbe a
+> regra genérica (`Defender 110`, `Land Cruiser 200`, `Alfa 1600`, `Lada 2107`).
 
 ## O sintoma
 
@@ -158,7 +173,21 @@ casada:
    (ver a condição `recompute`), portanto as estimativas `exato` ficariam presas
    com a amostra velha.
 
-## Decisão pedida
+## Decisão tomada
 
-Qual das opções (A/B/C), e se se acrescentam os casos 911 ao golden antes ou
-depois.
+**A**, implementada e validada (ver o cabeçalho). Os casos 911 entraram como
+testes de unidade sobre o catálogo sintético, não no golden: o golden é de
+anúncios REAIS rotulados à mão e não se rotula a si próprio.
+
+**Fica em aberto:** a opção **B** (disjunção temporal), que dispensa a lista por
+marca. O `NUMERIC_CHASSIS_MAKES` tem hoje uma entrada e vai precisar de outra à
+primeira marca de família numérica que apareça no catálogo — é o custo conhecido
+de A, e o sinal de que B vale a pena quando houver tempo de a calibrar.
+
+**Sequela conhecida, não corrigida:** um anúncio que diz "Carrera **Cabrio** GTS"
+não confirma o derivado `cabriolet` — o `derivativeGuard` compara tokens exatos e
+`cabrio` ≠ `cabriolet`. Já era assim antes desta alteração (o T-Roc funciona porque
+o mid do catálogo diz mesmo "Cabrio"); agora fica mais visível, porque estes
+anúncios caem em `provavel` em vez de casarem a versão errada. Um mapa de
+sinónimos de carroçaria resolve-o, e não foi feito aqui para manter a alteração no
+que estava provado.

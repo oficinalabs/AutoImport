@@ -28,6 +28,7 @@ import {
   BODY_TOKENS,
   type CatalogVersion,
   distinctiveTokensByMid,
+  type NoiseContext,
   type Generation,
   NEUTRAL_BODY,
   normGearbox,
@@ -312,12 +313,14 @@ function derivativeGuard(
   cands: CatalogVersion[],
   adTokens: Set<string>,
   midInfo: UsCatalogIndex["midInfo"],
+  noiseCtx: NoiseContext,
 ): { cands: CatalogVersion[]; derivadoAmbiguo: boolean } {
   const mids = [...new Set(cands.map((v) => v.mid))];
   if (mids.length < 2) return { cands, derivadoAmbiguo: false };
 
   const distinctive = distinctiveTokensByMid(
     new Map(mids.map((mid) => [mid, midInfo.get(mid)?.slugTokens ?? []])),
+    noiseCtx,
   );
   const universe = new Set<string>();
   for (const d of distinctive.values()) for (const t of d) universe.add(t);
@@ -574,7 +577,10 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   // Guarda de derivados de modelo/carroçaria: separa derivados distintos (Cross,
   // Cabrio, Defender 90/110) pelo texto do anúncio ou, na ausência de token,
   // recolhe o modelo base; sem base inequívoca marca `derivadoAmbiguo`.
-  const guard = derivativeGuard(cands, adTokens, catalog.midInfo);
+  // O ctx do ruído tem de ser o MESMO que o build usou (ver isNoiseToken): o núcleo
+  // é relativo ao universo, o ruído não. `familySlug` é o slug da família, já
+  // derivado acima para o filtro de badges.
+  const guard = derivativeGuard(cands, adTokens, catalog.midInfo, { makeSlug, family: familySlug });
   cands = guard.cands;
   const derivadoAmbiguo = guard.derivadoAmbiguo;
 

@@ -376,20 +376,59 @@ export const NEUTRAL_BODY = new Set([
 ]);
 
 /**
+ * Marcas cujos NOMES DE FAMÍLIA são, eles próprios, números — e que por isso usam
+ * números TAMBÉM para os códigos de chassis/geração: Porsche (família 911, 718,
+ * 356, 912, 924, 928, 944, 968; chassis 991/992/9921/9922, 986/987/981/982,
+ * 970/971). Nestas, um token numérico puro que NÃO é o slug da família é o
+ * chassis, não um derivado.
+ *
+ * Porquê uma lista por marca e não uma regra geral: **não existe regra ao nível do
+ * token**. Medido no catálogo, os numéricos puros que SÃO designações a sério —
+ * `Defender 90/110/130` (comprimento da carroçaria), `Land Cruiser 100/120/200`,
+ * `Alfa Giulia 1300/1600` (cilindrada no nome), `Lada 1200/2107` — não se
+ * distinguem de `9921`/`992` por número de dígitos: 110 e 992 têm ambos 3, 1600 e
+ * 9921 têm ambos 4. Uma regra genérica apagava os derivados verdadeiros.
+ *
+ * Escopo é a defesa: fora destas marcas nada muda. Mesmo precedente do
+ * `CHASSIS_MAKES` acima. A alternativa geral (disjunção temporal: gerações
+ * sucedem-se, derivados coexistem) está analisada em docs/10-DERIVADO-VS-GERACAO.md
+ * — é a correção certa, mas precisa de calibração própria.
+ */
+export const NUMERIC_CHASSIS_MAKES = new Set(["porsche"]);
+
+/** Contexto do universo de slugs (ver `NUMERIC_CHASSIS_MAKES`). */
+export interface NoiseContext {
+  makeSlug: string;
+  /** slug da família (ex. "911") — o token numérico que NÃO é ruído */
+  family: string;
+}
+
+/**
  * Ruído ao comparar slugs de mids da MESMA família (não designa um derivado):
  * anos, romanos, códigos de chassis (e210/g20/l663), marcadores de facelift,
  * marcas de geração (mk5/mk6), carroçaria neutra e tokens de UMA letra (letras de
  * chassis/geração isoladas: Corsa D/E, Astra J/K — nunca um modelo por si só).
+ *
+ * Com `ctx`, acrescenta o chassis numérico das marcas de família numérica (ver
+ * `NUMERIC_CHASSIS_MAKES`). Sem `ctx` o comportamento é o de sempre — os chamadores
+ * que não têm marca à mão não perdem nada.
  */
-export function isNoiseToken(t: string): boolean {
+export function isNoiseToken(t: string, ctx?: NoiseContext): boolean {
   if (/^(?:19|20)\d{2}$/.test(t)) return true; // ano
   if (ROMAN.has(t)) return true; // romano
   if (/^[a-z]{1,2}\d{1,3}[a-z]?$/.test(t)) return true; // chassis/plataforma letra-inicial (e210, g20, c8, mk5…)
   if (/^\d{1,3}[a-z]{1,2}$/.test(t)) return true; // chassis/plataforma dígito-inicial (8v, 8y, 8p — Audi/VW)
   if (/^(?:lci|facelift|restyling|mopf|phase)$/.test(t)) return true; // facelift/fase
-  if (/^(?:class|klasse|classe|clase)$/.test(t)) return true; // filler do nome (Classe C)
+  // filler do nome: "Classe C", e o "Series" que o ultimatespecs cola nos slugs
+  // ("911-coupe-9921-series"). Sem o `series` a correção do chassis numérico ficava
+  // a meio: uns mids trazem-no e outros não (M10225 "…-9921-series" vs M14162
+  // "…-9922"), portanto ele SOBREVIVIA como distintivo e continuava a partir a
+  // mesma carroçaria em duas linhas de derivado ("coupe-series" vs "coupe").
+  if (/^(?:class|klasse|classe|clase|series)$/.test(t)) return true;
   if (t.length === 1) return true; // letra/algarismo isolado (chassis/porta)
   if (NEUTRAL_BODY.has(t)) return true; // corpo por omissão → é a base
+  if (ctx && NUMERIC_CHASSIS_MAKES.has(ctx.makeSlug) && /^\d+$/.test(t) && t !== ctx.family)
+    return true; // chassis numérico (Porsche 9921/992/986) — nunca a própria família
   return false;
 }
 
@@ -403,13 +442,18 @@ export function isNoiseToken(t: string): boolean {
  * certo: a guarda passa os mids DOS CANDIDATOS (núcleo local), o build passa TODOS
  * os mids da família (núcleo da família). Só a lógica ruído/núcleo/diferença é a
  * mesma; o núcleo é relativo ao universo recebido.
+ *
+ * `ctx` (marca + slug da família) só serve o ruído — ver `isNoiseToken`. Os DOIS
+ * chamadores têm de o passar: o núcleo é relativo ao universo, mas o ruído não pode
+ * ser, ou o build e a guarda discordavam sobre o que é um derivado.
  */
 export function distinctiveTokensByMid(
   slugTokensByMid: Map<string, string[]>,
+  ctx?: NoiseContext,
 ): Map<string, Set<string>> {
   const modelTokens = new Map<string, Set<string>>();
   for (const [mid, toks] of slugTokensByMid) {
-    modelTokens.set(mid, new Set(toks.filter((t) => !isNoiseToken(t))));
+    modelTokens.set(mid, new Set(toks.filter((t) => !isNoiseToken(t, ctx))));
   }
   // núcleo comum a TODOS os mids do universo; os distintivos são o resto.
   let core: Set<string> | null = null;
@@ -584,6 +628,7 @@ export function buildIndex(models: UsModelRow[], versions: UsVersionRow[]): UsCa
     // CANDIDATOS — universos diferentes de propósito (ver distinctiveTokensByMid).
     const distinctiveByMid = distinctiveTokensByMid(
       new Map(mids.map((mid) => [mid, midResolved.get(mid)!.slugTokens])),
+      { makeSlug, family },
     );
     const derivativeOfMid = new Map<string, string>(
       mids.map((mid) => [mid, [...(distinctiveByMid.get(mid) ?? [])].join("-")]),

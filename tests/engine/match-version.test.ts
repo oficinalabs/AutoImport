@@ -235,6 +235,30 @@ model("CLA-C117", "Mercedes", "CLA-C117", 2016, [
   { name: "CLA 250 4matic", fuelSection: "petrol", fuel: "Petrol", year: 2016, hp: 218, cc: 1991, co2w: 155 },
 ]);
 
+// Porsche 911 — espelha a forma REAL dos slugs do ultimatespecs, onde o código de
+// chassis é NUMÉRICO ("911-coupe-9921-series") e por isso escapava ao isNoiseToken,
+// que só apanhava chassis com letra (e210/g20/l663). Todas estas versões têm a
+// MESMA assinatura dura (480cv, 2981cc): quem as separa é o derivado/geração.
+// Ver docs/10-DERIVADO-VS-GERACAO.md.
+model("P-992-1-COUPE", "Porsche", "911-coupe-9921-series", 2019, [
+  { name: "911 Carrera GTS", fuelSection: "petrol", fuel: "Petrol", year: 2021, hp: 480, cc: 2981, co2w: 221 },
+]);
+model("P-992-1-CAB", "Porsche", "911-cabriolet-9921-series", 2019, [
+  { name: "911 Carrera GTS Cabriolet", fuelSection: "petrol", fuel: "Petrol", year: 2021, hp: 480, cc: 2981, co2w: 224 },
+]);
+model("P-992-1-TARGA", "Porsche", "911-targa-9921-series", 2019, [
+  { name: "911 Targa 4 GTS", fuelSection: "petrol", fuel: "Petrol", year: 2021, hp: 480, cc: 2981, co2w: 227 },
+]);
+model("P-DAKAR", "Porsche", "911-dakar-992-series", 2022, [
+  { name: "911 Dakar 3.0 PDK", fuelSection: "petrol", fuel: "Petrol", year: 2022, hp: 480, cc: 2981, co2w: 256 },
+]);
+// Geração seguinte da MESMA carroçaria, e sem o "series" no slug — é este par
+// (…-9921-series vs …-9922) que provava que neutralizar só o número não bastava:
+// o "series" sobrevivia como distintivo e partia o coupé em duas linhas.
+model("P-992-2-COUPE", "Porsche", "911-coupe-9922", 2024, [
+  { name: "911 Carrera S PDK Coupe", fuelSection: "petrol", fuel: "Petrol", year: 2025, hp: 480, cc: 2981, co2w: 232 },
+]);
+
 const CAT: UsCatalogIndex = buildIndex(models, versions);
 
 // ── helper de input ──
@@ -655,6 +679,50 @@ test("derivados: T-Roc sem 'cabrio' no texto → SUV base (não o Cabriolet)", (
 test("derivados: T-Roc 'Cabrio' no texto → confirma o Cabriolet", () => {
   const r = resolveVersion(inp({ makeRaw: "Volkswagen", modelRaw: "T-Roc Cabrio", variant: "1.5 TSI", fuelRaw: "Benzin", year: 2018, powerHp: 150, displacementCc: 1498 }), CAT);
   assert.equal(vspec(r)?.tokens.includes("cabrio"), true);
+});
+
+// ── Chassis NUMÉRICO não é derivado (docs/10-DERIVADO-VS-GERACAO.md) ──
+// O bug real: um "992 GTS" de 480cv ficava `exato` no 911 Dakar. O código de
+// geração ("992") entrava no derivado canónico, o anúncio nomeia-o (é o chassis
+// que todo o vendedor de Porsche escreve) e o derivativeGuard elegia o único mid
+// que o continha — o Dakar. Ver a cadeia completa no doc.
+
+test("chassis numérico: '992 GTS' NUNCA casa com o 911 Dakar", () => {
+  const r = resolveVersion(inp({ makeRaw: "Porsche", modelRaw: "911 SERIES", variant: "992 GTS Approved bis 05/2027", fuelRaw: "Benzin", year: 2022, powerHp: 480, displacementCc: 2981, co2: 221 }), CAT);
+  assert.equal(vspec(r)?.tokens.includes("dakar") ?? false, false);
+  // O "992" do anúncio não pode eleger derivado nenhum: sem carroçaria nomeada o
+  // honesto é NÃO afirmar a versão (coupé, cabrio e targa têm preços diferentes).
+  assert.notEqual(r?.kind, "exato");
+});
+
+test("chassis numérico: um 911 Dakar a sério continua exato no Dakar", () => {
+  const r = resolveVersion(inp({ makeRaw: "Porsche", modelRaw: "911 SERIES", variant: "911 Dakar", fuelRaw: "Benzin", year: 2023, powerHp: 480, displacementCc: 2981, co2: 256 }), CAT);
+  assert.equal(r?.kind, "exato");
+  assert.equal(vspec(r)?.tokens.includes("dakar"), true);
+  assert.equal(CAT.midInfo.get(vspec(r)!.mid)?.derivative, "dakar");
+});
+
+test("chassis numérico: o derivado é a CARROÇARIA, sem o chassis nem o 'series'", () => {
+  // Antes: "coupe-9921-series" / "coupe-9922" — a mesma carroçaria em duas linhas
+  // de derivado, o que impedia o clusterGenerations de fechar as janelas.
+  assert.equal(CAT.midInfo.get("P-992-1-COUPE")?.derivative, "coupe");
+  assert.equal(CAT.midInfo.get("P-992-2-COUPE")?.derivative, "coupe");
+  assert.equal(CAT.midInfo.get("P-992-1-CAB")?.derivative, "cabriolet");
+  assert.equal(CAT.midInfo.get("P-DAKAR")?.derivative, "dakar");
+});
+
+test("chassis numérico: as janelas de geração do coupé passam a FECHAR", () => {
+  // A consequência escondida do bug: com a geração dentro do derivado, cada geração
+  // ficava sozinha na sua linha e nunca havia uma seguinte que lhe fechasse a
+  // janela — medido no armazém real, as 29 gerações de porsche|911 tinham TODAS
+  // yearEnd null, tornando a guarda de janela inerte na Porsche.
+  const fam = CAT.byFamily.get("porsche|911");
+  const coupe = (fam?.generations ?? []).filter((g) => g.id.includes("coupe"));
+  assert.equal(coupe.length, 2, "992.1 e 992.2 são duas gerações da MESMA linha");
+  const fechada = coupe.find((g) => g.yearEnd != null);
+  assert.ok(fechada, "a geração anterior tem de ter janela fechada");
+  const aberta = coupe.find((g) => g.yearEnd == null);
+  assert.ok(aberta && aberta.yearStart! > fechada!.yearEnd!, "e a seguinte começa depois");
 });
 
 test("derivados: carroçarias sem base (TT Coupe/Roadster) → designacao (motor provado, variante não única)", () => {
