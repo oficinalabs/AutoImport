@@ -73,6 +73,9 @@ const VM_OUTRO = "44444444-4444-4444-4444-444444444412";
 
 let servidor: ChildProcess | null = null;
 let cookie = "";
+/** stdout+stderr do servidor, para as asserções poderem dizer o que ele viu. */
+const logDoServidor: string[] = [];
+const ultimasLinhas = (n = 20) => logDoServidor.join("").trim().split("\n").slice(-n).join("\n");
 
 /** Anúncios: 10 Golf + 10 de outro modelo, todos na montra (exato + normal). */
 async function seedListings(sql: ReturnType<typeof postgres>) {
@@ -146,6 +149,11 @@ before(async () => {
     NEXT_TELEMETRY_DISABLED: "1",
     // Sem isto o Better Auth recusa o pedido vindo de 127.0.0.1:3111.
     BETTER_AUTH_URL: BASE,
+    // O CI não tem `.env.local`, e sem segredo o Better Auth devolve 500 ao
+    // registo — com corpo vazio, porque a app não vaza detalhe de erro (e faz
+    // bem). Um segredo fixo de teste torna isto auto-suficiente: nada aqui
+    // assina nada que saia desta base descartável.
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET || "smoke-test-secret-nao-usar-em-producao",
     NODE_ENV: "production" as const,
   };
 
@@ -154,6 +162,11 @@ before(async () => {
     env,
     stdio: "pipe",
   });
+  // A app nunca devolve detalhe de erro ao cliente (CLAUDE.md), portanto um 500
+  // chega aqui como corpo vazio. Sem isto, diagnosticar uma falha no CI é
+  // adivinhar — foi o que aconteceu à primeira.
+  servidor.stderr?.on("data", (d) => logDoServidor.push(String(d)));
+  servidor.stdout?.on("data", (d) => logDoServidor.push(String(d)));
   await esperarServidor();
 
   // Conta + sessão. O registo exige email verificado, e não há caixa de correio
@@ -163,7 +176,11 @@ before(async () => {
     headers: { "Content-Type": "application/json", Origin: BASE },
     body: JSON.stringify(UTILIZADOR),
   });
-  assert.equal(registo.status, 200, `registo falhou: ${await registo.text()}`);
+  assert.equal(
+    registo.status,
+    200,
+    `registo falhou: ${await registo.text()}\n--- servidor ---\n${ultimasLinhas()}`,
+  );
 
   const sql2 = postgres(url, { prepare: false, onnotice: () => {} });
   try {
@@ -177,7 +194,11 @@ before(async () => {
     headers: { "Content-Type": "application/json", Origin: BASE },
     body: JSON.stringify({ email: UTILIZADOR.email, password: UTILIZADOR.password }),
   });
-  assert.equal(login.status, 200, `login falhou: ${await login.clone().text()}`);
+  assert.equal(
+    login.status,
+    200,
+    `login falhou: ${await login.clone().text()}\n--- servidor ---\n${ultimasLinhas()}`,
+  );
   cookie = (login.headers.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
   assert.ok(cookie.includes("session_token"), "não veio cookie de sessão");
 });
