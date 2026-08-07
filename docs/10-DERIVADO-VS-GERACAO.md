@@ -1,9 +1,11 @@
 # 🔧 O derivado estava a engolir a geração
 
-> **Estado: OPÇÃO A IMPLEMENTADA** (07/ago/2026). O diagnóstico abaixo mantém-se
-> como registo; a opção **B continua em aberto** e é a correção certa a prazo — o
-> que está feito resolve as marcas de família numérica, não a classe do problema.
-> Números medidos no armazém local (664 264 anúncios, catálogo de 6 330 mids).
+> **Estado: OPÇÃO A IMPLEMENTADA; B TESTADA E FALSIFICADA** (07/ago/2026). O
+> diagnóstico abaixo mantém-se como registo. A opção A resolve as marcas de família
+> numérica, não a classe do problema — mas já não há "correção certa a prazo" à
+> espera: as três alternativas gerais candidatas foram testadas contra o catálogo
+> real e **as três caíram** (ver as secções próprias). A allowlist é a melhor opção
+> conhecida. Números medidos no armazém local (664 264 anúncios, 6 330 mids).
 >
 > **O que mudou:** `NUMERIC_CHASSIS_MAKES` em `lib/engine/us-catalog.ts` (hoje só
 > `porsche`) + `series` tratado como filler do nome, ambos no `isNoiseToken`, que
@@ -215,8 +217,76 @@ modelo. Mesmo contraexemplo do `Defender 90/110`, noutra roupagem.
 
 São **duas** regras gerais candidatas testadas contra o catálogo (contagem de
 dígitos, marcador estrutural) e **duas** falsificadas com contraexemplos concretos.
-Isto não é argumento contra a opção B — é a favor: B não olha para o token, olha
-para o comportamento no tempo. Fica em aberto, agora com mais motivo.
+Restava a opção B — ver a secção seguinte, onde também cai.
+
+## Opção B (disjunção temporal) — FALSIFICADA (07/ago)
+
+A hipótese: gerações **sucedem-se** no tempo, derivados **coexistem** — logo
+compara-se a janela de anos dos mids que diferem por um token numérico. Testadas 9
+formulações (estrita com tolerâncias 0/2/5, branda, cadeia de família, estrutural,
+e conjunções) contra uma tabela de 50 verdictos rotulados em 16 famílias. A melhor
+acerta **41 de 50**. Não é implementável, por três razões independentes:
+
+**1. Prova de impossibilidade: 68 % das famílias não têm irmã com que comparar.**
+Medido: 88 famílias têm um token numérico não-família; **60 delas têm só UM**
+(128 mids, 872 anúncios ativos). A regra não tem input — e os verdictos exigidos
+são **opostos com evidência estruturalmente idêntica**:
+
+| família | token | ano | veredito exigido |
+|---|---|---|---|
+| `alfa-romeo\|2000` | 102 | 1958 | **chassis** (Tipo 102) |
+| `volvo\|850` | 855 | 1996 | **designação** (855 break) |
+| `honda\|civic` | 10 | 2017–20 | **chassis** (10.ª geração) |
+| `buick\|electra` | 225 | 1958–78 | **designação** (Electra 225) |
+
+Qualquer default erra metade. Só isto fecha a opção B como está formulada.
+
+**2. Falsificada nos DOIS sentidos, onde há irmã.**
+*Sobrepõem-se mas SÃO chassis:* `porsche|911` 991 [2012‑16] ∩ 9912 [2015‑18] = 2
+anos; 993 ∩ 996 = 2; `porsche|boxster` 986 ∩ 987 = 1. As gerações Porsche não se
+sucedem no dado — o ultimatespecs dá um ano por versão e a 991.1 vendeu‑se ao lado
+da 991.2.
+*São disjuntas mas SÃO designações:* `alfa-romeo|giulia` 1300 [1966‑68] vs 1600
+[1972]; `bugatti|type` 35/46/49/57; `cadillac|series` 70 vs 62; e — descoberto pela
+medição, não estava previsto — **`bmw|serie-3` pré‑guerra 303/309/315/319/320/321/
+326/327/329/335**, onze modelos distintos com janelas de um ano cada, numa família
+com ~1 800 anúncios ativos.
+
+**3. A tolerância que "funciona" tem uma banda de 2 valores.** Só `tol ∈ {2,3}`:
+com `tol ≤ 1` o `porsche|911` volta a ser classificado designação (a falha original
+regressa); com `tol ≥ 4` o `toyota|land-cruiser` 90/100/120/200 passa a chassis.
+Calibrada em 8 famílias — é overfitting, não uma regra.
+
+**A raiz:** o dado de ano é esparso e sujo exactamente nas famílias que decidem.
+Dos 261 mids com token numérico, 36 % têm ≤1 versão datada e 38 % têm janela de um
+ano. O Giulia GT 1300 Junior e o GT 1600 Junior **coexistiram** (1972‑75), mas o
+catálogo tem uma versão datada de cada (1966 e 1972) — a coexistência é invisível.
+
+Se implementada (a melhor variante), mudaria 144 mids em 37 famílias e tocaria 331
+anúncios: ganhava `honda|civic` "10" (118 anúncios) e `alfa-romeo|spider` 916/939
+(58), e em troca fundia o Giulia GT 1300 com o GT 1600, apagava o Electra 225 (60
+mids) e colapsava os onze BMW pré‑guerra na linha base.
+
+**Conclusão: são três regras gerais testadas e três falsificadas** (contagem de
+dígitos, marcador `type`/`tipo`, disjunção temporal). A allowlist
+`NUMERIC_CHASSIS_MAKES` continua a ser a melhor opção conhecida, e o residual fica
+como está. Quem voltar a este problema poupa três tentativas.
+
+### Achado colateral: `us_models.model_year` com cilindradas
+
+Medido ao investigar B: **13 mids** têm `model_year` fora de [1880, 2100], e em 8
+deles o valor é a **cilindrada** — `6C-1750` → 1750, `6C-2500` → 2500, `Lada-1200`
+→ 1200, `Lada-2107` → 2107, `OT-1000` → 1000. Consequência real: a geração
+`alfa-romeo|6c 1750#0` fica com `yearStart` **1749**, quando as versões dizem
+1929‑1931.
+
+Alcance: **8 janelas de geração** de 5 476, em 4 famílias (`alfa-romeo|6c`,
+`vaz|lada`, `abarth|ot`, `abarth|otr`), **2 anúncios ativos**. Não corrigido de
+propósito: falha ABERTO (a janela fica permissiva, não exclusiva — o lado seguro do
+erro) e o custo de mexer não se justifica com 2 anúncios. Se algum dia justificar,
+a correção é rejeitar no `buildIndex` um `model_year` fora de [1880, 2100] — um ano
+assim não é um ano — e deixar o arranque vir das `us_versions.year`, que estão
+certas.
 
 ## Sinónimos de carroçaria — CORRIGIDO (07/ago)
 
