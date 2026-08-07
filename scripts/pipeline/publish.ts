@@ -168,6 +168,8 @@ export interface PublishReport {
   montra: number;
   /** montra que o destino mostrava ANTES do ciclo */
   montraNoDestino: number;
+  /** Estimativas apagadas no destino por terem desaparecido da origem. */
+  estimatesDropped: number;
   /** mortos NA ORIGEM (deleted_at verificado) → `deleted_at` no destino */
   softDeleted: number;
   /** vivos, mas fora da montra (perderam o `exato` ou a confiança `normal`) */
@@ -352,6 +354,7 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
     const report: PublishReport = {
       montra: listingRows.length,
       montraNoDestino: targetMontra.length,
+      estimatesDropped: 0,
       softDeleted: 0,
       demoted: 0,
       unknownToSource: unknownToSource.length,
@@ -405,9 +408,11 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
         if (toDropEstimate.length) {
           // O compute-costs apaga a estimativa de quem deixou de ser elegível
           // ("não deixar veredito órfão") — o destino segue-o.
-          await tx`
+          const apagadas = await tx`
             delete from import_cost_estimates where listing_id = any(${toDropEstimate}::uuid[])
+            returning listing_id
           `;
+          report.estimatesDropped = apagadas.length;
         }
         if (oppsToDeactivate.length) {
           const done = await tx`
@@ -575,8 +580,9 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
 
     const saem = `${report.softDeleted} soft-delete (mortos confirmados na origem)`;
     const caem = `${report.demoted} despromovidos (vivos, fora da montra)`;
+    const apagadas = `${report.estimatesDropped} estimativas apagadas (deixaram de ser elegíveis na origem)`;
     const opps = `${report.opportunitiesDeactivated} oportunidades desativadas`;
-    log(`publish: ${saem} · ${caem} · ${opps}`);
+    log(`publish: ${saem} · ${caem} · ${apagadas} · ${opps}`);
     // Nunca em silêncio: se o corpus não cobre uma fonte, o publicador não faz
     // ideia do que lá se passa — dizer quantos e de onde é o que deixa isso à vista.
     if (report.unknownToSource) {
