@@ -185,28 +185,63 @@ function escolherExemploIsv(top: Listing[]): Listing | null {
  * A página cacheia o resultado (ver `revalidate` em app/(marketing)/page.tsx):
  * mantém-na rápida sem servir números velhos.
  */
+/**
+ * A landing sem números — o estado degradado, não um estado de erro.
+ *
+ * A página já sabe lidar com ele: sem `lastSeenAt` não mostra o carimbo de
+ * frescura, e sem `isvExample` a secção da conta do ISV não aparece. Ver
+ * `escolherExemploIsv` e app/(marketing)/page.tsx.
+ */
+const LANDING_VAZIA: LandingData = {
+  totalListings: 0,
+  activeOpportunities: 0,
+  medianSavings: 0,
+  bestSavings: 0,
+  lastSeenAt: null,
+  featured: [],
+  isvExample: null,
+};
+
 export async function getLandingData(): Promise<LandingData> {
-  const [stats, top] = await Promise.all([
-    q.landingStatsQuery(),
-    // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
-    // largo porque os carros com imposto alto estão em baixo desta lista (é
-    // ordenada por poupança) — ver `escolherExemploIsv`.
+  try {
+    const [stats, top] = await Promise.all([
+      q.landingStatsQuery(),
+      // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
+      // largo porque os carros com imposto alto estão em baixo desta lista (é
+      // ordenada por poupança) — ver `escolherExemploIsv`.
+      //
+      // Por poupança ABSOLUTA, ao contrário do painel: a landing usa esta lista
+      // para escolher o carro que ilustra a conta do ISV, e esse critério assenta
+      // no peso do imposto em euros. Ordená-la por percentagem trocava o leque de
+      // valores absolutos por um de margens, e o exemplo do ISV ficava pior.
+      q.topOpportunitiesQuery(48, null, "savings"),
+    ]);
+    return {
+      ...stats,
+      // 5: a fila passou a carrossel com setas (components/ui/carousel.tsx), e
+      // com 4 visíveis de cada vez, 5 deixa exatamente um por revelar — que é o
+      // que faz a seta valer a pena. Com 8 ficavam duas páginas e a segunda
+      // raramente se via.
+      featured: top.slice(0, 5),
+      isvExample: escolherExemploIsv(top),
+    };
+  } catch (error) {
+    // ⚠️ A landing é PRÉ-RENDERIZADA (revalidate = 3600), portanto esta query
+    // corre durante o `next build`. E os previews de PR **não migram** — Preview
+    // e Production partilham a DATABASE_URL, e um PR por rever não pode alterar
+    // a produção (ver CLAUDE.md). Resultado: qualquer PR que traga uma migration
+    // fazia FALHAR o build de todos os previews com "column … does not exist" —
+    // não só o dele, e o preview é a única forma de a equipa rever o trabalho.
     //
-    // Por poupança ABSOLUTA, ao contrário do painel: a landing usa esta lista
-    // para escolher o carro que ilustra a conta do ISV, e esse critério assenta
-    // no peso do imposto em euros. Ordená-la por percentagem trocava o leque de
-    // valores absolutos por um de margens, e o exemplo do ISV ficava pior.
-    q.topOpportunitiesQuery(48, null, "savings"),
-  ]);
-  return {
-    ...stats,
-    // 5: a fila passou a carrossel com setas (components/ui/carousel.tsx), e
-    // com 4 visíveis de cada vez, 5 deixa exatamente um por revelar — que é o
-    // que faz a seta valer a pena. Com 8 ficavam duas páginas e a segunda
-    // raramente se via.
-    featured: top.slice(0, 5),
-    isvExample: escolherExemploIsv(top),
-  };
+    // Em produção NÃO se engole nada: o `db:migrate:deploy` corre ANTES do build
+    // (vercel.json), portanto lá o schema corresponde ao código por construção e
+    // uma falha aqui é real — rebenta, e a Vercel mantém a versão anterior no ar.
+    // Localmente também rebenta, que é onde se quer ver o erro.
+    const podeDegradar = Boolean(process.env.VERCEL) && process.env.VERCEL_ENV !== "production";
+    if (!podeDegradar) throw error;
+    console.error("[landing] preview sem dados (schema por migrar?):", error);
+    return LANDING_VAZIA;
+  }
 }
 
 // ── Painel ──────────────────────────────────────────────────────
