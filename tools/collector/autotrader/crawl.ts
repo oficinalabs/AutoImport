@@ -41,10 +41,15 @@ const FAIXAS_PRECO = [
   [30000, 40000], [40000, 60000], [60000, 100000], [100000, 0],
 ];
 
+// ⚠️ O caminho é `/auto`, não `/auto/occasions`. O site largou o segmento
+// `occasions` (verificado a 7 ago 2026: `/auto/occasions` → HTTP 404, `/auto` →
+// 200), e o coletor ficou a devolver zero anúncios em silêncio — foi assim que a
+// Holanda ficou meses só com o theparking. O payload não mudou: continua a vir
+// em `props.pageProps.listings` do `__NEXT_DATA__` (ver parse.ts).
 function urlListagem(params: Record<string, string>, page: number) {
   const qs = new URLSearchParams({ atype: 'C', ...params });
   if (page > 1) qs.set('page', String(page));
-  return `${BASE}/auto/occasions?${qs}`;
+  return `${BASE}/auto?${qs}`;
 }
 
 function statsVazias(): Stats {
