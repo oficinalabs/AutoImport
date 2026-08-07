@@ -1,6 +1,6 @@
 "use client";
 
-import { searchFiltersToQuery } from "@/app/(app)/(gated)/pesquisar/filters";
+import { DEFAULT_SORT, searchFiltersToQuery } from "@/app/(app)/(gated)/pesquisar/filters";
 import { CarCard } from "@/components/car-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -191,7 +191,7 @@ export function SearchView({
           </button>
           <div className="ml-auto">
             <select
-              value={f.sort ?? "savings"}
+              value={f.sort ?? DEFAULT_SORT}
               onChange={(e) => aplicar({ sort: e.target.value as Sort })}
               className="h-10 rounded-[6px] border border-line-strong bg-surface px-3 text-sm"
               aria-label="Ordenar"
