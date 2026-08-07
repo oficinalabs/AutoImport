@@ -139,7 +139,7 @@ test(
       origin_price: number | null;
     }[];
 
-    assert.equal(estimates.length, 6);
+    assert.equal(estimates.length, 8);
     const byId = new Map(estimates.map((e) => [e.external_id, e]));
 
     const compensa = byId.get("fixture-de-1");
@@ -159,16 +159,27 @@ test(
     assert.equal(byId.get("fixture-de-6")?.price, 24000);
     assert.equal(byId.get("fixture-de-6")?.origin_price, 24000);
 
-    // Oportunidade ativa apenas para o compensa
+    // Preço que não é de retalho (lib/engine/not-retail.ts): o de-7 é o de-1
+    // BYTE a byte — mesmo modelo, ano, km e preço — e só o texto difere
+    // ("-Motorschaden-"). Sem estimativa. É este par que prova a guarda: o de-8
+    // é o CONTROLO e diz "unfallfrei" (SEM acidentes), que contém "unfall" e
+    // seria apanhado por um padrão ingénuo — tem de compensar como o de-1.
+    // O par corre em SQL, portanto prova o lookahead do Postgres, não só o do JS.
+    assert.equal(byId.get("fixture-de-7")?.verdict, null);
+    assert.equal(byId.get("fixture-de-8")?.verdict, "compensa");
+
+    // Oportunidades ativas: os dois que compensam (o de-8 tem km 96 000 para não
+    // colapsar na identidade de carro físico do de-1), nunca o de-7.
     const opps = (await db.execute(sql`
     select l.external_id
     from opportunities o
     join listings l on l.id = o.listing_id
     where o.deleted_at is null and l.external_id like 'fixture-%'
+    order by l.external_id
   `)) as unknown as { external_id: string }[];
     assert.deepEqual(
       opps.map((o) => o.external_id),
-      ["fixture-de-1"],
+      ["fixture-de-1", "fixture-de-8"],
     );
   },
 );
@@ -829,6 +840,158 @@ test(
     // Proveniência auditável: a estimativa que passou grava contra o que passou.
     assert.equal(est[0]?.inputs.originSampleSize, 7, "7 comparáveis ES (o barato inclusive)");
     assert.equal(est[0]?.inputs.originMedian, 24_000);
+  },
+);
+
+test(
+  "carro de alto valor com amostra PT pequena (n<10 acima de 80 k€) não gera estimativa",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+
+    await cleanup();
+
+    // O caso real (Urus S de 279 666 € contra uma amostra de 6 da qual 5 eram
+    // Performante → "poupança" 68 582 €): no topo da gama um model_id junta a
+    // escada de trims toda, e nem o mid nem a potência a separam. Ver
+    // HIGH_VALUE_EUR em lib/engine/pt-market.ts.
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'topomodel', 'gasolina', 'testgen|topomodel|gasolina')
+      returning id
+    `)) as unknown as { id: string }[];
+
+    // Amostra PT sã mas PEQUENA: 6 stands (passa o MIN_SAMPLE_NORMAL de 5, falha
+    // o MIN_SAMPLE_HIGH_VALUE de 10). Mediana 101 500 €, dispersão apertada.
+    for (const [i, price] of [100_000, 100_600, 101_200, 101_800, 102_400, 103_000].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${`fixture-topo-pt-${i}`}, ${model.id}, 'Testgen', 'TopoModel',
+           'Gasolina', 'gasolina', 'TopoModel 1.5', 2022, 100000, 130, ${price}, 'PT',
+           ${`Stand Topo ${i}`}, ${`https://example.test/fixture-topo-pt-${i}`})
+      `);
+    }
+
+    // Dois gémeos em tudo menos o PREÇO, um de cada lado dos 80 000 €. O par é o
+    // que prova que a exclusão é do valor do carro e não de outra guarda — a
+    // amostra PT que os dois vêem é exatamente a mesma.
+    for (const [id, price] of [
+      ["fixture-topo-de-abaixo", 79_000],
+      ["fixture-topo-de-acima", 85_000],
+    ] as const) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, displacement_cc, co2, price, country, detail_url, first_registration)
+        values
+          ('autoscout24.de', ${id}, ${model.id}, 'Testgen', 'TopoModel', 'Gasolina', 'gasolina',
+           'TopoModel 1.5', 2022, 100000, 130, 1500, 135, ${price}, 'DE',
+           ${`https://example.test/${id}`}, '2022-06-01')
+      `);
+    }
+
+    await collectPtObservations();
+    const res = await computeCosts();
+    assert.equal(res.amostraFracaTopo, 1, "só o gémeo acima de 80 k€ é recusado");
+
+    const est = (await db.execute(sql`
+      select l.external_id, e.pt_sample_size
+      from import_cost_estimates e join listings l on l.id = e.listing_id
+      where l.external_id like 'fixture-topo-de-%'
+    `)) as unknown as { external_id: string; pt_sample_size: number }[];
+    assert.deepEqual(
+      est.map((e) => e.external_id),
+      ["fixture-topo-de-abaixo"],
+      "abaixo de 80 k€ a mesma amostra de 6 serve; acima não gera estimativa nenhuma",
+    );
+    assert.equal(est[0]?.pt_sample_size, 6, "a amostra é a MESMA para os dois gémeos");
+  },
+);
+
+test(
+  "poupança extrema sem amostra de origem que a prove não gera estimativa",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+
+    await cleanup();
+
+    // A guarda do preço de origem PASSA quando não há comparáveis (sem prova não
+    // se recusa) — e medido, quem não tem comparáveis são os anúncios anómalos,
+    // portanto a isenção caía onde mais fazia falta recusar. Ver
+    // MAX_UNPROVEN_SAVINGS_PCT em lib/engine/origin-market.ts.
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'provamodel', 'gasolina', 'testgen|provamodel|gasolina')
+      returning id
+    `)) as unknown as { id: string }[];
+
+    // Amostra PT sã (5 stands, mediana 30 000 €).
+    for (const [i, price] of [29_400, 29_700, 30_000, 30_300, 30_600].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${`fixture-prova-pt-${i}`}, ${model.id}, 'Testgen', 'ProvaModel',
+           'Gasolina', 'gasolina', 'ProvaModel 1.5', 2022, 100000, 130, ${price}, 'PT',
+           ${`Stand Prova ${i}`}, ${`https://example.test/fixture-prova-pt-${i}`})
+      `);
+    }
+
+    // Os gémeos: MESMO preço (12 000 €) e mesma poupança (>35%), a diferir só em
+    // ter ou não mercado próprio que prove o preço. O ES tem 5 comparáveis ao
+    // mesmo nível (rácio ≈1, passa o MIN_ORIGIN_RATIO); o DE está sozinho no seu
+    // país → sem amostra → é a poupança que ninguém prova.
+    const foreign: [string, string, number][] = [
+      ["fixture-prova-es-c0", "ES", 11_500],
+      ["fixture-prova-es-c1", "ES", 11_800],
+      ["fixture-prova-es-c2", "ES", 12_100],
+      ["fixture-prova-es-c3", "ES", 12_400],
+      ["fixture-prova-es-c4", "ES", 12_700],
+      ["fixture-prova-es-provado", "ES", 12_000],
+      ["fixture-prova-de-semprova", "DE", 12_000],
+    ];
+    for (const [id, country, price] of foreign) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, displacement_cc, co2, price, country, detail_url, first_registration)
+        values
+          (${country === "ES" ? "autocasion.com" : "autoscout24.de"}, ${id}, ${model.id},
+           'Testgen', 'ProvaModel', 'Gasolina', 'gasolina', 'ProvaModel 1.5', 2022, 100000, 130,
+           1500, 135, ${price}, ${country}, ${`https://example.test/${id}`}, '2022-06-01')
+      `);
+    }
+
+    await collectPtObservations();
+    const res = await computeCosts();
+
+    const est = (await db.execute(sql`
+      select l.external_id, e.savings_pct, e.inputs->>'originSampleSize' as origin_n
+      from import_cost_estimates e join listings l on l.id = e.listing_id
+      where l.external_id in ('fixture-prova-es-provado', 'fixture-prova-de-semprova')
+    `)) as unknown as { external_id: string; savings_pct: number; origin_n: string | null }[];
+    assert.deepEqual(
+      est.map((e) => e.external_id),
+      ["fixture-prova-es-provado"],
+      "com amostra de origem a mesma poupança passa; sem ela não gera estimativa",
+    );
+    assert.equal(est[0]?.origin_n, "5", "é a existência da prova que o distingue");
+    assert.ok(
+      (est[0]?.savings_pct ?? 0) >= 35,
+      "o gémeo que passa está ACIMA do limiar — a guarda não é um tecto cego à margem",
+    );
+    assert.equal(res.poupancaNaoProvada, 1, "só o gémeo sem mercado próprio é recusado");
   },
 );
 
