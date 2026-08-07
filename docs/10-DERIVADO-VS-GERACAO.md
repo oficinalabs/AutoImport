@@ -179,15 +179,65 @@ casada:
 testes de unidade sobre o catálogo sintético, não no golden: o golden é de
 anúncios REAIS rotulados à mão e não se rotula a si próprio.
 
-**Fica em aberto:** a opção **B** (disjunção temporal), que dispensa a lista por
-marca. O `NUMERIC_CHASSIS_MAKES` tem hoje uma entrada e vai precisar de outra à
-primeira marca de família numérica que apareça no catálogo — é o custo conhecido
-de A, e o sinal de que B vale a pena quando houver tempo de a calibrar.
+## Auditoria da lista por marca (07/ago, depois de A)
 
-**Sequela conhecida, não corrigida:** um anúncio que diz "Carrera **Cabrio** GTS"
-não confirma o derivado `cabriolet` — o `derivativeGuard` compara tokens exatos e
-`cabrio` ≠ `cabriolet`. Já era assim antes desta alteração (o T-Roc funciona porque
-o mid do catálogo diz mesmo "Cabrio"); agora fica mais visível, porque estes
-anúncios caem em `provavel` em vez de casarem a versão errada. Um mapa de
-sinónimos de carroçaria resolve-o, e não foi feito aqui para manter a alteração no
-que estava provado.
+A pergunta óbvia: falta alguma marca no `NUMERIC_CHASSIS_MAKES`? Auditadas **todas**
+as famílias de nome numérico com outros numéricos nos slugs. Ficam 8 com derivado
+ainda "sujo", e a resposta é **não acrescentar nenhuma**:
+
+| família | numéricos | o que são | anúncios |
+|---|---|---|---|
+| `volvo\|240` | 244, 245 | **designações** (244 sedan, 245 break) | 4 |
+| `volvo\|850` | 855 | **designação** (855 break) | 13 |
+| `lada\|1200` | 2101, 2102 | **designações** (VAZ-2101/2102) | 2 |
+| `audi\|200` | 43, 44 | chassis (Typ 43/44) | 8 |
+| `alfa-romeo\|2000` | 102 | chassis (Tipo 102) | 24 |
+| `paige\|6`, `abbott\|6`, `abbott-detroit\|8` | — | pré-guerra | 0 |
+
+Acrescentar `volvo` ou `vaz` **destruía** designações reais. E `alfa-romeo` é o caso
+que fecha a discussão: na MESMA família convivem os dois tipos —
+
+```
+M8372  ["giulia","gt","1300","junior"]   ← 1300 é DESIGNAÇÃO
+M8380  ["giulia","gt","1600","junior"]   ← 1600 é DESIGNAÇÃO
+M8833  ["giulia","952"]                  ← 952 é CHASSIS
+```
+
+— logo nem uma regra por marca serve para a Alfa. Residual não corrigido: 32
+anúncios ativos (Audi 200 e Alfa 2000, ambos clássicos) mais `giulia|952` e
+`alfa-romeo|spider` (`type-916`/`type-939`, 371 anúncios).
+
+**Segunda regra geral testada e também falsificada.** O chassis aparece por vezes
+precedido de `type`/`tipo` no slug (`["200","type","44"]`, `["2000","tipo","102"]`),
+o que sugeria uma regra estrutural sem listas. Mas `bugatti|type` tem `type 35` /
+`type 49` / `type 57` e `volkswagen|type` tem `Type 1/2/3` — aí o número **é** o
+modelo. Mesmo contraexemplo do `Defender 90/110`, noutra roupagem.
+
+São **duas** regras gerais candidatas testadas contra o catálogo (contagem de
+dígitos, marcador estrutural) e **duas** falsificadas com contraexemplos concretos.
+Isto não é argumento contra a opção B — é a favor: B não olha para o token, olha
+para o comportamento no tempo. Fica em aberto, agora com mais motivo.
+
+## Sinónimos de carroçaria — CORRIGIDO (07/ago)
+
+A sequela que este trabalho tornou visível: um anúncio que diz "CABRIOLET" não
+confirmava o mid cujo slug diz "cabrio" (o `derivativeGuard` compara por igualdade
+exata). Resolvido com `canonBody` em `lib/engine/us-catalog.ts` — `cabrio`,
+`cabriolet` e `convertible` para a mesma forma, mais `coup`→`coupe` e
+`spyder`→`spider` — aplicado **dos dois lados** da comparação, dentro do guard (não
+mexe no `midInfo.derivative` nem no encadeamento de gerações).
+
+Apanhou um bug REAL que estava no golden e ninguém tinha visto: um
+`SERIE 8 CABRIOLET M8 COMPETITION 625` resolvia `exato` na versão **Gran Coupe** M8
+Competition. O golden não podia apanhá-lo — valida família, combustível, potência e
+cilindrada, **idênticas** nos três corpos, e estas entradas não tinham
+`midEsperado`. Agora dá `designacao` com `derivative="cabrio"` (G14 e G14-LCI têm
+625 cv indistinguíveis), o que é o honesto e faz o `excludeMidsForDerivative`
+confinar a amostra PT a cabrios. Efeito no golden: `exato` 90→88, `designacao`
+72→74, violações 0 — as duas que "perdeu" eram as duas que estavam na carroçaria
+errada.
+
+**FORA do mapa de propósito:** os nomes de break (`touring`, `avant`, `variant`,
+`sw`, `kombi`, `estate`). São a mesma carroçaria mas cada marca usa o seu, e dentro
+de uma família só aparece um — canonizá-los não resolve nada e abria a porta a
+fundir corpos entre marcas.

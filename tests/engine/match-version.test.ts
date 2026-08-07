@@ -725,6 +725,48 @@ test("chassis numérico: as janelas de geração do coupé passam a FECHAR", () 
   assert.ok(aberta && aberta.yearStart! > fechada!.yearEnd!, "e a seguinte começa depois");
 });
 
+// ── Sinónimos de carroçaria (docs/10-DERIVADO-VS-GERACAO.md) ──
+// Bug real encontrado no golden: um "SERIE 8 CABRIOLET M8 COMPETITION 625" resolvia
+// `exato` no **Gran Coupe** M8 Competition. O anúncio escreve "cabriolet", o slug do
+// catálogo diz "cabrio" (a BMW chama-lhe assim), e a guarda comparava por igualdade
+// exata — o sinal que o vendedor deu era ignorado. O golden não o apanhava: valida
+// família/fuel/potência/cc, IDÊNTICAS nos três corpos.
+//
+// Catálogo DEDICADO, não o `CAT` partilhado: acrescentar corpos à família serie-8
+// muda os candidatos de testes vizinhos que dependem dela (o "840i ≠ M850i ≠ M8"
+// deixou de passar quando tentei). Três corpos, mesma potência/cilindrada — só a
+// carroçaria os separa.
+const BODY_MODELS: UsModelRow[] = [
+  { mid: "G15", make: "BMW", slug: "G15-8-Series-Coupe", modelYear: null },
+  { mid: "G14", make: "BMW", slug: "G14-8-Series-Cabrio", modelYear: null },
+  { mid: "G16", make: "BMW", slug: "G16-8-Series-Gran-Coupe", modelYear: null },
+];
+const BODY_VERSIONS: UsVersionRow[] = BODY_MODELS.map((m, i) => ({
+  versionId: `B${i}`, mid: m.mid, name: `${m.mid} M8 Competition`, fuelSection: "petrol",
+  fuel: "Petrol", year: 2020, powerHp: 625, powerKw: 460, displacementCc: 4395,
+  co2Wltp: 264, co2Nedc: null, doors: null, gearbox: null, engineCode: null,
+}));
+const BODY_CAT: UsCatalogIndex = buildIndex(BODY_MODELS, BODY_VERSIONS);
+
+/** Derivado que o resolver acabou por escolher, seja exato ou designacao. */
+function derivOf(r: MatchResult | null, cat: UsCatalogIndex): string | null | undefined {
+  if (!r) return undefined;
+  if (r.kind === "designacao") return r.facts.derivative;
+  const v = [...cat.byFamily.values()].flatMap((f) => f.versions).find((x) => x.versionId === r.versionId);
+  return v ? cat.midInfo.get(v.mid)?.derivative : undefined;
+}
+
+test("sinónimo de carroçaria: 'CABRIOLET' no anúncio resolve o Cabrio (nunca Gran Coupe)", () => {
+  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "SERIE 8 CABRIOLET", variant: "M8 COMPETITION 4.4 625 XDRIVE", fuelRaw: "Gasolina", year: 2021, powerHp: 625, displacementCc: 4395 }), BODY_CAT);
+  assert.equal(derivOf(r, BODY_CAT), "cabrio");
+});
+
+test("sinónimo de carroçaria: o canonBody NÃO funde corpos diferentes", () => {
+  // Contraprova do teste acima: um coupé não pode virar cabriolet por causa do mapa.
+  const r = resolveVersion(inp({ makeRaw: "BMW", modelRaw: "SERIE 8 COUPE", variant: "M8 COMPETITION 4.4 625 XDRIVE", fuelRaw: "Gasolina", year: 2021, powerHp: 625, displacementCc: 4395 }), BODY_CAT);
+  assert.notEqual(derivOf(r, BODY_CAT), "cabrio");
+});
+
 test("derivados: carroçarias sem base (TT Coupe/Roadster) → designacao (motor provado, variante não única)", () => {
   // coupe/roadster são a mesma designação em corpos distintos (motor/cc iguais) →
   // trimAmbiguo, não derivadoAmbiguo; sobrevivem 2 versões gémeas → designacao.

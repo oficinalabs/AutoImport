@@ -144,6 +144,32 @@ export const BODY_TOKENS = new Set([
   "sportscoupe", "sportcoupe",
 ]);
 
+/**
+ * Grafias da MESMA carroçaria → forma canónica. Só sinónimos ortográficos ou de
+ * língua da mesma coisa; NUNCA carroçarias diferentes.
+ *
+ * Porquê: a guarda de derivados compara tokens do ANÚNCIO com tokens do slug do
+ * mid, e compara-os por igualdade exata. Um anúncio que diz "Carrera **Cabrio**
+ * GTS" não confirmava o mid cujo slug diz "**cabriolet**" — `cabrio` ≠ `cabriolet`
+ * — e o carro ficava com o derivado indeciso apesar de o vendedor o ter escrito.
+ *
+ * Deliberadamente FORA: os nomes de break/station (touring, avant, variant, sw,
+ * kombi, estate…). São a mesma carroçaria mas cada marca usa o SEU nome, e dentro
+ * de uma família só aparece um deles — canonizá-los não resolve nada e abria a
+ * porta a fundir corpos entre marcas. Ver docs/10-DERIVADO-VS-GERACAO.md.
+ */
+const BODY_SYNONYM: Record<string, string> = {
+  cabrio: "cabriolet",
+  convertible: "cabriolet",
+  coup: "coupe",
+  spyder: "spider",
+};
+
+/** Forma canónica de um token de carroçaria (identidade para todo o resto). */
+export function canonBody(t: string): string {
+  return BODY_SYNONYM[t] ?? t;
+}
+
 /** Marcador de facelift a ignorar (LCI da BMW, Facelift, Restyling, Mopf). */
 const FACELIFT_RE = /(^|-)(lci|facelift|restyling|mopf)(-|$)/g;
 

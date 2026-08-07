@@ -12,6 +12,7 @@ import {
   genKeyOf,
   normEngineCode,
   normGearbox,
+  canonBody,
   isNoiseToken,
   resolveFamily,
   resolveVersionFuel,
@@ -432,4 +433,18 @@ test("sem ctx o comportamento é o de sempre", () => {
   assert.equal(isNoiseToken("992"), false);
   assert.equal(isNoiseToken("2019"), true);
   assert.equal(isNoiseToken("g20"), true);
+});
+
+test("canonBody funde grafias da MESMA carroçaria, nunca corpos diferentes", () => {
+  for (const t of ["cabrio", "cabriolet", "convertible"]) assert.equal(canonBody(t), "cabriolet", t);
+  assert.equal(canonBody("coup"), "coupe");
+  assert.equal(canonBody("spyder"), "spider");
+  // Corpos DIFERENTES continuam diferentes — o coupé não é um cabriolet.
+  assert.notEqual(canonBody("coupe"), canonBody("cabriolet"));
+  assert.notEqual(canonBody("targa"), canonBody("cabriolet"));
+  // Os nomes de break ficam FORA de propósito (cada marca usa o seu).
+  assert.equal(canonBody("touring"), "touring");
+  assert.equal(canonBody("avant"), "avant");
+  // Identidade para tudo o que não é carroçaria.
+  assert.equal(canonBody("gts"), "gts");
 });

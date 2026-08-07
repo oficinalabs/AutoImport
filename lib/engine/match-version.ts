@@ -26,6 +26,7 @@ import type { FuelType } from "../types";
 import { normFuel, normMake, normModel, normModelViaRule, slugify } from "./normalize-vehicle";
 import {
   BODY_TOKENS,
+  canonBody,
   type CatalogVersion,
   distinctiveTokensByMid,
   type NoiseContext,
@@ -326,20 +327,27 @@ function derivativeGuard(
   for (const d of distinctive.values()) for (const t of d) universe.add(t);
   if (universe.size === 0) return { cands, derivadoAmbiguo: false }; // sem derivados reais
 
+  // Comparação por forma CANÓNICA da carroçaria: o anúncio escreve "Cabrio", o slug
+  // do catálogo diz "cabriolet", e a igualdade exata perdia o sinal que o vendedor
+  // deu (ver canonBody em us-catalog.ts). Canoniza-se dos DOIS lados; para tudo o
+  // que não é sinónimo de carroçaria, canonBody é a identidade.
+  const adCanon = new Set([...adTokens].map(canonBody));
+  const named0 = (t: string) => adCanon.has(canonBody(t));
+
   // (i) o anúncio nomeia algum derivado → fica só quem o anúncio nomeia. Preferimos
   // CONTENÇÃO TOTAL: se ≥1 mid tem o conjunto distintivo INTEIRO contido em adTokens,
   // ficam só esses. Ex. real: "216d Gran Tourer" → adTokens ⊇ {gran,tourer} contém
   // por inteiro o Gran-Tourer {gran,tourer} mas só parcialmente o Gran-Coupe
   // {gran,coupe} (partilham "gran") → fica só o Gran-Tourer (o bug era o inverso).
   // Sem contenção total, cai no critério largo (some): qualquer token nomeado mantém.
-  const named = [...universe].some((t) => adTokens.has(t));
+  const named = [...universe].some(named0);
   if (named) {
     const full = mids.filter((mid) => {
       const d = distinctive.get(mid)!;
-      return d.size > 0 && [...d].every((t) => adTokens.has(t));
+      return d.size > 0 && [...d].every(named0);
     });
     const keep = new Set(
-      full.length ? full : mids.filter((mid) => [...distinctive.get(mid)!].some((t) => adTokens.has(t))),
+      full.length ? full : mids.filter((mid) => [...distinctive.get(mid)!].some(named0)),
     );
     const filtered = cands.filter((v) => keep.has(v.mid));
     return { cands: filtered.length ? filtered : cands, derivadoAmbiguo: false };
