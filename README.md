@@ -28,20 +28,30 @@ Importar carros para Portugal muitas vezes compensa, mas é difícil e trabalhos
 
 ## Desenvolvimento
 
-Frontend em Next.js (App Router) já implementado, a correr sobre uma **camada de
-dados mock**. Backend a ligar por cima (divisão de trabalho: frontend / backend).
+Next.js (App Router) + Drizzle + Postgres. **Dados reais de ponta a ponta**: os
+coletores enchem um corpus local, o pipeline calcula os custos, e o publicador
+leva a montra para a base que serve a app.
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:3000
+pnpm dev            # http://localhost:3000
+pnpm test           # cost engine, normalizador, pipeline, queries
+pnpm test:smoke     # a app compilada, a servir, com sessão real
 ```
 
-- **Estrutura e decisões:** [`docs/`](docs) (00–06) — identidade, design, stack.
-- **Ligar o backend:** [`docs/07-FRONTEND-HANDOFF.md`](docs/07-FRONTEND-HANDOFF.md) — o
-  único sítio a mexer é [`lib/data.ts`](lib/data.ts); o contrato está em [`lib/types.ts`](lib/types.ts).
+⚠️ **São duas bases de dados** e o default é a local. Ler o
+[`CLAUDE.md`](CLAUDE.md) antes de correr o que quer que seja contra a base — tem
+a história de como isto já partiu a produção.
+
+- **O que falta para o MVP:** [`MVP.md`](MVP.md) — auditoria com o estado item a item.
+- **Estrutura e decisões:** [`docs/`](docs) — identidade, design, stack, infra.
+- **Fronteira frontend/backend:** [`docs/07-FRONTEND-HANDOFF.md`](docs/07-FRONTEND-HANDOFF.md)
+  — a UI lê tudo por [`lib/data.ts`](lib/data.ts); o contrato está em [`lib/types.ts`](lib/types.ts).
 - **Design de referência:** [`design/`](design).
 - **Investigação:** [`research/`](research) — países viáveis e fontes de anúncios.
 
 ## Estado
 
-🌱 Frontend implementado (mock). A ligar backend (auth, dados reais, email mascarado, Polar).
+🚧 A caminho do MVP. O motor está pronto (custos, matching, pipeline, publicação);
+falta ligar o **checkout** da Polar e automatizar a **recolha**. Detalhe em
+[`MVP.md`](MVP.md).

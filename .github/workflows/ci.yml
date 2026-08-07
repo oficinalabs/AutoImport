@@ -55,8 +55,15 @@ jobs:
       - name: Migrations + seed (Postgres do serviço)
         run: pnpm db:migrate && pnpm db:seed
 
-      - name: Testes (cost engine, normalizador, pipeline)
+      - name: Testes (cost engine, normalizador, pipeline, queries)
         run: pnpm test
 
       - name: Build
         run: pnpm build
+
+      # Depois do build de propósito: o de fumo compila para uma pasta própria
+      # (NEXT_DIST_DIR) e arranca a app a sério, portanto é o passo mais lento e
+      # o único que precisa de um servidor. Fica no fim para o feedback rápido
+      # (lint/tipos/testes) não esperar por ele.
+      - name: Teste de fumo (app compilada, sessão real)
+        run: pnpm test:smoke

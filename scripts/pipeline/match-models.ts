@@ -15,6 +15,11 @@
  *   tudo a null (só contam no relatório). NÃO toca em fuel/model_id/updated_at
  *   (SQL cru → sem $onUpdate); só reescreve quando a resolução muda
  *   (determinístico ⇒ 2.ª corrida = 0 updates).
+ *
+ * C) CAIXA — gearbox_norm: classifica o `gearbox` cru de TODOS os ativos com o
+ *   `normGearbox` (o mesmo do matcher) e grava-o. É a coluna que a ficha e o
+ *   filtro da pesquisa lêem. Sobre todos os ativos e só escreve o que muda ⇒ a
+ *   1.ª corrida é o backfill e as seguintes são de manutenção.
  */
 import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { DesignationFacts } from "../../lib/engine/match-version";
@@ -156,7 +161,63 @@ export async function matchModels(opts: { rematch?: boolean } = {}) {
   // ════════════════════════════════════════════════════════════════
   const versao = await resolveVersions(db, sql, Boolean(opts.rematch));
 
-  return { total, matched, models: byKey.size, versao };
+  // ════════════════════════════════════════════════════════════════
+  // C) CAIXA — gearbox_norm
+  // ════════════════════════════════════════════════════════════════
+  const caixa = await normalizeGearboxes(db, sql);
+
+  return { total, matched, models: byKey.size, versao, caixa };
+}
+
+/**
+ * Classifica a caixa de TODOS os ativos com o `normGearbox` — o mesmo que o
+ * matcher de versão usa — e grava-a em `listings.gearbox_norm`. É essa coluna
+ * (não um regex sobre o texto livre) que a ficha mostra e o filtro da pesquisa
+ * usa; ver lib/queries.ts.
+ *
+ * Não há script de backfill separado, de propósito: a passagem é sobre todos os
+ * ativos, não só os novos, e escreve apenas o que muda — a primeira corrida É o
+ * backfill, a segunda dá 0, e um `gearbox` que mude num re-crawl é reclassificado
+ * sem ninguém se lembrar de o fazer. Um backfill à parte podia ficar
+ * dessincronizado do fluxo normal; isto não pode.
+ */
+async function normalizeGearboxes(
+  db: typeof import("../../db").db,
+  sql: typeof import("drizzle-orm").sql,
+) {
+  const { normGearbox } = await import("../../lib/engine/us-catalog");
+
+  const rows = (await db.execute(sql`
+    select id::text as id, gearbox, gearbox_norm as "cur"
+    from listings where deleted_at is null
+  `)) as unknown as { id: string; gearbox: string | null; cur: string | null }[];
+
+  const changed: { id: string; norm: string | null }[] = [];
+  const dist: Record<string, number> = { manual: 0, auto: 0, desconhecida: 0 };
+  for (const row of rows) {
+    const norm = normGearbox(row.gearbox);
+    dist[norm ?? "desconhecida"]++;
+    if (norm !== row.cur) changed.push({ id: row.id, norm });
+  }
+
+  // UPDATE batched via `from (values …)` — SQL cru para não tocar em updated_at.
+  for (const batch of chunk(changed, 1000)) {
+    const values = sql.join(
+      batch.map((c) => sql`(${c.id}::uuid, ${c.norm}::text)`),
+      sql`, `,
+    );
+    await db.execute(sql`
+      update listings as l set gearbox_norm = data.gb
+      from (values ${values}) as data(id, gb)
+      where l.id = data.id
+    `);
+  }
+
+  console.log(
+    `\ngearbox_norm: ${changed.length} escritos · manual ${dist.manual} · ` +
+      `auto ${dist.auto} · desconhecida ${dist.desconhecida} (de ${rows.length} ativos)`,
+  );
+  return { escritos: changed.length, dist };
 }
 
 /**

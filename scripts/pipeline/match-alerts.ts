@@ -15,6 +15,10 @@
  * `on conflict do nothing`, portanto o mesmo anúncio nunca notifica duas vezes
  * o mesmo alerta, por muitas vezes que o pipeline corra.
  */
+// Só tipos — apagado na compilação, portanto não corre antes do loadEnvFile
+// abaixo (que é a razão de tudo o resto aqui ser `await import`).
+import type { AlertCriteria, ModelFamily } from "../../lib/alert-criteria";
+
 try {
   process.loadEnvFile(".env.local");
 } catch {
@@ -49,27 +53,70 @@ interface NewMatch {
 export async function matchAlerts() {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
+  const { alertModelKeys } = await import("../../lib/alert-criteria");
   const { AlertMatchEmail } = await import("../../emails/alert-match");
   const { sendEmail } = await import("../../lib/email");
   const { formatEuro } = await import("../../lib/format");
   const { country } = await import("../../lib/countries");
 
+  // 0. Que MODELO vigia cada alerta ativo. Resolvido aqui, em TypeScript, com o
+  //    mesmo normalizador do pipeline (lib/engine/normalize-vehicle.ts) — é o
+  //    que põe os alertas antigos, gravados com texto cru ("VOLKSWAGEN"/"Golf
+  //    VII"), a falar a mesma língua que os novos, sem migração nenhuma.
+  //    Um alerta cujos critérios não dêem um modelo NUNCA poderá casar; conta-se
+  //    e diz-se, em vez de correr uma query que dá sempre zero.
+  const ativos = (await db.execute(sql`
+    select id, criteria from alerts where active = true
+  `)) as unknown as { id: string; criteria: AlertCriteria | null }[];
+
+  const vigiados: { id: string; family: ModelFamily }[] = [];
+  for (const a of ativos) {
+    const family = alertModelKeys(a.criteria ?? {});
+    if (family) vigiados.push({ id: a.id, family });
+  }
+  const semModelo = ativos.length - vigiados.length;
+  if (semModelo > 0) {
+    console.warn(
+      `match-alerts: ${semModelo} alerta(s) ativos sem modelo reconhecido — não casam com nada`,
+    );
+  }
+  if (vigiados.length === 0) {
+    console.log("match-alerts: 0 matches novos");
+    return { matched: 0, emailed: 0, failed: 0 };
+  }
+
+  const familias = sql.join(
+    vigiados.map(
+      (v) => sql`(${v.id}::uuid, ${v.family.makeKey}::text, ${v.family.modelKey}::text)`,
+    ),
+    sql`, `,
+  );
+
   // 1. Criar os eventos novos. O `returning` só devolve as linhas realmente
   //    inseridas (o `on conflict do nothing` cala as repetidas) — é sobre essas,
   //    e só essas, que enviamos email.
+  //
+  //    O casamento é pela FAMÍLIA normalizada do anúncio (vehicle_models, via
+  //    listings.model_id), não por igualdade de texto cru: `VOLKSWAGEN` e
+  //    `Volkswagen`, `Golf` e `Golf VII` são o mesmo carro para quem compra.
   const inserted = (await db.execute(sql`
-    with novos as (
+    with familia(alert_id, make_key, model_key) as (values ${familias}),
+    novos as (
       insert into alert_events (alert_id, listing_id)
       select a.id, o.listing_id
       from alerts a
+      join familia f on f.alert_id = a.id
       join opportunities o on o.deleted_at is null
       join listings l
         on l.id = o.listing_id
        and l.deleted_at is null
-       and l.country = any(a.countries)
+      join vehicle_models vm on vm.id = l.model_id
       where a.active = true
-        and lower(l.make_raw) = lower(a.criteria->>'make')
-        and lower(l.model_raw) = lower(a.criteria->>'model')
+        and vm.make = f.make_key
+        and vm.model = f.model_key
+        -- sem países escolhidos = todos. Era o contrário, em silêncio:
+        -- l.country = any('{}') nunca é verdade e o alerta nascia morto.
+        and (coalesce(array_length(a.countries, 1), 0) = 0 or l.country = any(a.countries))
         and (
           a.criteria->>'maxPrice' is null
           or exists (

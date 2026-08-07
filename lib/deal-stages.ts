@@ -15,7 +15,3 @@ export const DEAL_STAGES: { key: DealStageKey; label: string; short: string }[] 
 export const STAGE_INDEX: Record<DealStageKey, number> = Object.fromEntries(
   DEAL_STAGES.map((s, i) => [s.key, i]),
 ) as Record<DealStageKey, number>;
-
-export function stageLabel(key: DealStageKey): string {
-  return DEAL_STAGES[STAGE_INDEX[key]].label;
-}

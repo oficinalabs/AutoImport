@@ -50,6 +50,20 @@
       "when": 1785268157261,
       "tag": "0006_amazing_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785772419561,
+      "tag": "0007_perfect_odin",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786006534919,
+      "tag": "0008_flowery_giant_man",
+      "breakpoints": true
     }
   ]
 }

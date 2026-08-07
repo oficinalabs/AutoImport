@@ -3,8 +3,22 @@
  * lib/types.ts a partir de listings ⋈ import_cost_estimates ⋈ vehicle_models.
  * Consumidas exclusivamente por lib/data.ts ("use server").
  */
-import { type SQL, and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
-import type { PgSelect } from "drizzle-orm/pg-core";
+import {
+  type SQL,
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  max,
+  or,
+  sql,
+} from "drizzle-orm";
 import { db } from "../db";
 import {
   alertEvents,
@@ -16,17 +30,22 @@ import {
   opportunities,
   organization,
   sources,
+  subscriptions,
   usModels,
   usVersions,
   user,
   vehicleModels,
 } from "../db/schema";
+import { type AlertCriteria, alertModelKeys, familyLabel } from "./alert-criteria";
 import { co2Norm } from "./cost-engine";
 import type { SearchFilters, SearchResults } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
+import { CONDICOES } from "./legal";
+import { estadoEfetivo } from "./subscription";
 import type {
   Alert,
+  AlertModelOption,
   CostBreakdown,
   CountryCode,
   CountryInsight,
@@ -35,11 +54,19 @@ import type {
   Notification,
   PtMarket,
   Stand,
+  SubscriptionStatus,
   Transmission,
   Verdict,
 } from "./types";
 
-const SEARCH_LIMIT = 60;
+/** Anúncios por página. 24 divide certo nas grelhas de 2, 3 e 4 colunas da pesquisa. */
+export const PAGE_SIZE = 24;
+/**
+ * Teto de profundidade. `?pagina=99999` faria o Postgres percorrer a montra
+ * inteira para devolver zero linhas, e não há caso de uso: quem chega ao carro
+ * 5 000.º precisa de filtrar melhor, não de outra página.
+ */
+export const MAX_PAGE = 200;
 
 // ── Mapper ───────────────────────────────────────────────────────
 
@@ -48,10 +75,6 @@ type EstimateRow = typeof importCostEstimates.$inferSelect;
 type ModelRow = typeof vehicleModels.$inferSelect;
 type VersionRow = typeof usVersions.$inferSelect;
 type UsModelRow = typeof usModels.$inferSelect;
-
-function transmissionOf(gearbox: string | null): Transmission {
-  return gearbox && /auto/i.test(gearbox) ? "automática" : "manual";
-}
 
 /** Nome do modelo do catálogo sem o ruído de slug — "208 II (2023)" → "208 II". */
 function cleanCatalogModel(model: string): string {
@@ -111,7 +134,11 @@ function rowToListing(
       model: l.modelRaw ?? vm.model,
       variant: l.variant ?? undefined,
       fuel: (l.fuel ?? vm.fuel) as FuelType,
-      transmission: transmissionOf(l.gearbox),
+      // A caixa vem já classificada da coluna `gearbox_norm` (normGearbox, escrita
+      // pelo match-models) — não de um regex sobre o texto livre da fonte. `null`
+      // é "não sabemos", e vai como null até à ficha, que o diz.
+      transmission:
+        l.gearboxNorm === "auto" ? "automática" : l.gearboxNorm === "manual" ? "manual" : null,
       displacementCc:
         l.displacementCc ??
         ver?.displacementCc ??
@@ -157,6 +184,17 @@ function rowToListing(
     savings: e.savings,
     savingsPct: e.savingsPct,
     verdict: e.verdict as Verdict,
+    // NÃO usar aqui o VIN-do-URL do `carIdentitySql` (lib/engine/car-identity.ts).
+    // Medido no warehouse (3 ago): dos 39 759 anúncios da montra (exato+normal),
+    // ZERO têm `vin` — as 3 908 linhas com VIN são todas PT (Caetano/CarPlus/OLX),
+    // que são a amostra de comparação, nunca a montra. E os 1 158 que o regex de
+    // 17 chars apanha no `detail_url` são 100% falsos positivos: 1 032 hashes SHA-1
+    // do meinauto.de (`/detail/007f59b2f834ed69caf…`), 78 ids de slug do Quoka,
+    // 47 URLs de tracking do Trovit, 1 do Ooyyo — nem um VIN. Como chave de dedupe
+    // um hash estável por anúncio é inofensivo; aqui faria o cartão anunciar
+    // "Histórico disponível · VIN" sobre um carro sem VIN nenhum. Mentir é pior do
+    // que o ruído que isto tem hoje. VIN real só virá de uma fonte que o publique
+    // (ou de carVertical/autoDNA) — ver MVP.md P1-3.
     kmTrust: l.vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" },
     seenAt: l.lastSeenAt.toISOString(),
     isFavorite,
@@ -164,8 +202,22 @@ function rowToListing(
   };
 }
 
-/** As colunas de que o mapper precisa. */
-const BASE_FIELDS = {
+// As condições dos 6 joins que compõem um Listing, em constantes. O encadeado do
+// Drizzle não se deixa envolver numa função genérica (os tipos do builder mudam a
+// cada `.innerJoin`), por isso `baseSelect` e `searchSelect` repetem a cadeia —
+// mas as CONDIÇÕES, que é onde uma divergência daria resultados diferentes em
+// silêncio, vivem aqui e só aqui.
+const J_ESTIMATE = eq(importCostEstimates.listingId, listings.id);
+const J_MODEL = eq(vehicleModels.id, listings.modelId);
+const J_VERSION = eq(usVersions.versionId, listings.usVersionId);
+/** Modelo do catálogo para nome/imagem: via versão exata, senão via o mid dos
+ *  factos de designação (não-nulo ⟺ designacao com modelo único). */
+const J_US_MODEL = sql`${usModels.mid} = coalesce(${usVersions.mid}, ${listings.designationFacts}->>'mid')`;
+const J_SOURCE = eq(sources.id, listings.sourceId);
+const jFavorite = (standId: string | null) =>
+  and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? ""));
+
+const LISTING_COLUMNS = {
   l: listings,
   e: importCostEstimates,
   vm: vehicleModels,
@@ -175,34 +227,38 @@ const BASE_FIELDS = {
   favoriteId: favorites.id,
 };
 
-/**
- * Os joins de um Listing, num sítio só. É função à parte do `baseSelect` porque
- * a contagem da pesquisa (ver `countSelect`) precisa dos MESMOS joins com outras
- * colunas — duplicar seis joins era pior.
- */
-function comJoins<Q extends PgSelect>(q: Q, standId: string | null) {
-  return (
-    q
-      .innerJoin(importCostEstimates, eq(importCostEstimates.listingId, listings.id))
-      .innerJoin(vehicleModels, eq(vehicleModels.id, listings.modelId))
-      .leftJoin(usVersions, eq(usVersions.versionId, listings.usVersionId))
-      // Modelo do catálogo para nome/imagem: via versão exata, senão via o mid dos
-      // factos de designação (não-nulo ⟺ designacao com modelo único).
-      .leftJoin(
-        usModels,
-        sql`${usModels.mid} = coalesce(${usVersions.mid}, ${listings.designationFacts}->>'mid')`,
-      )
-      .leftJoin(sources, eq(sources.id, listings.sourceId))
-      .leftJoin(
-        favorites,
-        and(eq(favorites.listingId, listings.id), eq(favorites.standId, standId ?? "")),
-      )
-  );
-}
-
 /** Junta as 4 peças de um Listing; devolve linhas cruas para o mapper. */
 function baseSelect(standId: string | null) {
-  return comJoins(db.select(BASE_FIELDS).from(listings).$dynamic(), standId);
+  return db
+    .select(LISTING_COLUMNS)
+    .from(listings)
+    .innerJoin(importCostEstimates, J_ESTIMATE)
+    .innerJoin(vehicleModels, J_MODEL)
+    .leftJoin(usVersions, J_VERSION)
+    .leftJoin(usModels, J_US_MODEL)
+    .leftJoin(sources, J_SOURCE)
+    .leftJoin(favorites, jFavorite(standId));
+}
+
+/**
+ * Igual ao `baseSelect`, mais o total do conjunto filtrado.
+ *
+ * `count(*) over()` corre depois do WHERE e antes do LIMIT, portanto dá o total
+ * verdadeiro sem uma segunda passagem pelo dedupe, que é a parte cara. Não está
+ * no `baseSelect` de propósito: a janela obriga a materializar o conjunto todo e
+ * tirava o early-stop ao `topOpportunitiesQuery`, que só quer os primeiros N.
+ * `::int` porque o driver devolveria o bigint do `count()` como string.
+ */
+function searchSelect(standId: string | null) {
+  return db
+    .select({ ...LISTING_COLUMNS, total: sql<number>`count(*) over()::int` })
+    .from(listings)
+    .innerJoin(importCostEstimates, J_ESTIMATE)
+    .innerJoin(vehicleModels, J_MODEL)
+    .leftJoin(usVersions, J_VERSION)
+    .leftJoin(usModels, J_US_MODEL)
+    .leftJoin(sources, J_SOURCE)
+    .leftJoin(favorites, jFavorite(standId));
 }
 
 type BaseRow = Awaited<ReturnType<ReturnType<typeof baseSelect>["execute"]>>[number];
@@ -232,32 +288,39 @@ const COM_CATALOGO = and(
 /**
  * Dedupe da pesquisa por CARRO físico (ver lib/engine/car-identity.ts): o mesmo
  * Tucson listado por caetano.pt e carplus.pt (chassis igual no slug do URL, preço
- * e km ligeiramente diferentes) aparecia 2×. Mantém só o REPRESENTANTE de cada
- * identidade — o de maior savings, desempate pelo id mais baixo — via "não existe
- * outro visível do mesmo carro que ganhe". Determinístico e sem mexer no ORDER
- * BY/LIMIT: o corte é anterior ao limite, logo dá sempre 1 linha por carro.
+ * e km ligeiramente diferentes) aparecia 2×. Fica só o REPRESENTANTE de cada
+ * identidade: o de maior savings, desempate pelo id mais baixo.
+ *
+ * Era um `not exists` correlacionado. Para CADA linha candidata voltava a juntar
+ * listings×estimates e a calcular a identidade — que inclui um `substring(… from
+ * '<regex>')` sobre o `detail_url` — dos DOIS lados. Não é sargável, não há índice
+ * que a cubra, e como o corte tem de ser anterior ao LIMIT, o custo era a montra
+ * inteira por linha (medido: 3,4 s numa versão simplificada sobre 600k anúncios).
+ *
+ * O `distinct on` responde à mesma pergunta numa passagem só, e é exatamente a
+ * forma que o `flag-opportunities.ts` já usa para a mesma identidade. A semântica
+ * é idêntica, não aproximada: `order by <identidade>, savings desc, id` elege o
+ * mesmo vencedor que o "não existe outro que ganhe" elegia.
+ *
  * Restrito ao MESMO conjunto visível da montra (não-apagado, exato, normal) para
  * não esconder um anúncio bom por causa de um duplicado que a montra nem mostra.
  */
-const MONTRA_REPRESENTANTE = sql`not exists (
-  select 1
-  from listings l2
-  join import_cost_estimates e2 on e2.listing_id = l2.id
-  where l2.deleted_at is null
-    and l2.match_confidence = 'exato'
-    and e2.pt_confidence = 'normal'
-    and l2.id <> ${listings.id}
-    and ${carIdentitySql("l2")} = ${carIdentitySql("listings")}
-    and (e2.savings > ${importCostEstimates.savings}
-         or (e2.savings = ${importCostEstimates.savings} and l2.id < ${listings.id}))
+const MONTRA_REPRESENTANTES = sql`(
+  select distinct on (${carIdentitySql("l")}) l.id
+  from listings l
+  join import_cost_estimates e on e.listing_id = l.id
+  where l.deleted_at is null
+    and l.match_confidence = ${MONTRA_MATCH_CONFIDENCE}
+    and e.pt_confidence = ${MONTRA_PT_CONFIDENCE}
+  order by ${carIdentitySql("l")}, e.savings desc, l.id
 )`;
 
+const E_REPRESENTANTE = sql`${listings.id} in ${MONTRA_REPRESENTANTES}`;
+
 /**
- * Onde o texto livre procura. O cartão mostra o título do CATÁLOGO (ver
- * `rowToListing`: marca do us_models + nome da versão), mas o servidor só
- * conhecia os campos crus do anúncio — quem copiasse "Huracan Evo Spyder" do
- * cartão não encontrava nada, porque o anúncio cru diz "LAMBORGHINI Huracán".
- * Um monte de palha único com os dois mundos resolve os dois sentidos.
+ * Os campos por onde a pesquisa de texto passa, concatenados uma vez. Vem da
+ * implementação da main (PR #40) e é melhor do que os 6 `ilike` por token que eu
+ * tinha: um só `concat_ws` por linha em vez de seis comparações.
  */
 const TEXTO_PESQUISAVEL = sql`concat_ws(' ',
   ${usModels.make}, ${usModels.model}, ${usVersions.name},
@@ -271,11 +334,14 @@ const TEXTO_PESQUISAVEL = sql`concat_ws(' ',
  * `cleanVersionName` ainda corta o código de chassis à cabeça ("G16 8 Series…"
  * → "8 Series…"). Por palavras, copiar o título do cartão encontra o carro, e
  * escrever só "golf" continua a fazer o óbvio.
+ *
+ * Teto de 6 palavras: além disso é ruído, e cada uma é mais uma condição.
  */
 function condsDoTexto(query: string): SQL[] {
   return query
     .split(/\s+/)
     .filter(Boolean)
+    .slice(0, 6)
     .map((termo) => {
       // `%` e `_` escritos pelo utilizador são literais, não jokers do LIKE.
       const padrao = `%${termo.replace(/[\\%_]/g, "\\$&")}%`;
@@ -284,68 +350,85 @@ function condsDoTexto(query: string): SQL[] {
 }
 
 /**
- * O total que passa o filtro, em query PRÓPRIA e em paralelo com as linhas.
+ * Caixa em SQL, pela mesma coluna que a ficha mostra (`gearbox_norm`, escrita
+ * pelo `normGearbox` em lib/engine/us-catalog.ts) — o filtro e o que o produto
+ * afirma sobre o carro não podem divergir, e agora não podem MESMO: é o mesmo
+ * dado, sem regex nenhum a meio.
  *
- * A forma óbvia — `count(*) over ()` na mesma varredura — parecia de borla e não
- * é: mata o corte antecipado do `LIMIT 60`. Com a janela, o planeador tem de
- * levar o anti-join do `MONTRA_REPRESENTANTE` (correlacionado, sobre uma
- * identidade calculada, sem índice possível) até ao fim das 32 695 linhas.
- * Medido na montra sem filtros: **7 a 21 minutos** com a janela, contra 1,8 s
- * sem ela e 21 s para esta contagem à parte. Numa base com só a montra (a forma
- * da produção, onde o publicador manda 39 779 linhas) a janela é de facto grátis
- * — 159 ms contra 163 ms — mas é um penhasco de planeador, não uma rampa: basta
- * a tabela crescer ou o texto entrar no WHERE para cair do lado errado. Duas
- * queries em `Promise.all` custam o máximo das duas, não a soma, e não têm
- * penhasco.
+ * Antes isto replicava de propósito o erro do mapper (`gearbox ilike '%auto%'`,
+ * tudo o resto manual). Custava 376 anúncios mal rotulados na montra: 76 DSG/PDK
+ * anunciados como manuais e 291 sem caixa conhecida apresentados como manuais.
+ *
+ * DESCONHECIDOS (`gearbox_norm is null`) NÃO ENTRAM em nenhum dos dois. Antes
+ * caíam todos em "manual", porque tudo caía. Pôr um carro que não sabemos se é
+ * manual numa lista pedida como "Manual" é a mesma afirmação inventada que a
+ * ficha deixou de fazer — e quem filtra por caixa está a filtrar por certeza.
+ * Preço medido: 291 anúncios (0,7% da montra) deixam de ser alcançáveis COM o
+ * filtro de caixa; sem filtro — o default — continuam todos lá.
  */
-const countSelect = (standId: string | null) =>
-  comJoins(db.select({ total: sql<number>`count(*)::int` }).from(listings).$dynamic(), standId);
+function caixaSql(gearbox: Transmission): SQL {
+  return sql`${listings.gearboxNorm} = ${gearbox === "automática" ? "auto" : "manual"}`;
+}
+
+/**
+ * ORDER BY com **ordem total**: sem o `id` no fim, linhas com o mesmo valor
+ * (savings é inteiro em euros, repete muito) podiam trocar de posição entre
+ * pedidos, e a paginação por offset saltava ou repetia carros em silêncio.
+ */
+function ordemSql(sort: SearchFilters["sort"]): SQL[] {
+  const criterio =
+    sort === "price"
+      ? asc(importCostEstimates.totalPt)
+      : sort === "recent"
+        ? desc(listings.lastSeenAt)
+        : sort === "savings"
+          ? desc(importCostEstimates.savings)
+          : desc(importCostEstimates.savingsPct);
+  return [criterio, asc(listings.id)];
+}
 
 export async function searchListingsQuery(
   filters: SearchFilters,
   standId: string | null,
 ): Promise<SearchResults> {
-  const conds = [isNull(listings.deletedAt), COM_CATALOGO, MONTRA_REPRESENTANTE];
+  const conds = [isNull(listings.deletedAt), COM_CATALOGO, E_REPRESENTANTE];
   if (filters.query) conds.push(...condsDoTexto(filters.query));
   if (filters.countries?.length) conds.push(inArray(listings.country, filters.countries));
   if (filters.onlyOpportunities) conds.push(eq(importCostEstimates.verdict, "compensa"));
-  if (filters.minYear) conds.push(gte(listings.year, filters.minYear));
-  // Km desconhecidos ficam de fora de "até X km" — na montra não há nenhum (medido),
-  // e prometer um teto sobre um valor que não se sabe seria pior do que não o mostrar.
-  if (filters.maxKm) conds.push(lte(listings.km, filters.maxKm));
   if (filters.maxPrice) conds.push(lte(importCostEstimates.totalPt, filters.maxPrice));
+  if (filters.minYear) conds.push(gte(listings.year, filters.minYear));
+  if (filters.maxKm) conds.push(lte(listings.km, filters.maxKm));
   // O combustível do cartão é o do anúncio com o do modelo canónico em fallback
   // (ver `rowToListing`) — filtrar só por listings.fuel escondia os que só o
-  // vehicle_models sabe.
+  // vehicle_models sabe. Vem da implementação da main (PR #40).
   if (filters.fuel) {
     conds.push(sql`coalesce(${listings.fuel}, ${vehicleModels.fuel}) = ${filters.fuel}`);
   }
-  // A caixa não está gravada, é derivada: o `transmissionOf` chama automática a
-  // tudo o que tenha "auto" no gearbox e manual a TODO o resto — o null incluído
-  // (110 anúncios da montra hoje). O filtro tem de partir a montra no mesmo sítio.
-  if (filters.gearbox) {
-    conds.push(
-      filters.gearbox === "automática"
-        ? sql`${listings.gearbox} ~* 'auto'`
-        : sql`(${listings.gearbox} is null or ${listings.gearbox} !~* 'auto')`,
-    );
-  }
+  if (filters.gearbox) conds.push(caixaSql(filters.gearbox));
 
-  const orderBy =
-    filters.sort === "price"
-      ? importCostEstimates.totalPt
-      : filters.sort === "recent"
-        ? desc(listings.lastSeenAt)
-        : filters.sort === "savingsPct"
-          ? desc(importCostEstimates.savingsPct)
-          : desc(importCostEstimates.savings);
+  const page = Math.min(Math.max(filters.page ?? 1, 1), MAX_PAGE);
 
-  const filtro = and(...conds);
-  const [rows, contagem] = await Promise.all([
-    baseSelect(standId).where(filtro).orderBy(orderBy).limit(SEARCH_LIMIT),
-    countSelect(standId).where(filtro),
-  ]);
-  return { listings: rows.map((r) => toListing(r)), total: contagem[0]?.total ?? 0 };
+  const rows = await searchSelect(standId)
+    .where(and(...conds))
+    .orderBy(...ordemSql(filters.sort))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE);
+
+  // O `count(*) over()` viaja NAS linhas — numa página vazia não vem nenhum, e o
+  // total ficava 0. Quem aterrasse numa página fora do conjunto (link antigo,
+  // stock que encolheu) via "0 anúncios" e perdia a paginação com que voltar
+  // atrás. Nesse caso — e só nesse — vale a pena a segunda ida à base.
+  const total =
+    rows[0]?.total ??
+    (page > 1 ? (await searchListingsQuery({ ...filters, page: 1 }, standId)).total : 0);
+
+  return {
+    listings: rows.map((r) => toListing(r)),
+    total,
+    page,
+    pageSize: PAGE_SIZE,
+    hasMore: page < MAX_PAGE && page * PAGE_SIZE < total,
+  };
 }
 
 export async function getListingQuery(id: string, standId: string | null): Promise<Listing | null> {
@@ -374,6 +457,9 @@ export async function getListingsByIdsQuery(
 export async function topOpportunitiesQuery(
   limit: number,
   standId: string | null,
+  /** `savings` para a landing, que precisa de leque largo de valores absolutos
+   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). */
+  sort: "percentagem" | "savings" = "percentagem",
 ): Promise<Listing[]> {
   const rows = await baseSelect(standId)
     .innerJoin(
@@ -381,7 +467,20 @@ export async function topOpportunitiesQuery(
       and(eq(opportunities.listingId, listings.id), isNull(opportunities.deletedAt)),
     )
     .where(and(isNull(listings.deletedAt), COM_CATALOGO))
-    .orderBy(desc(opportunities.savings))
+    // Por omissão, percentagem — pela mesma razão que a pesquisa: ordenar por
+    // poupança absoluta enche o topo de supercarros, e o painel é a primeira
+    // coisa que um stand de usados vê de manhã. Os KPIs em euros ao lado
+    // continuam a apontar para `ordenar=savings`, que é o que os explica.
+    //
+    // A percentagem vem de `import_cost_estimates`, não da cópia em
+    // `opportunities`: é o mesmo valor por que a pesquisa ordena, e o painel e a
+    // pesquisa a discordarem sobre qual é o melhor negócio do dia seria pior do
+    // que qualquer das duas ordens. A cópia em `opportunities` é um instantâneo
+    // do último `flag-opportunities` e envelhece entre corridas.
+    .orderBy(
+      sort === "savings" ? desc(opportunities.savings) : desc(importCostEstimates.savingsPct),
+      asc(listings.id),
+    )
     .limit(limit);
   return rows.map((r) => toListing(r));
 }
@@ -475,40 +574,68 @@ export async function toggleFavoriteMutation(standId: string, listingId: string)
 }
 
 // ── Alertas ──────────────────────────────────────────────────────
-
-interface AlertCriteria {
-  summary?: string;
-  maxPrice?: number;
-  /** Marca/modelo exatos, quando o alerta nasce de um anúncio (ver
-   * components/listing-actions.tsx) — sem migration, é só mais uma chave no
-   * JSONB. Preparado para o futuro job de matching comparar exato, em vez de
-   * ter de reanalisar o resumo em texto livre. */
-  make?: string;
-  model?: string;
-}
+// A forma do JSONB `criteria` e a resolução da família a vigiar vivem em
+// lib/alert-criteria.ts — partilhadas com o scripts/pipeline/match-alerts.ts,
+// que é quem casa. Aqui só se lê e escreve.
 
 export async function alertsQuery(standId: string): Promise<Alert[]> {
+  // `matchCount`/`lastMatchAt` saem de alert_events (o job de matching já
+  // existe e corre em .github/workflows/alerts.yml); estavam escritos a zero à
+  // mão e o badge da UI nunca aparecia. `left join` porque um alerta sem
+  // eventos continua a ser um alerta.
   const rows = await db
-    .select()
+    .select({
+      id: alerts.id,
+      name: alerts.name,
+      criteria: alerts.criteria,
+      countries: alerts.countries,
+      active: alerts.active,
+      createdAt: alerts.createdAt,
+      matchCount: count(alertEvents.id),
+      // `max()` do drizzle e não um `sql` cru: leva o mapeador da coluna atrás e
+      // devolve um Date. Em cru vinha a string do driver e o `.toISOString()`
+      // rebentava só em runtime.
+      lastMatchAt: max(alertEvents.sentAt),
+    })
     .from(alerts)
+    .leftJoin(alertEvents, eq(alertEvents.alertId, alerts.id))
     .where(eq(alerts.standId, standId))
+    .groupBy(alerts.id)
     .orderBy(desc(alerts.createdAt));
+
   return rows.map((a) => {
     const criteria = (a.criteria ?? {}) as AlertCriteria;
-    // Sem summary (não devia acontecer nos caminhos de criação atuais, mas o
-    // JSONB não obriga), tenta reconstruir a partir de marca/modelo antes de
-    // cair no nome do alerta.
-    const fromMakeModel = [criteria.make, criteria.model].filter(Boolean).join(" ");
+    const family = alertModelKeys(criteria);
+    // Sem summary (o JSONB não obriga), reconstrói-se: a família normalizada
+    // primeiro, depois o texto cru, e só em último caso o nome do alerta.
+    const fallback = family
+      ? familyLabel(family)
+      : [criteria.make, criteria.model].filter(Boolean).join(" ");
     return {
       id: a.id,
       name: a.name,
-      criteria: criteria.summary ?? (fromMakeModel || a.name),
+      criteria: criteria.summary ?? (fallback || a.name),
       countries: (a.countries ?? []) as CountryCode[],
       active: a.active,
-      matchCount: 0, // preenchido quando o job de matching de alertas existir
-      lastMatchAt: undefined,
+      matchCount: a.matchCount,
+      lastMatchAt: a.lastMatchAt?.toISOString(),
+      matchable: family !== null,
     };
   });
+}
+
+/**
+ * As famílias de modelos que existem mesmo na montra. É a lista que o
+ * formulário de /alertas oferece: aceitar texto livre era prometer um alerta
+ * que ninguém conseguia casar.
+ */
+export async function alertModelsQuery(): Promise<AlertModelOption[]> {
+  const rows = await db
+    .selectDistinct({ makeKey: vehicleModels.make, modelKey: vehicleModels.model })
+    .from(vehicleModels)
+    .innerJoin(listings, and(eq(listings.modelId, vehicleModels.id), isNull(listings.deletedAt)))
+    .orderBy(asc(vehicleModels.make), asc(vehicleModels.model));
+  return rows.map((r) => ({ ...r, label: familyLabel(r) }));
 }
 
 export async function createAlertMutation(
@@ -520,8 +647,14 @@ export async function createAlertMutation(
     maxPrice?: number;
     make?: string;
     model?: string;
+    makeKey?: string;
+    modelKey?: string;
   },
 ): Promise<void> {
+  // A família é resolvida AQUI, no servidor: o formulário da ficha do anúncio
+  // manda marca/modelo em texto cru ("VOLKSWAGEN"/"Golf VII") e é este passo
+  // que os transforma no que o matching sabe comparar.
+  const family = alertModelKeys(draft);
   await db.insert(alerts).values({
     standId,
     name: draft.name,
@@ -530,6 +663,8 @@ export async function createAlertMutation(
       maxPrice: draft.maxPrice,
       make: draft.make,
       model: draft.model,
+      makeKey: family?.makeKey,
+      modelKey: family?.modelKey,
     } satisfies AlertCriteria,
     countries: draft.countries,
     active: true,
@@ -545,6 +680,15 @@ export async function toggleAlertMutation(
     .update(alerts)
     .set({ active })
     .where(and(eq(alerts.id, alertId), eq(alerts.standId, standId)));
+}
+
+/**
+ * Apaga um alerta do stand. O `stand_id` no WHERE é o da SESSÃO (resolvido em
+ * lib/data.ts) — sem ele, um id adivinhado apagava o alerta de outro stand.
+ * Os `alert_events` vão atrás pelo `on delete cascade` do FK (db/schema.ts).
+ */
+export async function deleteAlertMutation(standId: string, alertId: string): Promise<void> {
+  await db.delete(alerts).where(and(eq(alerts.id, alertId), eq(alerts.standId, standId)));
 }
 
 // ── Notificações ────────────────────────────────────────────────
@@ -581,24 +725,32 @@ export async function notificationsQuery(standId: string, limit = 8): Promise<No
 }
 
 // ── Stand / conta ───────────────────────────────────────────────
-/** Duração do 1.º mês grátis, em dias. */
-const TRIAL_DAYS = 30;
 
 export async function getStandQuery(standId: string): Promise<Stand | null> {
   const [org] = await db.select().from(organization).where(eq(organization.id, standId)).limit(1);
   if (!org) return null;
 
-  const rows = await db
-    .select({ id: user.id, name: user.name, email: user.email, role: member.role })
-    .from(member)
-    .innerJoin(user, eq(user.id, member.userId))
-    .where(eq(member.organizationId, standId))
-    .orderBy(desc(member.role)); // owner antes de member
+  const [rows, [sub]] = await Promise.all([
+    db
+      .select({ id: user.id, name: user.name, email: user.email, role: member.role })
+      .from(member)
+      .innerJoin(user, eq(user.id, member.userId))
+      .where(eq(member.organizationId, standId))
+      .orderBy(desc(member.role)), // owner antes de member
+    db.select().from(subscriptions).where(eq(subscriptions.standId, standId)).limit(1),
+  ]);
 
-  // Sem Polar ligado, a subscrição deriva da data de criação: 1.º mês grátis
-  // a contar do registo. É o que é verdade hoje — não inventamos "ativa".
-  const renewsAt = new Date(org.createdAt);
-  renewsAt.setDate(renewsAt.getDate() + TRIAL_DAYS);
+  // Sem linha de subscrição, o stand está no 1.º mês grátis derivado da data de
+  // registo — o trial não passa pela Polar (não pedimos cartão), portanto não
+  // há lá nada para gravar. Isto NÃO é um fallback de emergência: é o caminho
+  // normal de todos os stands até alguém pagar.
+  const fimDoTrial = new Date(org.createdAt);
+  fimDoTrial.setDate(fimDoTrial.getDate() + CONDICOES.trialDias);
+
+  const fimDoPeriodo = sub ? (sub.currentPeriodEnd ?? fimDoTrial) : fimDoTrial;
+  const estado = sub
+    ? estadoEfetivo(sub.status as SubscriptionStatus, sub.currentPeriodEnd)
+    : estadoEfetivo("trial", fimDoTrial);
 
   return {
     id: org.id,
@@ -613,9 +765,12 @@ export async function getStandQuery(standId: string): Promise<Stand | null> {
       role: r.role === "owner" ? "owner" : "member",
     })),
     subscription: {
-      status: renewsAt.getTime() > Date.now() ? "trial" : "expirada",
-      pricePerMonth: 100, // euros (formatEuroCents não divide — só mostra cêntimos)
-      renewsAt: renewsAt.toISOString(),
+      status: estado,
+      // euros (formatEuroCents não divide — só mostra cêntimos). O valor
+      // canónico está em lib/legal.ts, onde os Termos e o marketing o leem:
+      // escrevê-lo aqui outra vez era como divergiam.
+      pricePerMonth: CONDICOES.precoMensalEuros,
+      renewsAt: fimDoPeriodo.toISOString(),
     },
   };
 }
@@ -644,6 +799,28 @@ export async function updateStandMutation(
       updatedAt: new Date(),
     })
     .where(eq(organization.id, standId));
+}
+
+// ── Frescura ────────────────────────────────────────────────────
+/**
+ * Quando foi a última vez que o pipeline viu os anúncios que estamos a servir.
+ *
+ * A landing já mostrava isto; a app autenticada não mostrava nada, e foi assim
+ * que a produção esteve **sete dias** desatualizada sem ninguém reparar — quem
+ * está lá dentro todos os dias é quem tinha de ver primeiro.
+ *
+ * ⚠️ Devolve **string, não Date**: vem de um `sql` cru, e o Drizzle só converte
+ * para Date o que passa pelo mapeamento de uma coluna. Anotar `Date` compila e
+ * rebenta em runtime (a mesma armadilha do `landingStatsQuery`).
+ */
+export async function dataFreshnessQuery(): Promise<string | null> {
+  const [row] = await db
+    .select({
+      lastSeenAt: sql<string | null>`max(${listings.lastSeenAt})::text`,
+    })
+    .from(listings)
+    .where(isNull(listings.deletedAt));
+  return row?.lastSeenAt ?? null;
 }
 
 // ── Landing (números públicos) ──────────────────────────────────

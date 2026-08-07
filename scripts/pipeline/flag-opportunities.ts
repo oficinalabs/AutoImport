@@ -1,7 +1,7 @@
 /**
  * Marca oportunidades globais (stand_id null): estimativas com veredito
- * "compensa" e confiança normal. Soft-delete das que deixaram de compensar
- * ou cujo anúncio desapareceu; reaparecer reativa.
+ * "compensa", confiança normal e match ao catálogo `exato`. Soft-delete das que
+ * deixaram de compensar ou cujo anúncio desapareceu; reaparecer reativa.
  *   pnpm exec tsx scripts/pipeline/flag-opportunities.ts
  */
 import { assertWritable, dbUrl } from "../../lib/db-url";
@@ -17,12 +17,24 @@ export async function flagOpportunities() {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { carIdentitySql } = await import("../../lib/engine/car-identity");
+  // Dinâmico como os de cima, e pela mesma razão: `lib/queries` importa `db/`,
+  // que resolve a connection string no momento em que é avaliado. Um import
+  // estático seria içado para cima do `process.loadEnvFile` deste ficheiro e o
+  // cliente nascia sem WAREHOUSE_URL. O `publish.ts` importa-o estaticamente
+  // porque lá o `db` do módulo nunca é usado — aqui é.
+  const { MONTRA_MATCH_CONFIDENCE } = await import("../../lib/queries");
 
   // Dedup por CARRO físico (auditoria: duplicado_estrangeiro): agregadores
   // (trovit/theparking) reindexam o mesmo anúncio, e caetano/carplus cross-listam
   // o mesmo stock — a identidade partilhada (VIN, senão chassis no URL, senão
   // modelo+ano+km+preço; ver lib/engine/car-identity.ts) colapsa-os. Fica só o
   // listing com maior savings.
+  //
+  // O `match_confidence` é a regra da MONTRA (COM_CATALOGO em lib/queries.ts), e
+  // tem de estar aqui: sem ele o KPI contava 11 766 oportunidades das quais só
+  // 6 429 tinham página onde aterrar. E o filtro entra ANTES do distinct on de
+  // propósito — um match `designacao` com savings maior tapava o `exato` do
+  // mesmo carro, que era o único publicável, e o carro desaparecia dos dois lados.
   const identity = carIdentitySql("l");
   const winnersCte = sql`
     with winners as (
@@ -32,6 +44,7 @@ export async function flagOpportunities() {
       join listings l on l.id = e.listing_id
       where e.verdict = 'compensa'
         and e.pt_confidence = 'normal'
+        and l.match_confidence = ${MONTRA_MATCH_CONFIDENCE}
         and l.deleted_at is null
         and l.is_damaged is not true
       order by ${identity}, e.savings desc

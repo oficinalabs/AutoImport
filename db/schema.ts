@@ -280,6 +280,13 @@ export const listings = pgTable(
     /** normalizado (FuelType); null até o match-models correr */
     fuel: text("fuel"),
     gearbox: text("gearbox"),
+    /** caixa classificada pelo `normGearbox` (lib/engine/us-catalog.ts) a partir do
+     * `gearbox` cru: "manual" | "auto" | null. É esta coluna — e não um regex sobre o
+     * texto livre — que decide o que a ficha mostra e o que o filtro da pesquisa
+     * devolve. `null` significa NÃO SABEMOS (a fonte não diz, ou diz algo ambíguo
+     * como "semi-automática"); nunca é o mesmo que "manual". Escrita pelo
+     * scripts/pipeline/match-models.ts, que a recalcula em cada corrida. */
+    gearboxNorm: text("gearbox_norm"),
     engineRaw: text("engine_raw"),
     displacementCc: integer("displacement_cc"),
     color: text("color"),
@@ -497,6 +504,53 @@ export const favorites = pgTable(
   (table) => [uniqueIndex("favorites_stand_listing_uidx").on(table.standId, table.listingId)],
 );
 
+/**
+ * Subscrição do stand — o **estado real**, escrito pelo webhook da Polar
+ * (app/api/polar/webhook/route.ts) e lido por `getStandQuery`.
+ *
+ * ⚠️ Tabela própria, e não colunas na `organization`, de propósito: o
+ * `pnpm auth:generate` regenera o db/schema.ts a partir do Better Auth e
+ * apagaria tudo o que lá esteja à mão. O `nif`/`address`/`phone` já vivem nesse
+ * risco desde a migration 0002 — não se agrava.
+ *
+ * **Ausência de linha não é ausência de subscrição**: sem linha, o stand está
+ * no 1.º mês grátis derivado do `organization.created_at` (o trial não passa
+ * pela Polar — não pedimos cartão no registo, ver /legal/subscricao). Só quando
+ * alguém paga é que aparece cá uma linha.
+ *
+ * Uma linha por stand: um produto, um preço, sem níveis nem add-ons. O unique
+ * em `polar_subscription_id` é o outro lado da mesma verdade — a mesma
+ * subscrição da Polar não pode ficar pendurada em dois stands.
+ */
+export const subscriptions = pgTable(
+  "subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    standId: text("stand_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** `customer_id` da Polar — chave para o portal de faturação do cliente. */
+    polarCustomerId: text("polar_customer_id"),
+    /** `id` da subscrição na Polar; a chave para reconciliar com o lado deles. */
+    polarSubscriptionId: text("polar_subscription_id").notNull(),
+    /** Valores de SubscriptionStatus (lib/types.ts), já traduzidos do vocabulário
+     *  da Polar em lib/subscription.ts. Guarda-se o nosso, não o deles: a UI e o
+     *  gate leem daqui e não têm de conhecer a Polar. */
+    status: text("status").notNull(),
+    /** Fim do período pago. É isto (e não o `status`) que decide o acesso: uma
+     *  subscrição cancelada ainda dá acesso até aqui. Null = sem período
+     *  conhecido (a Polar não o manda em estados incompletos). */
+    currentPeriodEnd: timestamp("current_period_end"),
+    /** Cancelada mas ainda a correr — a UI não pode dizer "renova a X". */
+    cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
+    ...domainTimestamps,
+  },
+  (table) => [
+    uniqueIndex("subscriptions_stand_uidx").on(table.standId),
+    uniqueIndex("subscriptions_polar_subscription_uidx").on(table.polarSubscriptionId),
+  ],
+);
+
 // ── Catálogo ultimatespecs.com — referência de versões para o matching ──
 // Alimentado pelo coletor tools/collector/ultimatespecs (NDJSON → scripts/pipeline/
 // ingest-ultimatespecs.ts). Chaves naturais do site (mid/version_id, estáveis) em vez
@@ -660,6 +714,13 @@ export const favoritesRelations = relations(favorites, ({ one }) => ({
   listing: one(listings, {
     fields: [favorites.listingId],
     references: [listings.id],
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  stand: one(organization, {
+    fields: [subscriptions.standId],
+    references: [organization.id],
   }),
 }));
 

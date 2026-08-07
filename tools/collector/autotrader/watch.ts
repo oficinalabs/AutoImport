@@ -24,7 +24,7 @@ interface WatchConfig {
 function urlRecentes(page: number) {
   const qs = new URLSearchParams({ atype: 'C', sort: 'age', desc: '1' });
   if (page > 1) qs.set('page', String(page));
-  return `${BASE}/auto/occasions?${qs}`;
+  return `${BASE}/auto?${qs}`;
 }
 
 // config: { http, pages (default 1), intervalMs (default 60000), cycles (0=infinito), outDir }

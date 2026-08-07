@@ -57,8 +57,8 @@ const STEPS = [
     body: "Todos os dias recalculamos ISV, IUC, transporte e legalização de cada anúncio, e comparamos com o preço praticado em Portugal.",
   },
   {
-    n: "Contactas o vendedor",
-    body: "Falas com o stand estrangeiro a partir da plataforma e acompanhas a compra até à matrícula portuguesa.",
+    n: "Vais ao anúncio e compras",
+    body: "Levamos-te ao anúncio original, no site onde o carro está à venda. A compra é entre ti e o vendedor — a diferença é chegares lá com a conta já feita: ISV, transporte e legalização.",
   },
 ];
 

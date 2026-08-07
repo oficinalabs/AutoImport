@@ -17,18 +17,22 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { cache } from "react";
 import { auth } from "./auth";
+import * as inv from "./invites";
 import * as q from "./queries";
 import { checkStandFields } from "./stand-fields";
 import type {
   Alert,
+  AlertModelOption,
   Conversation,
   CountryCode,
   CountryInsight,
   DashboardStats,
   Deal,
   FuelType,
+  InviteView,
   Listing,
   Notification,
+  PendingInvite,
   Stand,
   Transmission,
 } from "./types";
@@ -78,16 +82,25 @@ export interface SearchFilters {
   fuel?: FuelType;
   gearbox?: Transmission;
   sort?: "savings" | "savingsPct" | "recent" | "price";
+  /** 1-based. Acima do teto (`MAX_PAGE` em lib/queries.ts) fica preso ao teto. */
+  page?: number;
 }
 
 /**
  * O que a pesquisa devolve. `total` NÃO é `listings.length`: a montra tem
  * dezenas de milhares e o servidor manda uma página. Sem ele a UI dizia "60
  * anúncios" — verdade sobre o que recebeu, mentira sobre o que existe.
+ *
+ * `page`/`pageSize`/`hasMore` são o passo seguinte ao `total`: saber que existem
+ * 32 920 e só conseguir ver os primeiros 60 é melhor do que a mentira, mas
+ * continua a ser um teto. Ver `searchListingsQuery`.
  */
 export interface SearchResults {
   listings: Listing[];
   total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
 }
 
 export async function searchListings(filters: SearchFilters = {}): Promise<SearchResults> {
@@ -172,23 +185,63 @@ function escolherExemploIsv(top: Listing[]): Listing | null {
  * A página cacheia o resultado (ver `revalidate` em app/(marketing)/page.tsx):
  * mantém-na rápida sem servir números velhos.
  */
+/**
+ * A landing sem números — o estado degradado, não um estado de erro.
+ *
+ * A página já sabe lidar com ele: sem `lastSeenAt` não mostra o carimbo de
+ * frescura, e sem `isvExample` a secção da conta do ISV não aparece. Ver
+ * `escolherExemploIsv` e app/(marketing)/page.tsx.
+ */
+const LANDING_VAZIA: LandingData = {
+  totalListings: 0,
+  activeOpportunities: 0,
+  medianSavings: 0,
+  bestSavings: 0,
+  lastSeenAt: null,
+  featured: [],
+  isvExample: null,
+};
+
 export async function getLandingData(): Promise<LandingData> {
-  const [stats, top] = await Promise.all([
-    q.landingStatsQuery(),
-    // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
-    // largo porque os carros com imposto alto estão em baixo desta lista (é
-    // ordenada por poupança) — ver `escolherExemploIsv`.
-    q.topOpportunitiesQuery(48, null),
-  ]);
-  return {
-    ...stats,
-    // 5: a fila passou a carrossel com setas (components/ui/carousel.tsx), e
-    // com 4 visíveis de cada vez, 5 deixa exatamente um por revelar — que é o
-    // que faz a seta valer a pena. Com 8 ficavam duas páginas e a segunda
-    // raramente se via.
-    featured: top.slice(0, 5),
-    isvExample: escolherExemploIsv(top),
-  };
+  try {
+    const [stats, top] = await Promise.all([
+      q.landingStatsQuery(),
+      // 48: os 8 da fila + um leque largo para o exemplo do ISV. Precisa de ser
+      // largo porque os carros com imposto alto estão em baixo desta lista (é
+      // ordenada por poupança) — ver `escolherExemploIsv`.
+      //
+      // Por poupança ABSOLUTA, ao contrário do painel: a landing usa esta lista
+      // para escolher o carro que ilustra a conta do ISV, e esse critério assenta
+      // no peso do imposto em euros. Ordená-la por percentagem trocava o leque de
+      // valores absolutos por um de margens, e o exemplo do ISV ficava pior.
+      q.topOpportunitiesQuery(48, null, "savings"),
+    ]);
+    return {
+      ...stats,
+      // 5: a fila passou a carrossel com setas (components/ui/carousel.tsx), e
+      // com 4 visíveis de cada vez, 5 deixa exatamente um por revelar — que é o
+      // que faz a seta valer a pena. Com 8 ficavam duas páginas e a segunda
+      // raramente se via.
+      featured: top.slice(0, 5),
+      isvExample: escolherExemploIsv(top),
+    };
+  } catch (error) {
+    // ⚠️ A landing é PRÉ-RENDERIZADA (revalidate = 3600), portanto esta query
+    // corre durante o `next build`. E os previews de PR **não migram** — Preview
+    // e Production partilham a DATABASE_URL, e um PR por rever não pode alterar
+    // a produção (ver CLAUDE.md). Resultado: qualquer PR que traga uma migration
+    // fazia FALHAR o build de todos os previews com "column … does not exist" —
+    // não só o dele, e o preview é a única forma de a equipa rever o trabalho.
+    //
+    // Em produção NÃO se engole nada: o `db:migrate:deploy` corre ANTES do build
+    // (vercel.json), portanto lá o schema corresponde ao código por construção e
+    // uma falha aqui é real — rebenta, e a Vercel mantém a versão anterior no ar.
+    // Localmente também rebenta, que é onde se quer ver o erro.
+    const podeDegradar = Boolean(process.env.VERCEL) && process.env.VERCEL_ENV !== "production";
+    if (!podeDegradar) throw error;
+    console.error("[landing] preview sem dados (schema por migrar?):", error);
+    return LANDING_VAZIA;
+  }
 }
 
 // ── Painel ──────────────────────────────────────────────────────
@@ -221,16 +274,24 @@ export async function getAlerts(): Promise<Alert[]> {
   return standId ? q.alertsQuery(standId) : [];
 }
 
+/** As famílias de modelos que existem na montra — a lista do formulário de /alertas. */
+export async function getAlertModels(): Promise<AlertModelOption[]> {
+  return q.alertModelsQuery();
+}
+
 export interface AlertDraft {
   name: string;
   criteria: string;
   countries: CountryCode[];
   maxPrice?: number;
-  /** Preenchidos quando o alerta nasce de um anúncio (ver
-   * components/listing-actions.tsx) — vão para o JSONB de criteria, para o
-   * futuro job de matching comparar exato em vez de reanalisar texto livre. */
+  /** Texto CRU do anúncio, quando o alerta nasce de um (ver
+   * components/listing-actions.tsx). O servidor normaliza-o para a família em
+   * `createAlertMutation`. */
   make?: string;
   model?: string;
+  /** Família já escolhida de uma lista real (formulário de /alertas). */
+  makeKey?: string;
+  modelKey?: string;
 }
 
 export async function createAlert(draft: AlertDraft): Promise<void> {
@@ -241,6 +302,18 @@ export async function createAlert(draft: AlertDraft): Promise<void> {
 export async function toggleAlert(id: string, active: boolean): Promise<void> {
   const standId = await activeStandId();
   if (standId) await q.toggleAlertMutation(standId, id, active);
+}
+
+/**
+ * Apaga um alerta. O `standId` vem da SESSÃO e nunca do cliente — só o id do
+ * alerta é que o cliente escolhe, e ele sozinho não chega para apagar nada de
+ * outro stand (o WHERE em lib/queries.ts leva os dois).
+ */
+export async function deleteAlert(id: string): Promise<void> {
+  const standId = await activeStandId();
+  if (!standId) return;
+  await q.deleteAlertMutation(standId, id);
+  revalidatePath("/alertas");
 }
 
 // ── Negociações ─────────────────────────────────────────────────
@@ -268,10 +341,98 @@ export async function getDeal(_id: string): Promise<Deal | null> {
 }
 
 // ── Stand / conta ───────────────────────────────────────────────
-/** O stand da sessão, ou null se não houver sessão/organização. */
-export async function getStand(): Promise<Stand | null> {
+/**
+ * ⚠️ Memoizado por pedido, como o `activeStandId`: o gate da subscrição
+ * (components/subscription-gate.tsx) precisa do estado em todas as rotas da
+ * app, e o layout já o tinha pedido para a etiqueta da barra de topo. Sem o
+ * `cache()` eram duas queries por render em vez de uma.
+ *
+ * A memoização não pode ficar no export — num módulo "use server" só podem sair
+ * funções `async`, e o `cache()` devolve uma função normal.
+ */
+const standCached = cache(async (): Promise<Stand | null> => {
   const standId = await activeStandId();
   return standId ? q.getStandQuery(standId) : null;
+});
+
+/** O stand da sessão, ou null se não houver sessão/organização. */
+export async function getStand(): Promise<Stand | null> {
+  return standCached();
+}
+
+// ── Equipa / convites ───────────────────────────────────────────
+/**
+ * Convites por aceitar do stand da sessão. Um convite enviado que não aparece
+ * em lado nenhum é um convite que ninguém sabe se saiu — por isso /stand
+ * lista-os, com forma de cancelar.
+ */
+export async function getPendingInvites(): Promise<PendingInvite[]> {
+  try {
+    const standId = await activeStandId();
+    return standId ? await inv.pendingInvites(standId) : [];
+  } catch (error) {
+    console.error("[convites] falha a listar:", error);
+    return [];
+  }
+}
+
+/**
+ * Convida um email para a equipa do stand. Server Action — o standId vem da
+ * SESSÃO, nunca do cliente, e o papel de dono é revalidado no servidor
+ * (mesmo padrão de `updateStand`).
+ */
+export async function inviteMember(email: string): Promise<inv.InviteResult> {
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  const result = await inv.createInvite(await headers(), standId, email);
+  if (result.ok) revalidatePath("/stand");
+  return result;
+}
+
+/** Cancela um convite por aceitar. Só o dono, e só do stand da sessão. */
+export async function cancelInvite(invitationId: string): Promise<inv.InviteResult> {
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  const result = await inv.cancelInvite(await headers(), standId, invitationId);
+  if (result.ok) revalidatePath("/stand");
+  return result;
+}
+
+/**
+ * O convite que a página /convite/[id] mostra. **Sem sessão** — quem é
+ * convidado pode ainda não ter conta.
+ */
+export async function getInvite(id: string): Promise<InviteView> {
+  try {
+    return await inv.readInvite(id);
+  } catch (error) {
+    console.error("[convites] falha a ler:", error);
+    return { status: "inexistente" };
+  }
+}
+
+/** Aceita o convite com a sessão atual. Ver lib/invites.ts para as recusas. */
+export async function acceptInvite(id: string): Promise<inv.InviteResult> {
+  const result = await inv.acceptInvite(await headers(), id);
+  if (result.ok) revalidatePath("/stand");
+  return result;
+}
+
+// ── Frescura ────────────────────────────────────────────────────
+/**
+ * Quando o pipeline leu os anúncios pela última vez. Público (nada por stand).
+ * Devolve null se a leitura falhar — a barra de topo não é sítio para rebentar
+ * por causa de um indicador.
+ */
+export async function getDataFreshness(): Promise<string | null> {
+  try {
+    return await q.dataFreshnessQuery();
+  } catch (error) {
+    console.error("[frescura] falha ao ler:", error);
+    return null;
+  }
 }
 
 // ── Notificações ────────────────────────────────────────────────

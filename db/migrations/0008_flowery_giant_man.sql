@@ -1,0 +1,1 @@
+ALTER TABLE "listings" ADD COLUMN "gearbox_norm" text;

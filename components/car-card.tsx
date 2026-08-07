@@ -84,7 +84,15 @@ export function CarCard({ listing }: { listing: Listing }) {
             Sem sinal {relativeDay(listing.seenAt)}. Pode ter sido vendido ou retirado.
           </p>
         ) : (
-          <KmTrustBadge trust={listing.kmTrust} />
+          // Só quando há informação REAL. `por_verificar` é o estado de todos os
+          // anúncios da montra (nenhuma fonte estrangeira publica VIN — ver
+          // `kmTrust` em lib/queries.ts), portanto o aviso saía 24× por página,
+          // igual em todos: um sinal que nunca varia não informa, treina o
+          // utilizador a ignorá-lo — o contrário do que se quer num aviso de
+          // fraude de km. A mensagem fica dita uma vez, na ficha do anúncio
+          // (bloco "Confiança"), onde vem com a explicação e não a competir com
+          // mais 23 cartões.
+          listing.kmTrust.level !== "por_verificar" && <KmTrustBadge trust={listing.kmTrust} />
         )}
 
         <div className="mt-auto flex items-end justify-between border-t border-line pt-3">

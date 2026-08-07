@@ -1,0 +1,84 @@
+# Publicação da montra: warehouse local → base da app (Supabase).
+#
+# ⚠️ ESTE WORKFLOW NÃO CORRE NA NUVEM DA GITHUB, E NÃO É ENGANO.
+#
+# O `publish.ts` abre DUAS ligações: a origem é o corpus (~600 mil anúncios) numa
+# Postgres LOCAL, e o destino é a base da app. Um runner da GitHub não tem acesso
+# ao warehouse — nem pode ter, porque o corpus não cabe nos 500 MB da Supabase
+# (é essa a razão de ele ser local; ver docs/05-INFRA-E-DEPLOY.md). Por isso o
+# `runs-on` é `self-hosted`: só corre se e quando existir um runner NA MÁQUINA
+# que tem o warehouse.
+#
+# Enquanto esse runner não existir, este ficheiro é uma peça inerte: o `schedule`
+# dispara, não há runner com as labels, e o job fica pendente até expirar. Isso é
+# ruído silencioso — o alarme que conta é o `frescura.yml`, que corre em runner
+# normal, mede a idade dos dados que a app SERVE e fica vermelho quando ninguém
+# publica. Um mede a causa, o outro mede o sintoma; é o sintoma que interessa.
+#
+# COMO O LIGAR quando houver máquina (VPS, mini-PC, o portátil do operador):
+#   1. Settings → Actions → Runners → New self-hosted runner, com a label
+#      `warehouse`.
+#   2. No `.env.production.local` da máquina, a DATABASE_URL da Supabase e a
+#      WAREHOUSE_URL local (ver .env.example).
+#   3. Descomentar o `schedule` abaixo.
+#
+# ENTRETANTO, à mão, na máquina do warehouse:
+#   DB_TARGET=prod pnpm pipeline:publish          # ensaio (dry-run, faz rollback)
+#   DB_TARGET=prod pnpm pipeline:publish:apply    # a sério
+#
+# O `DB_TARGET=prod` NÃO está nos scripts do package.json de propósito: é a
+# confirmação, comando a comando, de que se quer mesmo escrever numa base
+# não-local (ver a guarda em lib/db-url.ts e o CLAUDE.md). Metê-lo no script
+# tirava a única coisa que impede uma publicação por engano.
+name: Publicação da montra
+
+on:
+  # Descomentar quando existir um runner com a label `warehouse`.
+  # schedule:
+  #   - cron: "0 5 * * *" # 05:00 UTC — antes dos alertas (06:00) e da frescura (09:00)
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Publicar a sério (sem isto é só ensaio)"
+        type: boolean
+        required: false
+        default: false
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  publicar:
+    # Só uma máquina com o warehouse local serve. Ver o cabeçalho.
+    runs-on: [self-hosted, warehouse]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Publicar
+        env:
+          # A origem é a Postgres local da máquina; o destino é a Supabase.
+          WAREHOUSE_URL: ${{ secrets.WAREHOUSE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # A guarda de lib/db-url.ts: escrever numa base não-local exige esta
+          # confirmação explícita. Aqui é intencional e está à vista.
+          DB_TARGET: prod
+        run: |
+          if [ -z "$WAREHOUSE_URL" ] || [ -z "$DATABASE_URL" ]; then
+            echo "::error::faltam WAREHOUSE_URL (origem) ou DATABASE_URL (destino)."
+            exit 1
+          fi
+          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+            pnpm pipeline:publish:apply
+          else
+            echo "::notice::Ensaio (dry-run). Corre com apply=true para publicar a sério."
+            pnpm pipeline:publish
+          fi

@@ -11,6 +11,7 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/**/*.test.ts",
+    "test:smoke": "SMOKE=1 node --import tsx --test tests/smoke/*.test.ts",
     "typecheck:tools": "tsc -p tools/collector/tsconfig.json",
     "typecheck:net-capture": "tsc -p tools/net-capture/tsconfig.json",
     "auth:generate": "npx @better-auth/cli generate --config lib/auth.ts --output db/schema.ts --yes",
@@ -23,6 +24,9 @@
     "pipeline:daily": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/run-daily.ts",
     "pipeline:alerts": "TSX_TSCONFIG_PATH=tsconfig.scripts.json tsx scripts/pipeline/match-alerts.ts",
     "pipeline:ingest": "tsx scripts/pipeline/ingest.ts",
+    "pipeline:publish": "tsx scripts/pipeline/publish.ts",
+    "pipeline:publish:apply": "tsx scripts/pipeline/publish.ts --apply",
+    "pipeline:frescura": "tsx scripts/pipeline/check-freshness.ts",
     "db:migrate:deploy": "tsx scripts/db/migrate-deploy.ts"
   },
   "dependencies": {

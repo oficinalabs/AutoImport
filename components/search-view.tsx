@@ -1,15 +1,16 @@
 "use client";
 
-import { searchFiltersToQuery } from "@/app/(app)/pesquisar/filters";
+import { searchFiltersToQuery } from "@/app/(app)/(gated)/pesquisar/filters";
 import { CarCard } from "@/components/car-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { COUNTRY_LIST } from "@/lib/countries";
-import type { SearchFilters } from "@/lib/data";
+import type { SearchFilters, SearchResults } from "@/lib/data";
 import { formatNumber } from "@/lib/format";
 import type { CountryCode, FuelType, Listing, Transmission } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { GitCompareArrows, SlidersHorizontal, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
@@ -23,17 +24,15 @@ type Sort = NonNullable<SearchFilters["sort"]>;
 const DEBOUNCE_TEXTO_MS = 400;
 
 export function SearchView({
-  listings,
-  total,
+  results,
   filters,
 }: {
-  /** A janela que o servidor mandou (no máximo `SEARCH_LIMIT`), já filtrada e ordenada. */
-  listings: Listing[];
-  /** Quantos anúncios da montra passam o filtro — quase sempre muito mais do que a janela. */
-  total: number;
+  /** A página que o servidor mandou, já filtrada e ordenada, com o total real. */
+  results: SearchResults;
   /** O que o URL diz. É a fonte de verdade; os controlos são o espelho dele. */
   filters: SearchFilters;
 }) {
+  const { listings, total, page, pageSize, hasMore } = results;
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState<string[]>([]);
@@ -72,10 +71,18 @@ export function SearchView({
     });
   }
 
+  /** O URL de outra página, com os filtros que lá estão. */
+  function hrefDaPagina(n: number) {
+    const qs = searchFiltersToQuery({ ...f, page: n });
+    return qs ? `/pesquisar?${qs}` : "/pesquisar";
+  }
+
   /** Um controlo mexeu: espelho já, URL a seguir. */
   function aplicar(patch: Partial<SearchFilters>) {
     clearTimeout(timerTexto.current);
-    const next = { ...f, ...patch };
+    // Volta à página 1: continuar na 7 depois de estreitar a pesquisa mostrava
+    // um vazio que parecia avaria.
+    const next = { ...f, ...patch, page: undefined };
     setF(next);
     navegar(next);
   }
@@ -87,7 +94,7 @@ export function SearchView({
    */
   function escreverTexto(value: string) {
     setTexto(value);
-    const next = { ...f, query: value.trim() || undefined };
+    const next = { ...f, query: value.trim() || undefined, page: undefined };
     setF(next);
     clearTimeout(timerTexto.current);
     timerTexto.current = setTimeout(() => navegar(next, true), DEBOUNCE_TEXTO_MS);
@@ -119,11 +126,14 @@ export function SearchView({
           <h1 className="text-2xl font-bold">Pesquisar</h1>
           {/* O que se vê é uma janela sobre a montra — dizer só "60 anúncios" era
               verdade sobre o que chegou e mentira sobre o que existe. */}
-          <p className="mt-1 text-sm text-ink-soft">
+          <p className="mt-1 text-sm text-ink-soft" data-testid="total">
             {listings.length < total ? (
               <>
-                A mostrar <span className="tnum">{listings.length}</span> de{" "}
-                <span className="tnum">{formatNumber(total)}</span> anúncios
+                <span className="tnum">
+                  {formatNumber((page - 1) * pageSize + 1)}–
+                  {formatNumber((page - 1) * pageSize + listings.length)}
+                </span>{" "}
+                de <span className="tnum">{formatNumber(total)}</span> anúncios
               </>
             ) : (
               <>
@@ -142,6 +152,7 @@ export function SearchView({
             value={texto}
             onChange={(e) => escreverTexto(e.target.value)}
             placeholder="Marca ou modelo (ex.: Golf, BMW…)"
+            data-testid="pesquisa"
             className="max-w-xs"
           />
           <label
@@ -326,8 +337,10 @@ export function SearchView({
           )}
         >
           {listings.map((l) => (
-            <div key={l.id} className="relative">
-              <label className="absolute left-2 top-2 z-10 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
+            <div key={l.id} className="relative" data-testid="resultado">
+              {/* top-9, não top-2: o badge de veredito do cartão ocupa o mesmo
+                  canto, e a etiqueta tapava-o em todas as larguras. */}
+              <label className="absolute left-2 top-9 z-20 flex cursor-pointer items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 text-[11px] font-medium shadow-sm backdrop-blur">
                 <input
                   type="checkbox"
                   checked={selected.includes(l.id)}
@@ -339,6 +352,23 @@ export function SearchView({
               <CarCard listing={l} />
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Paginação. `Link` (e não `router.replace`) de propósito: mudar de página
+          É navegar, e o voltar do browser tem de voltar à página anterior — ao
+          contrário de mexer num filtro, que só substitui o URL. */}
+      {(page > 1 || hasMore) && (
+        <div className="flex items-center justify-center gap-3">
+          <Button asChild variant="outline" size="sm" disabled={page <= 1}>
+            <Link href={hrefDaPagina(page - 1)}>Anterior</Link>
+          </Button>
+          <span className="tnum text-sm text-ink-soft">
+            Página {page} de {Math.max(1, Math.ceil(total / pageSize))}
+          </span>
+          <Button asChild variant="outline" size="sm" disabled={!hasMore}>
+            <Link href={hrefDaPagina(page + 1)}>Seguinte</Link>
+          </Button>
         </div>
       )}
 

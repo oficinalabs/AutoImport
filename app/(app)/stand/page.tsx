@@ -1,22 +1,48 @@
 import { AccountForm } from "@/components/account-form";
 import { StandForm } from "@/components/stand-form";
+import { TeamCard } from "@/components/team-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getSessionUser, getStand, getStandRole } from "@/lib/data";
+import { getPendingInvites, getSessionUser, getStand, getStandRole } from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
-import { Mail } from "lucide-react";
+import type { SubscriptionStatus } from "@/lib/types";
 
-const SUB_LABEL = {
-  trial: { label: "Trial (1.º mês grátis)", className: "bg-good-soft text-good" },
-  ativa: { label: "Ativa", className: "bg-good-soft text-good" },
-  expirada: { label: "Expirada", className: "bg-bad-soft text-bad" },
+/**
+ * Etiqueta e frase da data, por estado. A frase acompanha a etiqueta porque a
+ * mesma data quer dizer coisas diferentes: no trial é quando acaba o mês
+ * grátis, numa subscrição ativa é a próxima cobrança, e numa cancelada é o fim
+ * do acesso — não uma renovação.
+ *
+ * /stand é a única rota da app **fora** do gate da subscrição
+ * (components/subscription-gate.tsx): é aqui que se aterra com o acesso
+ * expirado, portanto todos os cinco estados têm de estar cobertos.
+ */
+const SUB_LABEL: Record<SubscriptionStatus, { label: string; className: string; frase: string }> = {
+  trial: {
+    label: "Trial (1.º mês grátis)",
+    className: "bg-good-soft text-good",
+    frase: "Trial termina a",
+  },
+  ativa: { label: "Ativa", className: "bg-good-soft text-good", frase: "Renova a" },
+  cancelada: {
+    label: "Cancelada",
+    className: "bg-amber-soft text-amber-ink",
+    frase: "Acesso até",
+  },
+  em_atraso: {
+    label: "Pagamento em atraso",
+    className: "bg-amber-soft text-amber-ink",
+    frase: "Acesso até",
+  },
+  expirada: { label: "Expirada", className: "bg-bad-soft text-bad", frase: "Terminou a" },
 };
 
 export default async function StandPage() {
-  const [stand, role, utilizador] = await Promise.all([
+  const [stand, role, utilizador, invites] = await Promise.all([
     getStand(),
     getStandRole(),
     getSessionUser(),
+    getPendingInvites(),
   ]);
 
   // Só acontece com sessão inválida (a rota é protegida) — estado honesto.
@@ -58,38 +84,7 @@ export default async function StandPage() {
           </Card>
 
           {/* Equipa */}
-          <Card>
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle>Equipa</CardTitle>
-              {isOwner && (
-                <Button variant="outline" size="sm" disabled title="Ainda não disponível">
-                  Convidar
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {stand.members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-[8px] border border-line p-3"
-                >
-                  <span className="flex size-9 items-center justify-center rounded-full bg-steel/20 text-sm font-semibold text-steel">
-                    {initials(m.name)}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{m.name}</div>
-                    <div className="flex items-center gap-1 text-xs text-ink-soft">
-                      <Mail className="size-3" />
-                      {m.email}
-                    </div>
-                  </div>
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-ink-soft">
-                    {m.role === "owner" ? "Dono" : "Colaborador"}
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          <TeamCard members={stand.members} invites={invites} isOwner={isOwner} />
         </div>
 
         {/* Subscrição */}
@@ -109,10 +104,18 @@ export default async function StandPage() {
                 <span className="text-base font-medium text-ink-soft">/mês</span>
               </div>
               <p className="mt-1 text-sm text-ink-soft">
-                {stand.subscription.status === "trial" ? "Trial termina" : "Renova"} a{" "}
-                {formatDate(stand.subscription.renewsAt)}.
+                {sub.frase} {formatDate(stand.subscription.renewsAt)}.
               </p>
             </div>
+            {stand.subscription.status === "expirada" && (
+              <p className="text-sm text-ink-soft">
+                O acesso à app está suspenso. Os teus dados, favoritos e alertas ficam guardados —
+                voltam assim que a subscrição for reativada.
+              </p>
+            )}
+            {/* Continua desativado: o checkout da Polar precisa do
+                POLAR_ACCESS_TOKEN, que ainda não existe. Ligar um botão que dá
+                erro é pior do que um botão que diz que ainda não dá. */}
             <Button variant="primary" disabled title="Ainda não disponível">
               Gerir subscrição
             </Button>
@@ -121,13 +124,4 @@ export default async function StandPage() {
       </div>
     </div>
   );
-}
-
-function initials(name: string): string {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }

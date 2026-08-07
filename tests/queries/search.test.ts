@@ -9,7 +9,7 @@
  * Nada disto se prova com um duplo do `db`.
  *
  * A fixture é sintética ("Pesqmarke"/"Enchimarke") e tem 60 anúncios de
- * enchimento de propósito: sem passar do `SEARCH_LIMIT`, "o total é o total"
+ * enchimento de propósito: sem passar do `PAGE_SIZE`, "o total é o total"
  * e "o total é o tamanho da página" seriam a mesma asserção.
  *
  * Sem Postgres local (ou sem permissão para criar bases) o teste salta.
@@ -20,6 +20,7 @@ import { after, test } from "node:test";
 import postgres from "postgres";
 import type { SearchFilters } from "../../lib/data";
 import { dbUrl, isLocalDbUrl } from "../../lib/db-url";
+import { normGearbox } from "../../lib/engine/us-catalog";
 
 try {
   process.loadEnvFile(".env.local");
@@ -44,7 +45,7 @@ const withDbName = (name: string) => {
 type Sql = ReturnType<typeof postgres>;
 
 /** Página do servidor (lib/queries.ts) — o que faz valer os 60 de enchimento. */
-const SEARCH_LIMIT = 60;
+const PAGE_SIZE = 24;
 const ENCHIMENTO = 60;
 
 const VM = {
@@ -64,7 +65,7 @@ const TITULO_DO_CATALOGO = "Pesqmarke Pquatro Gran Coupe 840d";
 
 /** Anúncio da fixture: só o que varia; o resto é o mesmo carro. */
 function carro(externalId: string, over: Record<string, unknown> = {}) {
-  return {
+  const base = {
     source_site: "autoscout24.de",
     external_id: externalId,
     model_id: VM.gasolina,
@@ -83,6 +84,10 @@ function carro(externalId: string, over: Record<string, unknown> = {}) {
     match_confidence: "exato",
     ...over,
   };
+  // A coluna normalizada é escrita pelo `match-models` com este mesmo
+  // `normGearbox` — a fixture usa-o para não codificar uma segunda verdade
+  // sobre a caixa (ver a migration 0008).
+  return { ...base, gearbox_norm: normGearbox(base.gearbox as string | null) };
 }
 
 function estimativa(listingId: string, over: Record<string, unknown> = {}) {
@@ -287,8 +292,10 @@ test("pesquisa no servidor: filtros, texto livre e total", async (t) => {
   try {
     await t.test("montra completa: uma página, o total é a montra inteira", async () => {
       const { ext, total, res } = await pesquisar({});
-      assert.equal(res.listings.length, SEARCH_LIMIT, "o servidor manda uma página");
-      assert.equal(total, ENCHIMENTO + 4, "o total conta os 64 visíveis, não os 60 mandados");
+      assert.equal(res.listings.length, PAGE_SIZE, "o servidor manda uma página");
+      assert.equal(total, ENCHIMENTO + 4, "o total conta os 64 visíveis, não os 24 mandados");
+      assert.equal(res.page, 1);
+      assert.equal(res.hasMore, true, "64 não cabem numa página de 24");
       assert.equal(ext[0], "s-catalogo", "ordenado por poupança, o do catálogo primeiro");
       // As sentinelas têm a maior poupança da fixture: se o gate cedesse, viam-se.
       for (const fora of ["s-morto", "s-alargada", "s-designacao", "s-clone"]) {
@@ -324,17 +331,38 @@ test("pesquisa no servidor: filtros, texto livre e total", async (t) => {
       assert.deepEqual(ext, ["s-eletrico"]);
     });
 
-    await t.test("caixa automática: só quem tem 'auto' na caixa gravada", async () => {
+    await t.test("caixa automática: pela coluna normalizada, não por regex", async () => {
       const { ext } = await pesquisar({ gearbox: "automática" });
       assert.deepEqual(ext, ["s-diesel"]);
     });
 
-    await t.test("caixa manual inclui os anúncios sem caixa gravada", async () => {
-      const { ext, total } = await pesquisar({ gearbox: "manual" });
-      assert.ok(ext.includes("s-hibrido"), "sem caixa gravada, o cartão diz manual");
-      assert.ok(!ext.includes("s-diesel"));
-      assert.equal(total, ENCHIMENTO + 3, "os 3 manuais com nome mais o enchimento");
-      assert.equal(ext.length, SEARCH_LIMIT, "e o total continua a não ser a página");
+    await t.test("caixa desconhecida não entra em nenhum dos dois filtros", async () => {
+      // Mudou com a coluna `gearbox_norm` (migration 0008): antes, `gearbox`
+      // nulo virava "manual" no cartão e o filtro copiava esse erro de
+      // propósito. Agora a ficha diz "Não indicada" e quem filtra por caixa
+      // está a filtrar por certeza — pôr os desconhecidos em "Manual" era
+      // repor a mesma mentira noutro sítio.
+      const manual = await pesquisar({ gearbox: "manual" });
+      const auto = await pesquisar({ gearbox: "automática" });
+      assert.ok(!manual.ext.includes("s-hibrido"), "sem caixa gravada não é manual");
+      assert.ok(!auto.ext.includes("s-hibrido"), "nem automática");
+      assert.ok(!manual.ext.includes("s-diesel"));
+      assert.ok(
+        manual.total + auto.total < ENCHIMENTO + 4,
+        "as duas caixas já não somam a montra toda — e é isso que se quer",
+      );
+    });
+
+    await t.test("paginação: a página 2 não repete a 1, e o total não muda", async () => {
+      const p1 = await pesquisar({});
+      const p2 = await pesquisar({ page: 2 });
+      assert.equal(p1.total, p2.total, "o total é do conjunto, não da página");
+      assert.equal(p2.res.page, 2);
+      const ids1 = new Set(p1.res.listings.map((l) => l.id));
+      assert.ok(
+        p2.res.listings.every((l) => !ids1.has(l.id)),
+        "a página 2 não pode repetir carros da 1",
+      );
     });
 
     await t.test("preço máximo é o custo FINAL em Portugal", async () => {

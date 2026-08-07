@@ -5,12 +5,25 @@ import Link from "next/link";
 
 export const metadata: Metadata = { title: "Entrar — AutoImport" };
 
+/**
+ * Para onde voltar depois de entrar. Só rotas **internas**: um `next` com
+ * `//` ou `http://` era um redirect aberto para fora do site. O middleware já
+ * põe este parâmetro quando corta o acesso a uma rota da app; a página do
+ * convite põe-no para se voltar ao convite.
+ */
+function safeNext(next: string | undefined): string | undefined {
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
+    return undefined;
+  }
+  return next;
+}
+
 export default async function EntrarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string }>;
+  searchParams: Promise<{ reset?: string; next?: string }>;
 }) {
-  const { reset } = await searchParams;
+  const { reset, next } = await searchParams;
 
   return (
     <div className="rounded-[12px] border border-line bg-surface p-6">
@@ -27,6 +40,7 @@ export default async function EntrarPage({
       <div className="mt-5">
         <SignInForm
           googleEnabled={Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET)}
+          next={safeNext(next)}
         />
       </div>
 

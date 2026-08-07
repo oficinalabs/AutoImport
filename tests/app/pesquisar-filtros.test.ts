@@ -12,7 +12,10 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseSearchFilters, searchFiltersToQuery } from "../../app/(app)/pesquisar/filters";
+import {
+  parseSearchFilters,
+  searchFiltersToQuery,
+} from "../../app/(app)/(gated)/pesquisar/filters";
 import type { SearchFilters } from "../../lib/data";
 
 /** "?a=1&b=2" como o Next o entrega ao `page.tsx`. */
@@ -23,6 +26,7 @@ test("URL vazio não filtra nada", () => {
     query: undefined,
     countries: undefined,
     onlyOpportunities: false,
+    page: undefined,
     minYear: undefined,
     maxKm: undefined,
     maxPrice: undefined,
@@ -43,6 +47,7 @@ test("os nove filtros vêm do URL", () => {
     query: "golf gti",
     countries: ["DE", "FR"],
     onlyOpportunities: true,
+    page: undefined,
     minYear: 2021,
     maxKm: 100_000,
     maxPrice: 30_000,
@@ -64,6 +69,7 @@ test("valores inválidos são ignorados, não rebentam nem filtram", () => {
     query: undefined,
     countries: undefined,
     onlyOpportunities: false,
+    page: undefined,
     minYear: undefined,
     maxKm: undefined,
     maxPrice: undefined,
@@ -120,7 +126,15 @@ test("ida e volta: o que o cliente escreve no URL é o que o servidor lê", () =
 });
 
 test("o valor de omissão não vai para o URL — links curtos", () => {
-  assert.equal(searchFiltersToQuery({ sort: "savings" }), "");
+  // O default passou a ser `savingsPct`: ordenar por poupança ABSOLUTA punha
+  // supercarros no topo (preço médio dos 60 primeiros: 147 169 €) quando 87%
+  // das oportunidades estão abaixo dos 40 000 €. `savings` continua a existir —
+  // é para lá que apontam os KPIs do painel, que são em euros.
+  assert.equal(searchFiltersToQuery({ sort: "savingsPct" }), "");
   assert.equal(searchFiltersToQuery({ onlyOpportunities: false }), "");
   assert.equal(searchFiltersToQuery({ sort: "recent" }), "ordenar=recent");
+  assert.equal(searchFiltersToQuery({ sort: "savings" }), "ordenar=savings");
+  // A página 1 também não suja o URL.
+  assert.equal(searchFiltersToQuery({ page: 1 }), "");
+  assert.equal(searchFiltersToQuery({ page: 3 }), "pagina=3");
 });
