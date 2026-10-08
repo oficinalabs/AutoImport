@@ -13,6 +13,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  DEFAULT_SORT,
   parseSearchFilters,
   searchFiltersToQuery,
 } from "../../app/(app)/(gated)/pesquisar/filters";
@@ -137,4 +138,16 @@ test("o valor de omissão não vai para o URL — links curtos", () => {
   // A página 1 também não suja o URL.
   assert.equal(searchFiltersToQuery({ page: 1 }), "");
   assert.equal(searchFiltersToQuery({ page: 3 }), "pagina=3");
+});
+
+test("DEFAULT_SORT é o que o servidor faz sem `?ordenar` — e não suja o URL", () => {
+  // O invariante que amarra os dois lados: a ordenação por omissão é a MESMA no
+  // `select` do search-view, no serializador do URL e no `orderBy` do lib/queries
+  // (o `else` final, savingsPct). Divergiram uma vez — o dropdown dizia "Maior
+  // poupança" com a lista ordenada por percentagem — e este teste é o que impede
+  // que voltem a divergir sem alguém dar por isso.
+  assert.equal(DEFAULT_SORT, "savingsPct");
+  assert.equal(searchFiltersToQuery({ sort: DEFAULT_SORT }), "");
+  // Qualquer OUTRA ordenação tem de ficar explícita no URL.
+  assert.equal(searchFiltersToQuery({ sort: "savings" }), "ordenar=savings");
 });

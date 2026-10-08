@@ -40,6 +40,35 @@ export interface GenWindow {
 const MIN_SAMPLE_NORMAL = 5;
 const MIN_SAMPLE_WIDE = 3;
 const WINDOW_DAYS = 60;
+
+/**
+ * Carro de ALTO VALOR: acima disto exige-se `MIN_SAMPLE_HIGH_VALUE` observações.
+ * Aplicado pelo `scripts/pipeline/compute-costs.ts` (como o `MIN_ORIGIN_RATIO`),
+ * porque o preço do anúncio não entra neste módulo — aqui só se DEFINE a regra.
+ *
+ * Porquê. Um `model_id` é `marca|família|combustível` e junta a ESCADA DE TRIMS
+ * inteira, que no topo da gama vale 2–3× em preço. Nada nos dados a separa:
+ *   · o `mid` do catálogo não é trim-level — M11461 cobre "Urus 4.0 V8" (650cv),
+ *     "Urus Performante" e "Urus S" (ambos 666cv), logo a exclusão por derivado
+ *     não lhes toca;
+ *   · a potência também não — Urus S e Performante têm a MESMA (666cv), e um
+ *     Huracán Tecnica (640) contra um STO (639) é indistinguível.
+ * Caso real medido: Urus S de 279 666 € comparado com uma amostra de 6 da qual 5
+ * eram Performante → mediana 390 000 € → "poupança" 68 582 €. E o
+ * `MAX_IQR_SPREAD` não a apanha: a amostra tem IQR 0,02 — é internamente
+ * coerentíssima, é só uniformemente o carro ERRADO.
+ *
+ * ⚠️ Uma amostra maior NÃO resolve o mecanismo, e isto não é um esquecimento: o
+ * Porsche 911 GTS (480cv) errado tinha n=29, com GT3 (510cv) e GT3 RS (525cv)
+ * dentro da tolerância de ±48cv a puxarem a mediana de ~175k para 230k. Exigir
+ * n≥10 acima de 80 k€ é a decisão do dono do produto — reduz a exposição no
+ * segmento onde cada erro de margem vale mais dinheiro por anúncio (medido: 72
+ * dos 94 anúncios acima de 80 k€ da montra, 0,9% do total), mas quem quiser
+ * fechar a porta ao trim precisa de um sinal de trim, que hoje não existe.
+ */
+export const HIGH_VALUE_EUR = 80_000;
+/** Ver `HIGH_VALUE_EUR`. O dobro do `MIN_SAMPLE_NORMAL`. */
+export const MIN_SAMPLE_HIGH_VALUE = 10;
 // Guarda anti-frota (auditoria): amostras de um único stand a preço de tabela
 // (ex.: 6× "La Prima" santogal a 23.490 €) não são mercado — TODA a estimativa
 // (normal e alargada) exige dispersão mínima de preços e de vendedores.

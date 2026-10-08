@@ -26,8 +26,10 @@ import type { FuelType } from "../types";
 import { normFuel, normMake, normModel, normModelViaRule, slugify } from "./normalize-vehicle";
 import {
   BODY_TOKENS,
+  canonBody,
   type CatalogVersion,
   distinctiveTokensByMid,
+  type NoiseContext,
   type Generation,
   NEUTRAL_BODY,
   normGearbox,
@@ -312,16 +314,25 @@ function derivativeGuard(
   cands: CatalogVersion[],
   adTokens: Set<string>,
   midInfo: UsCatalogIndex["midInfo"],
+  noiseCtx: NoiseContext,
 ): { cands: CatalogVersion[]; derivadoAmbiguo: boolean } {
   const mids = [...new Set(cands.map((v) => v.mid))];
   if (mids.length < 2) return { cands, derivadoAmbiguo: false };
 
   const distinctive = distinctiveTokensByMid(
     new Map(mids.map((mid) => [mid, midInfo.get(mid)?.slugTokens ?? []])),
+    noiseCtx,
   );
   const universe = new Set<string>();
   for (const d of distinctive.values()) for (const t of d) universe.add(t);
   if (universe.size === 0) return { cands, derivadoAmbiguo: false }; // sem derivados reais
+
+  // Comparação por forma CANÓNICA da carroçaria: o anúncio escreve "Cabrio", o slug
+  // do catálogo diz "cabriolet", e a igualdade exata perdia o sinal que o vendedor
+  // deu (ver canonBody em us-catalog.ts). Canoniza-se dos DOIS lados; para tudo o
+  // que não é sinónimo de carroçaria, canonBody é a identidade.
+  const adCanon = new Set([...adTokens].map(canonBody));
+  const named0 = (t: string) => adCanon.has(canonBody(t));
 
   // (i) o anúncio nomeia algum derivado → fica só quem o anúncio nomeia. Preferimos
   // CONTENÇÃO TOTAL: se ≥1 mid tem o conjunto distintivo INTEIRO contido em adTokens,
@@ -329,14 +340,14 @@ function derivativeGuard(
   // por inteiro o Gran-Tourer {gran,tourer} mas só parcialmente o Gran-Coupe
   // {gran,coupe} (partilham "gran") → fica só o Gran-Tourer (o bug era o inverso).
   // Sem contenção total, cai no critério largo (some): qualquer token nomeado mantém.
-  const named = [...universe].some((t) => adTokens.has(t));
+  const named = [...universe].some(named0);
   if (named) {
     const full = mids.filter((mid) => {
       const d = distinctive.get(mid)!;
-      return d.size > 0 && [...d].every((t) => adTokens.has(t));
+      return d.size > 0 && [...d].every(named0);
     });
     const keep = new Set(
-      full.length ? full : mids.filter((mid) => [...distinctive.get(mid)!].some((t) => adTokens.has(t))),
+      full.length ? full : mids.filter((mid) => [...distinctive.get(mid)!].some(named0)),
     );
     const filtered = cands.filter((v) => keep.has(v.mid));
     return { cands: filtered.length ? filtered : cands, derivadoAmbiguo: false };
@@ -574,7 +585,10 @@ export function resolveVersion(input: ResolveInput, catalog: UsCatalogIndex): Ma
   // Guarda de derivados de modelo/carroçaria: separa derivados distintos (Cross,
   // Cabrio, Defender 90/110) pelo texto do anúncio ou, na ausência de token,
   // recolhe o modelo base; sem base inequívoca marca `derivadoAmbiguo`.
-  const guard = derivativeGuard(cands, adTokens, catalog.midInfo);
+  // O ctx do ruído tem de ser o MESMO que o build usou (ver isNoiseToken): o núcleo
+  // é relativo ao universo, o ruído não. `familySlug` é o slug da família, já
+  // derivado acima para o filtro de badges.
+  const guard = derivativeGuard(cands, adTokens, catalog.midInfo, { makeSlug, family: familySlug });
   cands = guard.cands;
   const derivadoAmbiguo = guard.derivadoAmbiguo;
 

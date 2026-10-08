@@ -30,6 +30,16 @@ const FUELS: FuelType[] = ["gasolina", "diesel", "híbrido", "phev", "elétrico"
 const GEARBOXES: Transmission[] = ["manual", "automática"];
 const SORTS: Sort[] = ["savings", "savingsPct", "recent", "price"];
 
+/**
+ * Ordenação por omissão — a MESMA que o servidor aplica quando não vem `?ordenar`
+ * (o `else` final do `orderBy` em lib/queries.ts). Existe como constante porque os
+ * dois lados divergiram: o `select` do search-view.tsx fazia fallback para
+ * "savings" e mostrava "Maior poupança" enquanto a lista vinha ordenada por
+ * percentagem — a caixa mentia sobre a ordem ativa, escolher "Maior poupança (%)"
+ * parecia não fazer nada, e escolher "Maior poupança" é que mudava a ordem.
+ */
+export const DEFAULT_SORT: Sort = "savingsPct";
+
 /** `?pais=DE&pais=FR` — o Next dá array; fica a primeira, que é o que o link diz. */
 function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -95,7 +105,7 @@ export function searchFiltersToQuery(f: SearchFilters): string {
   // ABSOLUTA enchia o topo de supercarros (preço médio dos 60 primeiros:
   // 147 169 €) quando 87% das oportunidades estão abaixo dos 40 000 €, e o
   // público-alvo são stands de usados.
-  if (f.sort && f.sort !== "savingsPct") p.set("ordenar", f.sort);
+  if (f.sort && f.sort !== DEFAULT_SORT) p.set("ordenar", f.sort);
   if (f.page && f.page > 1) p.set("pagina", String(f.page));
   return p.toString();
 }

@@ -60,6 +60,30 @@ const MIN_SAMPLE = 5;
  */
 export const MIN_ORIGIN_RATIO = 0.5;
 
+/**
+ * Poupança (%) a partir da qual uma estimativa SEM amostra de origem deixa de
+ * ser publicada. Aplicado no `compute-costs.ts`, como o `MIN_ORIGIN_RATIO`.
+ *
+ * O `MIN_SAMPLE` acima faz a guarda PASSAR quando não há comparáveis (sem prova
+ * não se recusa) — e essa regra, correta em geral, tem um viés que foi medido: os
+ * anúncios sem comparáveis no próprio mercado são justamente os ANÓMALOS (muito
+ * rodados, muito velhos, versões raras), portanto a isenção por falta de prova
+ * cai desproporcionadamente sobre os casos que mais precisavam de ser recusados.
+ * Medido no armazém: 2 750 das 8 320 oportunidades ativas (33%) passaram sem
+ * amostra nenhuma, e 126 delas anunciavam ≥30% de poupança — entre elas um
+ * Mercedes C 220 CDI com 299 989 km a 4 700 € (53,1%) e um BMW 123d com 266 604
+ * km a 2 900 € (43,9%).
+ *
+ * Decisão do dono do produto: cortar em 35% **só quando não há prova**. Não é um
+ * tecto cego à margem — os 27 anúncios que estão ≥35% mas TÊM amostra de origem
+ * que os valida ficam, porque aí a margem grande tem uma medição por trás. Custo
+ * medido: 62 anúncios, 0,75% da montra.
+ *
+ * Combina-se com o `MIN_ORIGIN_RATIO` sem o substituir: um cobre o preço de
+ * origem provado como implausível, o outro a poupança que ninguém pôde provar.
+ */
+export const MAX_UNPROVEN_SAVINGS_PCT = 35;
+
 /** Janela de ano da amostra (a mesma do pt-market: ±1 não atravessa gerações). */
 const YEAR_SPREAD = 1;
 // Janela de km, SIMÉTRICA em log — 1,6× é o mesmo teto de excesso do pt-market
