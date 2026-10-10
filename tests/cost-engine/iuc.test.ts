@@ -5,10 +5,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { TAX_TABLES_2026 } from "../../db/seed/isv-2026";
-import { calculateIuc } from "../../lib/cost-engine/iuc";
+import {
+  calculateIuc,
+  expectedPtRegistration,
+  iucFirstYearFraction,
+} from "../../lib/cost-engine/iuc";
 import type { CostInput } from "../../lib/cost-engine/types";
 
 const T = TAX_TABLES_2026;
+// Referência fixa em 2026: matrícula PT prevista em agosto de 2026 → IUC anual
+// inteiro (regime anterior ao DL 161/2026). Sem isto o teste mudava com a data.
+const REF = new Date("2026-07-14");
 
 function input(partial: Partial<CostInput>): CostInput {
   return {
@@ -18,6 +25,7 @@ function input(partial: Partial<CostInput>): CostInput {
     co2: 120,
     firstRegistration: new Date("2022-01-15"),
     country: "DE",
+    referenceDate: REF,
     ...partial,
   };
 }
@@ -74,5 +82,52 @@ test("coeficiente por ano: 2007 → 1,00 · 2008 → 1,05 · 2009 → 1,10", () 
 
 test("elétrico → IUC 0 (isento)", () => {
   const r = calculateIuc(input({ fuel: "elétrico", displacementCc: undefined, co2: undefined }), T);
+  assert.equal(r, 0);
+});
+
+// ── IUC 2027: 1.º ano proporcional (DL 161/2026, CIUC art. 5.º n.º 10) ──
+
+const DIESEL_2015 = {
+  fuel: "diesel" as const,
+  displacementCc: 1461,
+  co2: 119,
+  firstRegistration: new Date("2015-06-01"),
+};
+
+test("matrícula PT prevista = dia 1 do mês seguinte à referência", () => {
+  assert.deepEqual(expectedPtRegistration(new Date("2026-07-14")), new Date("2026-08-01"));
+  assert.deepEqual(expectedPtRegistration(new Date("2026-12-10")), new Date("2027-01-01"));
+});
+
+test("fração do 1.º ano: até 2026 inteira; desde 2027 (12 − meses completos) / 12", () => {
+  assert.equal(iucFirstYearFraction(new Date("2026-11-20")), 1);
+  assert.equal(iucFirstYearFraction(new Date("2027-01-01")), 1);
+  // 15 de março: janeiro e fevereiro completos → 10/12
+  assert.equal(iucFirstYearFraction(new Date("2027-03-15")), 10 / 12);
+  assert.equal(iucFirstYearFraction(new Date("2027-12-01")), 1 / 12);
+});
+
+test("matrícula PT em 2026 → IUC anual inteiro (regime antigo)", () => {
+  const r = calculateIuc(input({ ...DIESEL_2015, referenceDate: new Date("2026-10-10") }), T);
+  assert.equal(r, 158.29);
+});
+
+test("matrícula PT a 15/03/2027 → 10/12 do anual", () => {
+  const r = calculateIuc(input(DIESEL_2015), T, { ptRegistration: new Date("2027-03-15") });
+  assert.equal(r, Math.round(158.29 * (10 / 12) * 100) / 100);
+});
+
+test("sem data de matrícula: referência 20/05/2027 → junho → 7/12 do anual", () => {
+  const r = calculateIuc(input({ ...DIESEL_2015, referenceDate: new Date("2027-05-20") }), T);
+  const anual = (63.74 + 65.15) * 1.15 + 10.07;
+  assert.equal(r, Math.round(anual * (7 / 12) * 100) / 100);
+});
+
+test("elétrico continua isento em 2027", () => {
+  const r = calculateIuc(
+    input({ fuel: "elétrico", displacementCc: undefined, co2: undefined }),
+    T,
+    { ptRegistration: new Date("2027-06-01") },
+  );
   assert.equal(r, 0);
 });
