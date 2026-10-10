@@ -1,3 +1,8 @@
+/** @jsxRuntime automatic */
+// ↑ Para o JSX funcionar também fora do Next: o tsx/esbuild, com o "jsx":
+// "preserve" do tsconfig, compila para React.createElement sem React em escopo
+// ("React is not defined"). Com o pragma, o `pnpm test` renderiza o email sem
+// precisar do TSX_TSCONFIG_PATH. Ver o aviso em scripts/pipeline/match-alerts.ts.
 import {
   Body,
   Container,

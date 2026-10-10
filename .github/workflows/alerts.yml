@@ -1,5 +1,6 @@
 # Alertas dos stands: casa as oportunidades publicadas com os alertas guardados,
-# cria a notificação no sino e envia o email (scripts/pipeline/match-alerts.ts).
+# cria a notificação no sino e envia UM resumo por stand (scripts/pipeline/match-alerts.ts).
+# Depois, os emails do período experimental — dia 1, 7 e 25 (scripts/pipeline/trial-emails.ts).
 #
 # PORQUÊ UM WORKFLOW PRÓPRIO. Até 27/07 os alertas eram o passo 10/10 do
 # `pipeline:daily`, que corria no cron do daily-batch. Esse cron saiu quando a
@@ -59,3 +60,13 @@ jobs:
           # o email rebenta com "React is not defined" — só em runtime, e só no
           # envio (ver docs/09).
           pnpm pipeline:alerts
+
+      - name: Emails do período experimental (dia 1, 7 e 25)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ vars.EMAIL_FROM || 'noreply@arestadigital.pt' }}
+          BETTER_AUTH_URL: ${{ vars.BETTER_AUTH_URL || 'https://autoimport.arestadigital.pt' }}
+        # Mesmo motivo do passo de cima para o TSX_TSCONFIG_PATH: renderiza JSX.
+        # Sem RESEND_API_KEY o script não envia nem regista nada (sai a 0).
+        run: TSX_TSCONFIG_PATH=tsconfig.scripts.json pnpm exec tsx scripts/pipeline/trial-emails.ts

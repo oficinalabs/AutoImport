@@ -13,7 +13,7 @@
 | Guardar | `alerts` — `countries` (text[]) + `criteria` (jsonb: `{summary, maxPrice?, make?, model?}`) |
 | **Disparar** | `scripts/pipeline/match-alerts.ts` — passo 10/10 do `run-daily` |
 | Notificação no sino | `alert_events` → `notificationsQuery` → `components/notifications-menu.tsx` |
-| Email | `emails/alert-match.tsx` via `lib/email.ts` (Resend) |
+| Email | resumo diário por stand, `emails/digest.tsx` via `lib/email.ts` (Resend) |
 
 ## O job (`match-alerts.ts`)
 
