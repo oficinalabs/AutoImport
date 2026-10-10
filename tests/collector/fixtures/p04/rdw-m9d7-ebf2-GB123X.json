@@ -1,0 +1,23 @@
+[
+  {
+    "kenteken": "GB123X",
+    "voertuigsoort": "Personenauto",
+    "merk": "VOLKSWAGEN",
+    "handelsbenaming": "GOLF",
+    "vervaldatum_apk": "20270512",
+    "datum_tenaamstelling": "20230115",
+    "inrichting": "hatchback",
+    "eerste_kleur": "GRIJS",
+    "export_indicator": "Nee",
+    "openstaande_terugroepactie_indicator": "Nee",
+    "tenaamstellen_mogelijk": "Ja",
+    "datum_eerste_toelating": "20210503",
+    "datum_eerste_tenaamstelling_in_nederland": "20210503",
+    "wacht_op_keuren": "Geen verstrekking in Open Data",
+    "catalogusprijs": "34950",
+    "bruto_bpm": "2865",
+    "tellerstandoordeel": "Logisch",
+    "code_toelichting_tellerstandoordeel": "00",
+    "jaar_laatste_registratie_tellerstand": "2025"
+  }
+]

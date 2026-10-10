@@ -9,6 +9,7 @@
 // research/quoka-investigacao.md.
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do quoka = os campos-base comuns + extras próprios do site (P2P).
@@ -135,6 +136,12 @@ export function normalizeListing(card: RawCard, { ld = null, brandHint = null, c
   // engine: cilindrada (cm³) do JSON-LD (unitText "CMQ").
   const cc = ld?.vehicleEngine?.engineDisplacement?.value;
 
+  // IVA (P04): o quoka é P2P → 'particular', a não ser que o texto mostre um stand
+  // ("MwSt. ausweisbar", "§25a", "Netto: …"), caso em que vale o que o texto diz.
+  const price = card.price ?? toInt(ld?.offers?.price);
+  const vat = resolveVat({ texts: [title, desc], price });
+  const imgs = Array.isArray(ld?.image) ? ld.image.map((i) => i?.contentUrl) : null;
+
   return {
     // --- campos comuns (uniformes entre coletores) ---
     make: cleanStr(make),
@@ -148,7 +155,7 @@ export function normalizeListing(card: RawCard, { ld = null, brandHint = null, c
     color: null,                                  // não estruturado na listagem
     doors: null,                                  // não estruturado na listagem
     category: null,                               // subcategoria não exposta por card
-    price: card.price ?? toInt(ld?.offers?.price),
+    price,
     currency: 'EUR',
     country: 'GERMANY',
     region: cleanStr(decodeEntities(card.region)),  // Bundesland
@@ -157,6 +164,9 @@ export function normalizeListing(card: RawCard, { ld = null, brandHint = null, c
     detail_url: cleanStr(card.detailUrl),
     image: cleanStr(card.image || ld?.image?.[0]?.contentUrl),
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime ?? 'particular',     // P04
+    price_net: vat.price_net,
+    image_urls: imageUrlList(imgs),
 
     // --- extras próprios do quoka ---
     source_site: 'quoka.de',
