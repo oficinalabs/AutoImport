@@ -10,6 +10,7 @@ import { COUNTRY_LIST } from "@/lib/countries";
 import type { Notification } from "@/lib/types";
 import {
   BellRing,
+  Calculator,
   Car,
   ChevronDown,
   Heart,
@@ -29,6 +30,7 @@ const NAV = [
   { href: "/painel", label: "Painel", icon: LayoutDashboard },
   { href: "/pesquisar", label: "Pesquisar", icon: Search },
   { href: "/favoritos", label: "Favoritos", icon: Heart },
+  { href: "/calculadora", label: "Calculadora", icon: Calculator },
 ];
 
 function isActive(pathname: string, href: string) {
