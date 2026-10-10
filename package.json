@@ -27,6 +27,7 @@
     "pipeline:publish": "tsx scripts/pipeline/publish.ts",
     "pipeline:publish:apply": "tsx scripts/pipeline/publish.ts --apply",
     "pipeline:frescura": "tsx scripts/pipeline/check-freshness.ts",
+    "pipeline:fontes": "tsx scripts/pipeline/check-sources.ts",
     "db:migrate:deploy": "tsx scripts/db/migrate-deploy.ts"
   },
   "dependencies": {
