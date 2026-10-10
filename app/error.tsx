@@ -16,8 +16,12 @@ export default function RootError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Vai para os logs da Vercel (e para o Sentry quando existir).
+    // Vai para os logs da Vercel e, com DSN, para o Sentry (SDK carregado só
+    // nesse caso — ver instrumentation-client.ts).
     console.error("[error boundary]", error);
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
+    }
   }, [error]);
 
   return <ErrorState digest={error.digest} onRetry={reset} />;
