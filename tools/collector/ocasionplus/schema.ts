@@ -27,13 +27,16 @@
 // Extras próprios: source_site, id (token do slug), slug, center (card), power_hp ("(115 CV)"),
 // price_reference (card span-price, PVP riscado), price_finance (card span-finance, financiado),
 // monthly (card, cuota/mes), condition (offers.itemCondition).
+// P05: image (todas, até 8) -> image_urls; vat_regime vem de quem chama (ver crawl.ts: só a página
+// /coches-ocasion/iva-deducible o sabe — o card e o JSON-LD não trazem etiqueta de IVA).
 //
 // GOTCHA do preço: o OcasionPlus mostra TRÊS números — PVP de referência (riscado, `price_reference`),
 // preço financiado (`price_finance`, o destaque grande) e o preço AL CONTADO. Confirmámos na página
 // de detalhe que o preço canónico (o que domina o detalhe) é o `offers.price` do JSON-LD (contado);
 // usamo-lo como `price` e guardamos os outros dois como extras.
 
-import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord, type VatRegimeAnuncio } from '../lib/normalize.ts';
+import { galleryUrls } from '../lib/vat-text-es.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do ocasionplus = os campos-base comuns + extras próprios do site.
@@ -89,8 +92,8 @@ function powerFrom(...strs: unknown[]): number | null {
   return null;
 }
 
-// `extras` (do card) e `collectedAt` são injetados por quem chama.
-export function normalizeVehicle(v: RawVehicle, { extras = {}, collectedAt = null }: { extras?: CardExtras; collectedAt?: string | null } = {}): OcasionplusRecord {
+// `extras` (do card), `collectedAt` e `vatRegime` (da página de listagem) são injetados por quem chama.
+export function normalizeVehicle(v: RawVehicle, { extras = {}, collectedAt = null, vatRegime = null }: { extras?: CardExtras; collectedAt?: string | null; vatRegime?: VatRegimeAnuncio | null } = {}): OcasionplusRecord {
   const offer = v.offers || {};
   const make = cleanStr((v.brand as { name?: unknown } | null)?.name || v.brand);
   // model curto = `name` ("Skoda Karoq") sem a marca → "Karoq". Se falhar, fica o `name` completo.
@@ -134,6 +137,9 @@ export function normalizeVehicle(v: RawVehicle, { extras = {}, collectedAt = nul
     price_finance: extras.price_finance ?? null,     // preço financiado (card span-finance)
     monthly: extras.monthly ?? null,                 // cuota €/mes (card)
     condition: cleanStr(offer.itemCondition),
+    // --- P05 ---
+    vat_regime: vatRegime,
+    image_urls: galleryUrls(v.image),
   };
 }
 

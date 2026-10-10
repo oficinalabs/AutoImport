@@ -6,6 +6,7 @@
 // no registo comum, estendido com os extras que o autocasion oferece de graça.
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { galleryUrls, vatFromTextEs } from '../lib/vat-text-es.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do autocasion = os campos-base comuns + extras próprios do site.
@@ -26,6 +27,8 @@ export interface CardExtras {
   dealer?: string | null;
   dealer_rating?: number | null;
   certified?: boolean;
+  text?: string | null;        // texto visível do card (P05: palavras de IVA)
+  is_private?: boolean;        // card sem bloco de concesionario = particular
 }
 
 // Forma mínima do `Product` (JSON-LD) que consumimos. Payload externo dinâmico → tipamos só o
@@ -54,6 +57,7 @@ interface Offer {
 export interface RawProduct {
   brand?: { name?: unknown };
   name?: unknown;
+  description?: unknown;
   image?: unknown;
   color?: unknown;
   offers?: Offer;
@@ -83,6 +87,12 @@ export interface RawProduct {
 // Extras próprios: source_site, id (=identifier), dealer, dealer_rating, power_hp (enginePower
 // BHP), condition (itemCondition), certified (badge "Certificado").
 //
+// P05 — IVA e fotos. O estudo ES (§3.2) não conseguiu ver o Autocasión (bloqueia a consulta
+// automática) e nesta implementação também não: NÃO há campo estruturado conhecido. Lemos as
+// palavras do estudo no texto do card + `description` do JSON-LD (lib/vat-text-es.ts); um card
+// sem bloco de concesionario é de particular → 'particular'. Sem menção → null.
+// image (todas, até 8) -> image_urls.
+//
 // `extras` (do card) e `collectedAt` são injetados por quem chama.
 export function normalizeProduct(p: RawProduct, { extras = {}, collectedAt = null }: { extras?: CardExtras; collectedAt?: string | null } = {}): AutocasionRecord {
   const offer = p.offers || {};
@@ -90,6 +100,9 @@ export function normalizeProduct(p: RawProduct, { extras = {}, collectedAt = nul
   const power = car.vehicleEngine?.enginePower;
   const powerHp = power && /bhp/i.test(power.unitCode || '') ? toInt(power.value) : toInt(power?.value);
   const img = Array.isArray(p.image) ? p.image[0] : p.image;
+  const vat = extras.is_private
+    ? { regime: 'particular' as const, priceNet: null }
+    : vatFromTextEs([extras.text, cleanStr(p.description)].filter(Boolean).join(' · '));
 
   return {
     make: cleanStr(p.brand?.name || p.brand || car.manufacturer),
@@ -120,5 +133,9 @@ export function normalizeProduct(p: RawProduct, { extras = {}, collectedAt = nul
     power_hp: powerHp,
     condition: cleanStr(offer.itemCondition),
     certified: Boolean(extras.certified),
+    // --- P05 ---
+    vat_regime: vat.regime,
+    price_net: vat.priceNet,
+    image_urls: galleryUrls(p.image),
   };
 }

@@ -29,6 +29,7 @@ interface Stats {
   byCategory: Record<string, number>;
   price: { count: number; sum: number; min: number | null; max: number | null };
   nbResults: Record<string, number | null>;
+  byVatRegime?: Record<string, number>;
   maxId: number | null;
 }
 
@@ -49,7 +50,7 @@ function urlListagem(slice: string | null, page: number) {
 }
 
 function statsVazias(): Stats {
-  return { records: 0, pages: 0, byCountry: {}, bySource: {}, byRegion: {}, byFuel: {}, byOfferType: {}, byCategory: {}, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {}, maxId: null };
+  return { records: 0, pages: 0, byCountry: {}, bySource: {}, byRegion: {}, byFuel: {}, byOfferType: {}, byCategory: {}, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {}, byVatRegime: {}, maxId: null };
 }
 function atualizaStats(stats: Stats, r: AramisautoRecord) {
   stats.records++;
@@ -57,6 +58,8 @@ function atualizaStats(stats: Stats, r: AramisautoRecord) {
   stats.bySource[r.source || '?'] = (stats.bySource[r.source || '?'] || 0) + 1;
   stats.byRegion[r.region || '?'] = (stats.byRegion[r.region || '?'] || 0) + 1;
   stats.byFuel[r.fuel || '?'] = (stats.byFuel[r.fuel || '?'] || 0) + 1;
+  const vat = (stats.byVatRegime ??= {});   // ??=: checkpoints anteriores ao P05 não têm o bucket
+  vat[r.vat_regime || '?'] = (vat[r.vat_regime || '?'] || 0) + 1;
   stats.byOfferType[r.offer_type || '?'] = (stats.byOfferType[r.offer_type || '?'] || 0) + 1;
   stats.byCategory[r.category || '?'] = (stats.byCategory[r.category || '?'] || 0) + 1;
   const idNum = Number(r.id);

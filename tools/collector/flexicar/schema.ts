@@ -5,7 +5,8 @@
 // veículo do `props.pageProps.initialVehicles` (SSR `__NEXT_DATA__`) no registo comum, estendido com
 // os extras que o Flexicar oferece de graça (etiqueta DGT, preços de campanha, potência, galeria).
 
-import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord, type VatRegimeAnuncio } from '../lib/normalize.ts';
+import { galleryUrls } from '../lib/vat-text-es.ts';
 import { BASE } from './http.ts';
 export { CAMPOS, toInt, cleanStr };
 
@@ -100,6 +101,21 @@ function parsePower(version: unknown): { kw: number | null; hp: number | null } 
   return { kw: kw ? Number(kw[1]) : null, hp: hp ? Number(hp[1]) : null };
 }
 
+// IVA (P05, estudo ES §3.2): o Flexicar tem o filtro "I.V.A. deducible", que é o `taxDeductible` de
+// cada veículo. Um stand profissional que NÃO fatura com IVA dedutível vende em REBU (as duas únicas
+// hipóteses para um revendedor), por isso `false` explícito → 'margem'. Campo ausente → null.
+function vatRegime(taxDeductible: unknown): VatRegimeAnuncio | null {
+  if (taxDeductible === true) return 'dedutivel';
+  if (taxDeductible === false) return 'margem';
+  return null;
+}
+
+// Fotos da galeria (strings ou {url}); paths relativos ao site ganham o BASE.
+function fotos(images: unknown, img: unknown): string[] | null {
+  const lista = Array.isArray(images) && images.length ? images : img ? [img] : [];
+  return galleryUrls(lista.map((x) => (typeof x === 'string' && x.startsWith('/') && !x.startsWith('//') ? `${BASE}${x}` : x)));
+}
+
 // --- mapeamento initialVehicles -> registo normalizado ------------------------
 //
 // `dealerMap` (cidade→província/CP) e `collectedAt` são injetados por quem chama (parse.ts).
@@ -147,5 +163,8 @@ export function normalizeVehicle(v: RawVehicle, { dealerMap = null, collectedAt 
     financiable: Boolean(v.financiable),
     tax_deductible: Boolean(v.taxDeductible),
     images: Array.isArray(v.images) ? v.images : (img ? [img] : []),
+    // --- P05 ---
+    vat_regime: vatRegime(v.taxDeductible),
+    image_urls: fotos(v.images, img),
   };
 }

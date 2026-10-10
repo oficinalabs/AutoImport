@@ -13,6 +13,7 @@
 // div-dealer). Juntamos card↔JSON-LD pelo TOKEN no fim do slug do URL (ex. ".../…-2024-rtadgqat").
 
 import { normalizeVehicle, tokenFromSlug, type RawVehicle, type CardExtras, type OcasionplusRecord } from './schema.ts';
+import type { VatRegimeAnuncio } from '../lib/normalize.ts';
 
 // Resultado do parse de uma página de listagem.
 export interface ParsedPage {
@@ -87,8 +88,9 @@ function spanInt(chunk: string, name: string): number | null {
 }
 
 // (3) Parse completo de uma página → { listings, total }.
-// Junta cada Vehicle (JSON-LD) com os extras do card pelo token do slug.
-export function parseListingPage(html: string, { collectedAt = null }: { collectedAt?: string | null } = {}): ParsedPage {
+// Junta cada Vehicle (JSON-LD) com os extras do card pelo token do slug. `vatRegime` marca todos os
+// carros da página (a listagem /coches-ocasion/iva-deducible → 'dedutivel'); por omissão null.
+export function parseListingPage(html: string, { collectedAt = null, vatRegime = null }: { collectedAt?: string | null; vatRegime?: VatRegimeAnuncio | null } = {}): ParsedPage {
   const vehicles = extractVehicles(html);
   const extras = extractCardExtras(html);
   const listings = vehicles.map((v) => {
@@ -96,7 +98,7 @@ export function parseListingPage(html: string, { collectedAt = null }: { collect
     let token: string | null = null;
     try { token = url ? tokenFromSlug(new URL(String(url)).pathname) : null; } catch { /* url inválido */ }
     const ex = (token != null ? extras.get(token) : null) || {};
-    return normalizeVehicle(v, { extras: ex, collectedAt });
+    return normalizeVehicle(v, { extras: ex, collectedAt, vatRegime });
   });
   return { listings, total: readTotal(html) };
 }
