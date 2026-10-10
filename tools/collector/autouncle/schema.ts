@@ -16,6 +16,7 @@
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
 import { marketSourceSite, type Market } from './http.ts';
+import { resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do autouncle = os campos-base comuns + extras próprios do agregador.
@@ -150,6 +151,10 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     : null;
   // imagem: preferimos a real do RSC; o JSON-LD costuma trazer placeholder.
   const jsonImg = item.image?.url && !IMG_PLACEHOLDER.test(item.image.url) ? item.image.url : null;
+  // IVA (P04): agregador — o vendedor particular vem marcado (isPrivate); de resto só o título
+  // e a variante podem trazer o vocabulário ("MwSt. ausweisbar", "BTW verrekenbaar", "marge").
+  const price = item.offers?.price != null ? toInt(item.offers.price) : null;
+  const vat = resolveVat({ texts: [item.name, extra.variant], isPrivate: extra.isPrivate === true, price });
 
   return {
     // --- campos comuns (uniformes entre coletores) ---
@@ -164,7 +169,7 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     color: cleanStr(item.color),
     doors: item.numberOfDoors != null ? toInt(item.numberOfDoors) : null,
     category: cleanStr(item.bodyType),
-    price: item.offers?.price != null ? toInt(item.offers.price) : null,
+    price,
     currency: cleanStr(item.offers?.priceCurrency) || market.currency,
     country: market.countryLabel,
     region: null,                                  // JSON-LD só expõe addressCountry por anúncio
@@ -173,6 +178,8 @@ export function normalizeCar(item: JsonLdItem, extra: SourceExtra = {}, { collec
     detail_url: detailUrl,
     image: cleanStr(extra.image) || jsonImg,
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime,                    // P04
+    price_net: vat.price_net,
 
     // --- extras próprios do autouncle ---
     source_site: marketSourceSite(market),         // 'autouncle.pt' / 'autouncle.dk' / …

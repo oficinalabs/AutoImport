@@ -8,6 +8,7 @@
 
 import { extractNextData } from './parse.ts';
 import { toInt, cleanStr } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 import type { HttpClient } from '../lib/http.ts';
 import type { Autoscout24Record } from './schema.ts';
 
@@ -33,14 +34,35 @@ function flattenEquipment(eq: unknown): string[] | null {
   return out.length ? out : null;
 }
 
+// IVA na página de detalhe (P04): o bloco de preços (`prices`, com o preço líquido quando o
+// stand o publica) e a descrição do vendedor ("MwSt. ausweisbar", "§25a", "Netto: …").
+function vatDoDetalhe(d: Record<string, unknown>, price: number | null) {
+  const seller = (d.seller || {}) as Record<string, unknown>;
+  const prices = (d.prices || {}) as Record<string, unknown>;
+  const pub = (prices.public || prices) as Record<string, unknown>;
+  return resolveVat({
+    raw: { prices, price: d.price },
+    priceLabel: pub.price ?? pub.priceFormatted,
+    texts: [d.description],
+    isPrivate: /private/i.test(String(seller.type || '')),
+    price,
+  });
+}
+
 // Extrai os extras ricos de uma página de detalhe já descarregada (HTML).
-export function parseDetail(html: string) {
+// `price` é o preço da listagem (para validar o líquido).
+export function parseDetail(html: string, price: number | null = null) {
   const data = extractNextData(html) as { props?: { pageProps?: { listingDetails?: Record<string, unknown> } } } | null;
   const d = data?.props?.pageProps?.listingDetails;
   if (!d) return null;
   const v = (d.vehicle || {}) as Record<string, unknown>;
   const carfax = (d.vehicleReport as { carfax?: Record<string, unknown> } | undefined)?.carfax ?? null;
+  const vat = vatDoDetalhe(d, price);
   return {
+    // P04: o detalhe sabe mais do IVA que a listagem (descrição, preço líquido)
+    vat_regime: vat.vat_regime,
+    price_net: vat.price_net,
+    image_urls: imageUrlList(Array.isArray(d.images) ? d.images : null),
     // completa os comuns que faltavam ao nível da listagem:
     color: cleanStr(v.bodyColor),
     doors: toInt(v.numberOfDoors),
@@ -75,11 +97,17 @@ export async function enrichWithDetail(http: HttpClient, record: Autoscout24Reco
   if (!record.detail_url) return record;
   const html = await http.fetchText(record.detail_url, { validate });
   if (!html) return record;
-  const extras = parseDetail(html);
+  const extras = parseDetail(html, record.price);
   if (!extras) return record;
   // Não sobrepor comuns já preenchidos; só completar color/doors se estavam vazios.
   const merged = { ...record, ...extras };
   merged.color = record.color ?? extras.color;
   merged.doors = record.doors ?? extras.doors;
+  // P04: o detalhe só substitui o IVA/galeria da listagem quando diz alguma coisa.
+  merged.vat_regime = extras.vat_regime ?? record.vat_regime ?? null;
+  merged.price_net = extras.vat_regime ? extras.price_net : (record.price_net ?? null);
+  merged.image_urls = extras.image_urls ?? record.image_urls ?? null;
+  // Matrícula só nos NL (contrato P01: é para a RDW).
+  merged.plate = record.country === 'NETHERLANDS' ? (extras.license_plate ?? record.plate ?? null) : null;
   return merged;
 }

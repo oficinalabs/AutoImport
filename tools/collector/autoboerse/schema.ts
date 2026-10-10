@@ -7,6 +7,7 @@
 // Ver research/autoboerse-investigacao.md.
 
 import { toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 
 const BASE = 'https://autoboerse.de';
 const CDN = 'https://img.autoboerse.de/';   // cdnURL do runtimeConfig; URL = CDN + imageList[].name
@@ -49,7 +50,7 @@ interface RawClassified {
   color?: Named;
   measures?: { bodyDoors?: unknown };
   body?: Named;
-  price?: { amount?: unknown; currency?: unknown };
+  price?: { amount?: unknown; currency?: unknown; [k: string]: unknown };
   currentProvince?: Named;
   dealer?: Named;
   huDate?: unknown;
@@ -85,6 +86,14 @@ export function normalizeListing(C: RawClassified, { collectedAt = null, detailP
   // 1ª-registo "MM/AAAA" a partir de registration.month/year.
   const firstReg = reg.year ? `${String(reg.month || '').padStart(2, '0') || '??'}/${String(reg.year)}` : null;
   const img0 = Array.isArray(C.imageList) ? C.imageList.find((i) => i.default) || C.imageList[0] : null;
+  // Galeria (P04): a default primeiro, depois as outras pela ordem da fonte.
+  const imgs = Array.isArray(C.imageList)
+    ? [img0, ...C.imageList].filter((i) => i?.name).map((i) => CDN + i.name)
+    : null;
+  // IVA (P04): marketplace de stands → nunca particular; o regime vem dos campos do anúncio
+  // (preço, extras) ou do vocabulário DE ("MwSt. ausweisbar", "§25a") — lib/vat-regime-text.ts.
+  const price = toInt(C.price?.amount);
+  const vat = resolveVat({ raw: C, price });
 
   return {
     // --- campos comuns (uniformes entre coletores) ---
@@ -99,7 +108,7 @@ export function normalizeListing(C: RawClassified, { collectedAt = null, detailP
     color: cleanStr(C.color?.name),
     doors: toInt(C.measures?.bodyDoors),
     category: cleanStr(C.body?.name),
-    price: toInt(C.price?.amount),
+    price,
     currency: cleanStr(C.price?.currency) || 'EUR',
     country: 'GERMANY',
     region: cleanStr(C.currentProvince?.name),
@@ -108,6 +117,10 @@ export function normalizeListing(C: RawClassified, { collectedAt = null, detailP
     detail_url: detailUrl(C, detailPath),
     image: img0?.name ? CDN + img0.name : null,
     collected_at: collectedAt,
+    // --- P04 ---
+    vat_regime: vat.vat_regime,
+    price_net: vat.price_net,
+    image_urls: imageUrlList(imgs),
 
     // --- extras próprios do autoboerse ---
     source_site: 'autoboerse.de',

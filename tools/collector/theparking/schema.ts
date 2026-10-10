@@ -11,6 +11,7 @@
 
 // Normalizadores e campos-base comuns vêm do lib/ partilhado.
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do theparking = os campos-base comuns (o JSON-LD já preenche os 20 CAMPOS_BASE).
@@ -76,6 +77,10 @@ export function normalizeVehicle(v: RawVehicle, { source = null, collectedAt = n
     const m = /Category\s+([A-Za-zÀ-ú0-9 /-]{2,25})/i.exec(v.description || '');
     return m ? cleanStr(m[1]) : null;
   })();
+  // IVA (P04): agregador — só há o título e a descrição livre do anúncio de origem
+  // ("BTW verrekenbaar", "TVA déductible", "marge"…). Sem menção → null.
+  const price = toInt(offer.price);
+  const vat = resolveVat({ texts: [v.name, v.description], price });
 
   return {
     make: cleanStr(v.brand?.name || v.brand) || cleanStr((v.name || '').split(/\s+/)[0]),
@@ -89,7 +94,7 @@ export function normalizeVehicle(v: RawVehicle, { source = null, collectedAt = n
     color: cleanStr(v.color),
     doors: toInt(v.numberOfDoors),
     category,
-    price: toInt(offer.price),
+    price,
     currency: cleanStr(offer.priceCurrency) || 'EUR',
     country: cleanStr(addr.addressCountry?.name || addr.addressCountry),
     region: cleanStr(addr.addressRegion),
@@ -98,5 +103,8 @@ export function normalizeVehicle(v: RawVehicle, { source = null, collectedAt = n
     detail_url: cleanStr(offer.url),
     image: cleanStr(Array.isArray(v.image) ? v.image[0] : v.image),
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime,                    // P04
+    price_net: vat.price_net,
+    image_urls: imageUrlList(Array.isArray(v.image) ? v.image : null),
   };
 }
