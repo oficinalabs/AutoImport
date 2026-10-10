@@ -1,5 +1,6 @@
 /**
- * Territórios que o motor de custos NÃO sabe calcular — não é elegibilidade do
+ * Territórios que o motor de custos NÃO sabe calcular (ilhas e territórios fora
+ * do IVA da UE em ES e FR) — não é elegibilidade do
  * pipeline, é uma limitação do próprio motor, e por isso vive aqui ao lado do
  * `transport.ts` que a causa.
  *
@@ -45,20 +46,57 @@ export const ES_ISLAND_REGION_PATTERNS = [
 /** Alternância única, para reutilizar no SQL do pipeline sem duplicar a lista. */
 export const ES_ISLAND_REGION_REGEX_SOURCE = `(${ES_ISLAND_REGION_PATTERNS.join("|")})`;
 
-const REGION_RE = new RegExp(ES_ISLAND_REGION_REGEX_SOURCE, "i");
+/**
+ * Fora do território IVA da UE, além das ilhas: Ceuta (51) e Melilla (52), art.
+ * 3.Dos LIVA — https://sede.agenciatributaria.gob.es/Sede/estadisticas/estadisticas-impuesto/resultados-economicos-tributarios-impuesto-sobre-anadido/metodologia/ambito-referencia/ambito-geografico.html
+ * (estudo ES §2). Mesmo critério das Canárias: excluir em vez de mostrar uma
+ * conta falsa (plano §5). As listas `ES_ISLAND_*` acima ficam como estão
+ * porque o SQL do pipeline as usa; o P06 passa-o para estas.
+ */
+export const ES_EXCLUDED_POSTAL_PREFIXES = [...ES_ISLAND_POSTAL_PREFIXES, "51", "52"] as const;
+export const ES_EXCLUDED_REGION_REGEX_SOURCE = `(${[
+  ...ES_ISLAND_REGION_PATTERNS,
+  "ceuta",
+  "melilla",
+].join("|")})`;
 
 /**
- * Anúncio numa ilha espanhola? Fecha ABERTO: sem região e sem CP → `false`
- * (incluído). Não há dados para excluir, e excluir por ausência de dados
- * deitava fora anúncios continentais legítimos.
+ * França: os DOM (CP 971–976, e o resto do prefixo 97) estão fora do território
+ * IVA da UE (Diretiva 2006/112/CE art. 6.º —
+ * https://eur-lex.europa.eu/legal-content/PT/TXT/?uri=CELEX:32006L0112) e a
+ * Córsega (CP 20xxx; départements 2A/2B) precisa de ferry, sem custo conhecido
+ * (estudo FR §5).
+ */
+export const FR_EXCLUDED_POSTAL_PREFIXES = ["97", "20", "2A", "2B"] as const;
+
+/**
+ * Fallback por texto da região para FR. Sem "réunion" sozinho de propósito:
+ * só "la réunion"/"la reunion", para não apanhar nomes de ruas ou de empresas.
+ */
+export const FR_EXCLUDED_REGION_REGEX_SOURCE =
+  "(corse|guadeloupe|martinique|guyane|la r[ée]union|mayotte)";
+
+const ES_REGION_RE = new RegExp(ES_EXCLUDED_REGION_REGEX_SOURCE, "i");
+const FR_REGION_RE = new RegExp(FR_EXCLUDED_REGION_REGEX_SOURCE, "i");
+
+/**
+ * Anúncio num território que o motor não sabe calcular? Fecha ABERTO: sem
+ * região e sem CP → `false` (incluído). Não há dados para excluir, e excluir
+ * por ausência de dados deitava fora anúncios continentais legítimos.
  */
 export function isExcludedTerritory(
   country: string | null | undefined,
   region: string | null | undefined,
   postalCode: string | null | undefined,
 ): boolean {
-  if (country !== "ES") return false;
-  const prefix = (postalCode ?? "").slice(0, 2);
-  if ((ES_ISLAND_POSTAL_PREFIXES as readonly string[]).includes(prefix)) return true;
-  return REGION_RE.test(region ?? "");
+  const prefix = (postalCode ?? "").trim().slice(0, 2).toUpperCase();
+  if (country === "ES") {
+    if ((ES_EXCLUDED_POSTAL_PREFIXES as readonly string[]).includes(prefix)) return true;
+    return ES_REGION_RE.test(region ?? "");
+  }
+  if (country === "FR") {
+    if ((FR_EXCLUDED_POSTAL_PREFIXES as readonly string[]).includes(prefix)) return true;
+    return FR_REGION_RE.test(region ?? "");
+  }
+  return false;
 }

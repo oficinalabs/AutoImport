@@ -104,3 +104,65 @@ export interface IsvBreakdown {
   /** assunções tomadas por falta de dados (ex.: "phev sem autonomia — assumido elegível") */
   assumptions: string[];
 }
+
+// ── IVA e margem (P02) ─────────────────────────────────────────────
+// Os nomes dos campos são os do contrato de dados (lib/types.ts e
+// import_cost_estimates), para os resultados encaixarem sem tradução.
+
+/** Regime de IVA APLICADO na conta do stand. */
+export type VatRegime = "dedutivel" | "margem";
+
+/** O que o anúncio diz sobre o IVA (`listings.vat_regime`); null = a fonte não diz. */
+export type SourceVatRegime = VatRegime | "particular";
+
+/** Inputs de um negócio: o carro (CostInput) + o que o anúncio diz do IVA e do local. */
+export interface DealInput extends CostInput {
+  sourceVatRegime?: SourceVatRegime | null;
+  /** preço sem IVA quando a fonte o publica ("Netto", "HTVA", "excl. BTW") */
+  priceNet?: number | null;
+  /** código postal do vendedor (transporte por região) */
+  postalCode?: string | null;
+  /** km do anúncio (regra do meio de transporte novo) */
+  km?: number | null;
+}
+
+/** Opções do negócio: tabelas fiscais + custos do stand (os omitidos usam os defaults). */
+export interface DealOptions {
+  tables: TaxTables;
+  /** o stand tem n.º de IVA válido no VIES; default true */
+  standVatRegistered?: boolean;
+  transport?: number;
+  /** custo oficial de legalização; default `estimateLegalization({ coc })` */
+  legalization?: number;
+  despachante?: number;
+  preparation?: number;
+  /** o carro tem COC; default true (sem COC o IMT cobra 165 € em vez de 45 €) */
+  coc?: boolean;
+}
+
+/** Resultado completo do negócio. Compatível com `CostBreakdown` (mesmos campos + extras). */
+export interface DealResult {
+  /** preço anunciado */
+  originPrice: number;
+  transport: number;
+  isv: number;
+  iuc: number;
+  /** custo oficial de legalização (sem despachante) */
+  legalization: number;
+  despachante: number;
+  preparation: number;
+  /** custo total em PT: originPriceNet + transporte + ISV + IUC + legalização + despachante + preparação */
+  totalPt: number;
+  vatRegime: VatRegime;
+  /** custo de compra efetivo: líquido se dedutível, = preço se margem */
+  originPriceNet: number;
+  /** caução de IVA que o vendedor costuma pedir até à prova de transporte (0 em margem) */
+  vatDeposit: number;
+  /** IVA a liquidar na revenda ao preço PT */
+  outputVat: number;
+  grossMargin: number;
+  grossMarginPct: number;
+  /** ≤ 6 000 km ou ≤ 6 meses: IVA PT sempre devido, sem margem */
+  newMeansOfTransport: boolean;
+  isvDetail: IsvBreakdown;
+}
