@@ -107,3 +107,80 @@ test("sem variant → não excluído (não excluir por falta de dados)", () => {
   assert.equal(isNotRetailListing(undefined), false);
   assert.equal(isNotRetailListing(""), false);
 });
+
+// ── P06: palavras novas por país (estudos de out. 2026, secção 6) ──
+
+test("P06 — DE: preço de exportação/profissional, Brief na banca, preço com financiamento", () => {
+  for (const v of [
+    "Golf 1.6 TDI Exportpreis",
+    "A4 Avant Händlerpreis!",
+    "Passat Variant kein Privatverkauf",
+    "Focus Turnier *Brief bei Bank*",
+    "Polo 1.0 ohne Brief",
+    "Tiguan Preis gilt nur bei Finanzierung",
+    "Octavia Finanzierungspreis",
+    "Leon ST Aktionspreis mit Finanzierung",
+    "Corsa F Preis bei Inzahlungnahme",
+  ]) {
+    assert.equal(isNotRetailListing(v), true, v);
+  }
+});
+
+test("P06 — FR/BE: marchand, sans CT, moteur HS, VGE, export", () => {
+  for (const v of [
+    "Clio IV prix marchand",
+    "308 SW VO marchand",
+    "C3 vente aux pros uniquement",
+    "Megane réservé aux professionnels",
+    "208 sans CT",
+    "Twingo sans contrôle technique",
+    "Scenic moteur HS",
+    "Kangoo boite HS",
+    "Picasso pour pièces",
+    "Zoe non roulant",
+    "Captur ne démarre pas",
+    "DS3 VGE",
+    "Kadjar prix export",
+    "Golf uniquement export",
+    "Astra sans garantie",
+    "Focus zonder keuring",
+    "Fiesta prijs met inruil",
+  ]) {
+    assert.equal(isNotRetailListing(v), true, v);
+  }
+});
+
+test("P06 — NL e ES: venda a profissionais, avaria, sem inspeção", () => {
+  for (const v of [
+    "Polo alleen voor handel",
+    "Astra handel/export",
+    "Golf meeneemprijs",
+    "Clio verkocht zoals gezien",
+    "A3 Motorschade",
+    "Corsa loopt niet",
+    "Aygo geen APK",
+    "Fiesta NAP onlogisch",
+    "León FR solo profesionales",
+    "Ibiza para exportar",
+    "Megane motor averiado",
+    "Corsa no arranca",
+    "Clio sin ITV",
+  ]) {
+    assert.equal(isNotRetailListing(v), true, v);
+  }
+});
+
+test("P06 — o que parece mas não é: financiamento possível, VE elétrico, sem avarias", () => {
+  for (const v of [
+    "Golf 1.5 TSI Finanzierung möglich",
+    "Passat Inzahlungnahme möglich",
+    "Gewerbeleasing ab 299 €",
+    "Zoe VE 100% électrique",
+    "Megane E-Tech garantie 12 mois",
+    "León FR sin averías, sin siniestros",
+    "Polo NAP logisch",
+    "Golf Variant Export möglich",
+  ]) {
+    assert.equal(isNotRetailListing(v), false, v);
+  }
+});

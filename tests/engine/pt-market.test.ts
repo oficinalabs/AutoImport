@@ -178,9 +178,12 @@ test("guardas de coerência da amostra PT", async (t) => {
   }
   const sql = await bootstrap();
   const db = drizzle(sql, { schema });
-  /** km do carro estrangeiro (a banda sai deles dentro do estimatePtPrice). */
-  const estimar = (modelId: string, km = KM_BANDA_2) =>
-    estimatePtPrice(db, modelId, YEAR, km, POWER);
+  /** km do carro estrangeiro (a banda sai deles dentro do estimatePtPrice). As
+   * guardas olham só para a mediana; os comparáveis têm o seu próprio teste. */
+  const estimar = async (modelId: string, km = KM_BANDA_2) => {
+    const e = await estimatePtPrice(db, modelId, YEAR, km, POWER);
+    return e && { estimatedPrice: e.estimatedPrice, sampleSize: e.sampleSize, confidence: e.confidence };
+  };
   try {
     await t.test("amostra coerente → mediana com confiança normal", async () => {
       assert.deepEqual(await estimar(VM.coerente), {
@@ -188,6 +191,32 @@ test("guardas de coerência da amostra PT", async (t) => {
         sampleSize: 6,
         confidence: "normal",
       });
+    });
+
+    await t.test("P06 — comparáveis: os carros da amostra, os mais perto da mediana primeiro", async () => {
+      const e = await estimatePtPrice(db, VM.coerente, YEAR, KM_BANDA_2, POWER);
+      // mediana 20 250: 20 000 e 20 500 estão a 250, 19 900 a 350, 19 500 e 21 000
+      // a 750 (empate → o mais barato primeiro), 21 500 a 1 250.
+      assert.deepEqual(
+        e?.sample.map((r) => r.p),
+        [20_000, 20_500, 19_900, 19_500, 21_000, 21_500],
+      );
+      assert.deepEqual(e?.sample[0], {
+        t: "Ptmarke P1",
+        y: YEAR,
+        km: KM_BANDA_2,
+        p: 20_000,
+        s: "standvirtual.com",
+        u: "https://ex.test/co-2",
+      });
+    });
+
+    await t.test("P06 — no máximo 8 comparáveis, mesmo com amostra maior", async () => {
+      // bimodal tem n=8 no fallback; o Huracán n=6. Uma amostra de 9+ não existe
+      // nas fixtures daqui — o limite está provado no teste de integração (n=20).
+      const e = await estimatePtPrice(db, VM.alargadaOk, YEAR, KM_BANDA_2, POWER);
+      assert.equal(e?.confidence, "alargada");
+      assert.equal(e?.sample.length, 6, "o fallback guarda os carros da amostra ALARGADA");
     });
 
     await t.test("amostra dispersa (IQR 0,42) não é mercado → sem estimativa", async () => {

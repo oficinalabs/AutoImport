@@ -1,7 +1,7 @@
 # 🔁 Pipeline de dados
 
 Do anúncio estrangeiro ao veredito: scrape → Postgres → matching → mercado PT
-→ custos de importação (ISV/IUC) → poupança/veredito → oportunidades → UI.
+→ conta do stand (IVA, ISV/IUC, custos) → margem bruta/veredito → oportunidades → UI.
 
 ## Arranque local (sem Supabase)
 
@@ -23,10 +23,51 @@ pnpm dev            # a UI passa a mostrar dados reais (sem DATABASE_URL → moc
 | 3 | `pt-market.ts` | 1 observação de preço/dia por anúncio PT ativo → `pt_price_observations`. |
 | 4 | desaparecidos | soft-delete de anúncios sem sinal há 14+ dias (`--stale-days`). |
 | 5 | `check-gone.ts` | HEAD às oportunidades ativas: 404/410 → soft-delete, antes de recalcular veredito sobre um carro que já não existe. |
-| 6 | `compute-costs.ts` (1.ª) | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos, dispersão robusta (p75−p25)/mediana ≤ 0,25 e km comparáveis (ver "Guardas de coerência da amostra" abaixo); o preço de origem tem de ser plausível face ao próprio mercado estrangeiro (`lib/engine/origin-market.ts`: ≥ 0,50 × mediana dos comparáveis do mesmo país); fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). **Veículos novos ficam de fora**: pelo RITI, ≤6 000 km **ou** menos de 6 meses de matrícula é um *meio de transporte novo* e paga 23% de IVA em Portugal, que o motor não modela — excluir em vez de adivinhar (a semântica do IVA no preço anunciado em ES/DE é ambígua e desconhecida por anúncio). A regra vive no predicado `elegivel`, portanto também apaga as estimativas já gravadas destes anúncios. Ver "Resolução de versão" e "Specs efetivas" abaixo. |
+| 6 | `compute-costs.ts` (1.ª) | cost engine (`lib/cost-engine/`) + mediana PT (`lib/engine/pt-market.ts`: year±1/band±1, mín. 5 com ≥3 preços e ≥2 vendedores distintos, dispersão robusta (p75−p25)/mediana ≤ 0,25 e km comparáveis (ver "Guardas de coerência da amostra" abaixo); o preço de origem tem de ser plausível face ao próprio mercado estrangeiro (`lib/engine/origin-market.ts`: ≥ 0,50 × mediana dos comparáveis do mesmo país); fallback ±2, mín. 3, confiança `alargada`; amostra **deduplicada por carro físico** — VIN, senão preço+ano+km) → `import_cost_estimates` com veredito (`lib/verdict.ts`). **Matching estrito por designação**: a potência é obrigatória dos dois lados e a amostra só aceita ±10%/±15cv (840i≠M850i, xDrive40≠45, Golf≠GTI). Sem CO₂/cilindrada/potência ou sem amostra → **sem estimativa** (nunca adivinhar). **Veículos novos ficam de fora**: pelo RITI, ≤6 000 km **ou** ≤6 meses de matrícula é um *meio de transporte novo*, paga sempre IVA PT e não pode ir para a margem — excluir (as constantes vêm de `lib/cost-engine/new-vehicle.ts`). A regra vive no predicado `elegivel`, portanto também apaga as estimativas já gravadas destes anúncios; a data **assumida** (sem 1.ª matrícula) é apanhada no ciclo. A conta e o veredito são os da secção "Conta do stand: IVA e margem" abaixo. Ver também "Resolução de versão" e "Specs efetivas". |
 | 7 | `enrich-es.ts` | stands ES anunciam o FINANCIADO. Para os AS24-ES que a 1.ª passagem deu como `compensa`/`marginal`, busca a página de detalhe e extrai o "precio al contado" da descrição (`lib/engine/precio-contado.ts`), corrigindo o preço (1 visita por anúncio, rate 1,5 s). Só visita quem já parece negócio: o contado é ≥ ao anunciado, logo nunca cria uma oportunidade — só a pode desfazer. |
 | 8 | `compute-costs.ts` (2.ª) | recalcula os anúncios corrigidos no passo 7 (o `pending` filtra por `updated_at > computed_at`). |
-| 9 | `flag-opportunities.ts` | veredito `compensa` + confiança `normal` → `opportunities`. Corre no fim: nada é publicado como oportunidade ao preço financiado. |
+| 9 | `flag-opportunities.ts` | veredito `compensa` (pela margem) + confiança `normal` → `opportunities`; entre anúncios do mesmo carro fica o de maior margem. `savings`/`savings_pct` continuam a ser copiadas. Corre no fim: nada é publicado como oportunidade ao preço financiado. |
+
+## Conta do stand: IVA e margem (compute-costs, P06)
+
+O `compute-costs` usa o `computeDeal` do motor (`lib/cost-engine/index.ts`) e grava
+em `import_cost_estimates` a conta como um stand a faz:
+
+- **Regime de IVA** (`vat_regime`): `dedutivel` só quando o anúncio o declara
+  (`listings.vat_regime`, preenchido pelos coletores) **e** o stand tem n.º de IVA no
+  VIES. A montra assume que tem (`STAND_VAT_REGISTERED = true`, DEFAULT do plano §5);
+  quem não tiver recalcula à leitura com os seus custos (P09). Margem, particular ou
+  "a fonte não diz" contam como margem. Nos Países Baixos, dedutível sem `price_net`
+  conta como margem (a BPM está no preço e fora da base do IVA).
+- **Custo efetivo** (`origin_price_net`): o líquido publicado ou preço ÷ (1 + IVA da
+  origem) quando dedutível; o preço anunciado em margem. A **caução** (`vat_deposit`)
+  é só informativa.
+- **Custos**: transporte por país e região (CP do anúncio), ISV, IUC, legalização
+  oficial (`legalization`, ~205 € com COC), despachante (250 €) e preparação (300 €).
+  `total_pt` é a soma de tudo, a partir do custo efetivo.
+- **Revenda** ao PVP PT estimado (a mediana): IVA de saída (`output_vat`) sobre o PVP
+  todo em regime normal, ou só sobre a diferença em margem; **margem bruta**
+  (`gross_margin`, `gross_margin_pct`) = PVP − IVA de saída − `total_pt`.
+- **Veredito** pela margem (`verdictFromMargin`, `lib/verdict.ts`): compensa com
+  ≥ 1 500 € **e** ≥ 6 %; marginal com ≥ 500 €; senão não compensa.
+- `savings` = PVP − `total_pt`, mantida para quem ainda a lê. A guarda da poupança não
+  provada (`MAX_UNPROVEN_SAVINGS_PCT`) mede-a sobre o preço anunciado (com a caução),
+  porque foi calibrada assim e o desconto do IVA dedutível volta a pagar-se à saída.
+- **Comparáveis PT** (`pt_sample`): até 8 carros da amostra que deu a mediana, os mais
+  perto dela, em forma compacta `{ t, y, km, p, s, u }`. Saem do mesmo SQL da mediana
+  (`lib/engine/pt-market.ts`), portanto são exatamente os carros comparados.
+
+Exclusões novas no `elegivel`, além das antigas: territórios fora do IVA da UE ou sem
+transporte conhecido (ES Ceuta 51 e Melilla 52, além das ilhas; FR DOM 97x e Córsega
+20/2A/2B, por CP ou região — `lib/cost-engine/territory.ts`) e veredito oficial de km
+incoerente (`listings.km_check.verdict = 'incoerente'`, RDW). O `not-retail.ts` ganhou
+as palavras por país dos estudos (DE, FR, BE, NL, ES); "Export" e "Gewerbe" sozinhos
+continuam de fora (casam com anúncios normais), entram as formas que dizem que o preço
+é de exportação/profissional ou condicionado a financiamento.
+
+As estimativas da conta antiga (`origin_price_net` a null) são recalculadas na corrida
+seguinte sem precisar de `--all`. Para recalcular tudo à mão:
+`pnpm exec tsx scripts/pipeline/compute-costs.ts --all` no warehouse local.
 
 ## Tabelas fiscais (ISV/IUC)
 
