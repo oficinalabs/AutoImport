@@ -52,10 +52,14 @@ import type {
   FuelType,
   Listing,
   Notification,
+  PtComparable,
   PtMarket,
+  PtSampleRow,
+  SourceVatRegime,
   Stand,
   SubscriptionStatus,
   Transmission,
+  VatRegime,
   Verdict,
 } from "./types";
 
@@ -100,6 +104,42 @@ function listingPhoto(url: string | null): string[] {
   return [url.replace(/\/250x188\.webp$/, "/640x480.webp")];
 }
 
+/** Fotos do anúncio: a galeria `image_urls` quando o coletor a deu (até 8), senão a
+ * capa `image_url` de sempre. Cada URL passa pelo mesmo filtro do `listingPhoto`. */
+function listingPhotos(urls: string[] | null, cover: string | null): string[] {
+  const gallery = (urls ?? []).flatMap(listingPhoto);
+  return gallery.length > 0 ? gallery : listingPhoto(cover);
+}
+
+/** Campos de IVA/margem da estimativa. Só existem depois de o motor novo correr
+ * (`origin_price_net` preenchido): antes disso o `vat_regime` está no default
+ * "margem" da migration e os outros a 0/null, e a UI tem de continuar como estava. */
+function vatMarginFields(e: EstimateRow): Partial<CostBreakdown> {
+  if (e.originPriceNet == null) return {};
+  return {
+    vatRegime: e.vatRegime as VatRegime,
+    originPriceNet: e.originPriceNet,
+    vatDeposit: e.vatDeposit ?? undefined,
+    preparation: e.preparation,
+    despachante: e.despachante,
+    outputVat: e.outputVat ?? undefined,
+    grossMargin: e.grossMargin ?? undefined,
+    grossMarginPct: e.grossMarginPct ?? undefined,
+  };
+}
+
+/** `pt_sample` compacto (chaves curtas, ver PtSampleRow) → PtComparable. */
+function ptSampleFrom(rows: PtSampleRow[] | null): PtComparable[] | undefined {
+  return rows?.map((r) => ({
+    title: r.t,
+    year: r.y,
+    km: r.km,
+    price: r.p,
+    source: r.s,
+    url: r.u,
+  }));
+}
+
 function rowToListing(
   l: ListingRow,
   e: EstimateRow,
@@ -117,6 +157,7 @@ function rowToListing(
     iuc: e.iuc,
     legalization: e.legalization,
     totalPt: e.totalPt,
+    ...vatMarginFields(e),
   };
   // Fallbacks de display: valor do anúncio → versão exata do catálogo → factos
   // da designação → mediana do vehicle_models (último recurso; pode misturar
@@ -170,7 +211,7 @@ function rowToListing(
     country: l.country as CountryCode,
     source: sourceName ?? l.sourceSite,
     sourceUrl: l.detailUrl ?? undefined,
-    images: listingPhoto(l.imageUrl),
+    images: listingPhotos(l.imageUrls, l.imageUrl),
     catalogImage:
       (ver ? (ver.imageUrl ?? usm?.imageUrls?.[0]) : facts ? usm?.imageUrls?.[0] : null) ??
       undefined,
@@ -198,6 +239,8 @@ function rowToListing(
     kmTrust: l.vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" },
     seenAt: l.lastSeenAt.toISOString(),
     isFavorite,
+    sourceVatRegime: (l.vatRegime as SourceVatRegime | null) ?? undefined,
+    ptSample: ptSampleFrom(e.ptSample),
     unavailableSince: l.deletedAt?.toISOString(),
   };
 }

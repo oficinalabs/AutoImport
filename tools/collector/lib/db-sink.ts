@@ -125,6 +125,56 @@ export function powerHp(record: Record<string, unknown>): number | null {
   return text ? parsePowerFromText(text) : null;
 }
 
+// IVA declarado no anúncio — só os três valores do contrato; o resto é "não diz".
+const VAT_REGIMES = new Set(['dedutivel', 'margem', 'particular']);
+export function vatRegime(v: unknown): string | null {
+  const s = str(v)?.toLowerCase();
+  return s && VAT_REGIMES.has(s) ? s : null;
+}
+
+// Preço líquido: só faz sentido positivo e não acima do preço com IVA.
+export function priceNet(v: unknown, price: number | null): number | null {
+  const n = int(v);
+  if (n == null || n <= 0) return null;
+  return price != null && n > price ? null : n;
+}
+
+// Galeria: `image_urls` (contrato) ou `images` quando é uma lista de URLs (há
+// coletores em que `images` é a CONTAGEM — um número, que se ignora). Até 8, sem
+// repetidos, só http(s). Lista vazia → null, para o coalesce não apagar a anterior.
+export const MAX_IMAGE_URLS = 8;
+export function imageUrls(record: Record<string, unknown>): string[] | null {
+  const raw = Array.isArray(record.image_urls)
+    ? record.image_urls
+    : Array.isArray(record.images)
+      ? record.images
+      : null;
+  if (!raw) return null;
+  const urls = [
+    ...new Set(raw.map(str).filter((u): u is string => !!u && /^https?:\/\//.test(u))),
+  ].slice(0, MAX_IMAGE_URLS);
+  return urls.length ? urls : null;
+}
+
+// Matrícula: maiúsculas sem espaços nem hífens ("12-ABC-3" → "12ABC3"), como a RDW a pede.
+export function plate(v: unknown): string | null {
+  const s = str(v)?.toUpperCase().replace(/[\s-]/g, '');
+  return s || null;
+}
+
+const KM_SOURCES = new Set(['RDW', 'Car-Pass', 'HistoVec', 'DGT']);
+const KM_VERDICTS = new Set(['coerente', 'incoerente', 'sem_juizo']);
+export function kmCheck(v: unknown): Record<string, string> | null {
+  if (v == null || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const source = str(o.source);
+  const verdict = str(o.verdict);
+  const checkedAt = str(o.checkedAt);
+  if (!source || !KM_SOURCES.has(source) || !verdict || !KM_VERDICTS.has(verdict)) return null;
+  if (!checkedAt || Number.isNaN(Date.parse(checkedAt))) return null;
+  return { source, verdict, checkedAt };
+}
+
 function sellerType(record: Record<string, unknown>): string | null {
   const s = (str(record.seller_type) ?? str(record.source))?.toLowerCase();
   if (!s) return null;
@@ -178,6 +228,9 @@ export class DbSink {
     if (record.engine_code != null) rawMin.engine_code = record.engine_code;
     if (record.title != null) rawMin.title = record.title;
 
+    const imgs = imageUrls(record);
+    const kmChk = kmCheck(record.km_check);
+
     const rows = await this.sql`
       insert into listings (
         source_site, external_id, source_id,
@@ -185,7 +238,8 @@ export class DbSink {
         displacement_cc, color, doors, category, price, currency, country,
         region, postal_code, detail_url, image_url,
         co2, power_hp, first_registration, seller_name, seller_type,
-        price_evaluation, is_damaged, vin, raw, first_seen_at, last_seen_at
+        price_evaluation, is_damaged, vin, raw, first_seen_at, last_seen_at,
+        vat_regime, price_net, image_urls, plate, km_check
       ) values (
         ${sourceSite}, ${externalId},
         (select id from sources where slug = ${sourceSite}),
@@ -201,7 +255,10 @@ export class DbSink {
         ${str(record.source)}, ${sellerType(record)},
         ${(() => { const n = int(record.price_evaluation); return n != null && n >= 1 && n <= 5 ? n : null; })()},
         ${typeof record.is_damaged === 'boolean' ? record.is_damaged : null},
-        ${str(record.vin)}, ${this.sql.json(rawMin as never)}, ${firstSeenAt}, ${seenAt}
+        ${str(record.vin)}, ${this.sql.json(rawMin as never)}, ${firstSeenAt}, ${seenAt},
+        ${vatRegime(record.vat_regime)}, ${priceNet(record.price_net, price)},
+        ${imgs}::text[], ${plate(record.plate)},
+        ${kmChk ? this.sql.json(kmChk) : null}
       )
       on conflict (source_site, external_id) do update set
         -- Preço: o re-crawl NÃO pode desfazer a correção do "precio al contado"
@@ -226,6 +283,11 @@ export class DbSink {
         first_registration = coalesce(excluded.first_registration, listings.first_registration),
         price_evaluation = coalesce(excluded.price_evaluation, listings.price_evaluation),
         image_url = coalesce(excluded.image_url, listings.image_url),
+        vat_regime = coalesce(excluded.vat_regime, listings.vat_regime),
+        price_net = coalesce(excluded.price_net, listings.price_net),
+        image_urls = coalesce(excluded.image_urls, listings.image_urls),
+        plate = coalesce(excluded.plate, listings.plate),
+        km_check = coalesce(excluded.km_check, listings.km_check),
         -- raw é sempre o registo fresco da fonte, mas as marcas do contado não
         -- vivem no coletor — vivem aqui. Mesma condição do preço: enquanto o
         -- preço de montra não mudar, sobrevivem ao re-crawl.

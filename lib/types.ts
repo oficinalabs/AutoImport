@@ -53,6 +53,46 @@ export interface VehicleModel {
   powerHp?: number;
 }
 
+/**
+ * Regime de IVA APLICADO na conta. `dedutivel` = o anúncio declara IVA dedutível e o
+ * stand tem n.º de IVA no VIES: compra-se pelo líquido e revende-se em regime normal.
+ * Tudo o resto é `margem` (lado seguro: não inventa desconto).
+ */
+export type VatRegime = "dedutivel" | "margem";
+
+/** O que o ANÚNCIO diz do IVA (coluna `listings.vat_regime`); null/undefined = não diz. */
+export type SourceVatRegime = "dedutivel" | "margem" | "particular";
+
+/** Veredito de um registo oficial de km (coluna `listings.km_check`). */
+export interface KmCheck {
+  source: "RDW" | "Car-Pass" | "HistoVec" | "DGT";
+  verdict: "coerente" | "incoerente" | "sem_juizo";
+  /** ISO */
+  checkedAt: string;
+}
+
+/** Um anúncio PT usado na estimativa do preço PT (o que a ficha mostra). */
+export interface PtComparable {
+  title: string;
+  year: number;
+  km: number;
+  price: number;
+  /** source_site, ex.: "standvirtual.com" */
+  source: string;
+  url?: string;
+}
+
+/** Forma compacta de PtComparable guardada em `import_cost_estimates.pt_sample`
+ *  (chaves curtas: ~40 000 linhas × até 8 comparáveis, ver docs/04). */
+export interface PtSampleRow {
+  t: string;
+  y: number;
+  km: number;
+  p: number;
+  s: string;
+  u?: string;
+}
+
 /** Decomposição do custo de importar até estar legalizado em PT. */
 export interface CostBreakdown {
   /** preço pedido no país de origem */
@@ -64,6 +104,20 @@ export interface CostBreakdown {
   legalization: number;
   /** soma de tudo = custo final em Portugal */
   totalPt: number;
+  // ── IVA e margem (opcionais: só existem depois de o motor novo correr) ──
+  vatRegime?: VatRegime;
+  /** custo de compra efetivo (líquido se dedutível; = preço se margem) */
+  originPriceNet?: number;
+  /** caução de IVA (dinheiro parado até à prova de transporte, não custo) */
+  vatDeposit?: number;
+  /** preparação/garantia */
+  preparation?: number;
+  despachante?: number;
+  /** IVA a liquidar na revenda ao preço PT estimado */
+  outputVat?: number;
+  /** margem bruta estimada (€) */
+  grossMargin?: number;
+  grossMarginPct?: number;
 }
 
 /**
@@ -98,8 +152,9 @@ export interface Listing {
   source: string;
   /** URL original (o backend pode mascarar/proxiar) */
   sourceUrl?: string;
-  /** fotos do próprio anúncio; hoje só a 1.ª (a capa) — vazio se a fonte não
-   * deu foto ou se o URL não é utilizável (ver `listingPhoto` em lib/queries.ts) */
+  /** fotos do próprio anúncio: a galeria `image_urls` (até 8) quando o coletor a
+   * deu, senão só a capa — vazio se a fonte não deu foto ou se nenhum URL é
+   * utilizável (ver `listingPhotos` em lib/queries.ts) */
   images: string[];
   /** imagem principal do catálogo ultimatespecs (versão exata ou galeria do
    * modelo da designação) — **fallback** da capa, para os anúncios sem foto
@@ -116,6 +171,10 @@ export interface Listing {
   /** ISO date em que foi visto pela engine */
   seenAt: string;
   isFavorite: boolean;
+  /** o que o anúncio diz do IVA; undefined = a fonte não diz */
+  sourceVatRegime?: SourceVatRegime;
+  /** comparáveis PT da estimativa (até 8); undefined antes de o pipeline os gravar */
+  ptSample?: PtComparable[];
   /**
    * ISO — quando o anúncio deixou de aparecer nas fontes; `undefined` se ainda
    * está no mercado. A engine marca isto ao fim de 14 dias sem sinal

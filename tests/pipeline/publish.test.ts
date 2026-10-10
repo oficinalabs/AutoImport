@@ -60,6 +60,19 @@ const DEAD_AT = "2026-07-01 10:00:00";
 
 type Sql = ReturnType<typeof postgres>;
 
+const KM_CHECK = { source: "RDW", verdict: "coerente", checkedAt: "2026-10-01T00:00:00.000Z" };
+const PT_SAMPLE = [
+  {
+    t: "Pubmarke P100",
+    y: 2022,
+    km: 28000,
+    p: 26500,
+    s: "standvirtual.com",
+    u: "https://example.test/pt-1",
+  },
+  { t: "Pubmarke P100", y: 2021, km: 41000, p: 25200, s: "olx.pt" },
+];
+
 /** Anúncio da fixture: só o que varia; o resto é o mesmo carro. */
 function listing(external: string, over: Record<string, unknown> = {}) {
   return {
@@ -127,7 +140,14 @@ async function seedSource(sql: Sql): Promise<void> {
   `;
 
   const rows = [
-    listing("pub-fixture-1"),
+    // Colunas do P01: IVA declarado, preço líquido, galeria, matrícula e km_check.
+    listing("pub-fixture-1", {
+      vat_regime: "dedutivel",
+      price_net: 15126,
+      image_urls: ["https://example.test/a.jpg", "https://example.test/b.jpg"],
+      plate: "AB123C",
+      km_check: sql.json(KM_CHECK),
+    }),
     listing("pub-fixture-2"),
     listing("pub-fixture-3", { deleted_at: DEAD_AT }),
     listing("pub-fixture-4"),
@@ -174,7 +194,21 @@ async function seedSource(sql: Sql): Promise<void> {
     ["pub-fixture-6", "normal"],
   ] as const) {
     const row = estimate(byExternal.get(external) as string, confidence);
-    await sql`insert into import_cost_estimates ${sql(row)}`;
+    const extra =
+      external === "pub-fixture-1"
+        ? {
+            vat_regime: "dedutivel",
+            origin_price_net: 15126,
+            vat_deposit: 2874,
+            preparation: 300,
+            despachante: 250,
+            output_vat: 4862,
+            gross_margin: 1388,
+            gross_margin_pct: 5.34,
+            pt_sample: sql.json(PT_SAMPLE),
+          }
+        : {};
+    await sql`insert into import_cost_estimates ${sql({ ...row, ...extra })}`;
   }
   await sql`
     insert into opportunities (listing_id, savings, savings_pct)
@@ -443,6 +477,63 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     assert.equal(obs[0].price, 26000);
     assert.equal(obs[0].model_id, before.get("__model"));
     assert.equal(obs[0].listing_id, null);
+
+    // 10. Colunas do P01: IVA, galeria e km_check atravessam; a matrícula NÃO
+    //     (só serve à consulta da RDW, no warehouse). As linhas sem elas ficam a
+    //     null / nos defaults da migration.
+    const [p01] = await tgt`
+      select l.vat_regime, l.price_net, l.image_urls, l.km_check, l.plate,
+             e.vat_regime as e_vat_regime, e.origin_price_net, e.vat_deposit, e.preparation,
+             e.despachante, e.output_vat, e.gross_margin, e.gross_margin_pct, e.pt_sample
+      from listings l join import_cost_estimates e on e.listing_id = l.id
+      where l.external_id = 'pub-fixture-1'
+    `;
+    assert.equal(p01.vat_regime, "dedutivel");
+    assert.equal(p01.price_net, 15126);
+    assert.deepEqual(p01.image_urls, ["https://example.test/a.jpg", "https://example.test/b.jpg"]);
+    assert.deepEqual(p01.km_check, KM_CHECK);
+    assert.equal(p01.plate, null, "a matrícula fica no warehouse");
+    assert.deepEqual(
+      {
+        vatRegime: p01.e_vat_regime,
+        originPriceNet: p01.origin_price_net,
+        vatDeposit: p01.vat_deposit,
+        preparation: p01.preparation,
+        despachante: p01.despachante,
+        outputVat: p01.output_vat,
+        grossMargin: p01.gross_margin,
+      },
+      {
+        vatRegime: "dedutivel",
+        originPriceNet: 15126,
+        vatDeposit: 2874,
+        preparation: 300,
+        despachante: 250,
+        outputVat: 4862,
+        grossMargin: 1388,
+      },
+    );
+    assert.ok(Math.abs(p01.gross_margin_pct - 5.34) < 1e-4);
+    assert.deepEqual(p01.pt_sample, PT_SAMPLE);
+    const [legacy] = await tgt`
+      select l.vat_regime, l.image_urls, l.km_check, e.vat_regime as e_vat_regime,
+             e.origin_price_net, e.preparation, e.pt_sample
+      from listings l join import_cost_estimates e on e.listing_id = l.id
+      where l.external_id = 'pub-fixture-6'
+    `;
+    assert.deepEqual(
+      { ...legacy },
+      {
+        vat_regime: null,
+        image_urls: null,
+        km_check: null,
+        e_vat_regime: "margem",
+        origin_price_net: null,
+        preparation: 0,
+        pt_sample: null,
+      },
+      "sem os campos novos: null e defaults",
+    );
 
     // ── Idempotência: a segunda corrida não muda NADA ──
     const afterFirst = await fingerprint(tgt);

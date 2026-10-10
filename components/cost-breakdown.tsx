@@ -2,7 +2,10 @@ import { formatEuro } from "@/lib/format";
 import type { CostBreakdown as Breakdown } from "@/lib/types";
 import { ChevronDown, Info } from "lucide-react";
 
-const LINES: { key: keyof Omit<Breakdown, "totalPt">; label: string }[] = [
+const LINES: {
+  key: "originPrice" | "transport" | "isv" | "iuc" | "legalization";
+  label: string;
+}[] = [
   { key: "originPrice", label: "Preço na origem" },
   { key: "transport", label: "Transporte" },
   { key: "isv", label: "ISV" },
