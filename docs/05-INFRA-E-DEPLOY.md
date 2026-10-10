@@ -89,6 +89,46 @@ depende dela.
 O arquivo NDJSON vive em `/Volumes/SSD 500GB/autoimport-collector-out` (o disco interno não
 tem espaço: cada passagem `--full` são ~564 MB). Aponta-se com `COLLECTOR_OUT_DIR`.
 
+### Automação: publicação diária e alarme por fonte
+
+Três peças, cada uma com o seu papel:
+
+| Peça | Onde corre | O que faz |
+|---|---|---|
+| `collector-daemon.mjs --sync-db` | máquina do warehouse | recolhe (watch contínuo + `--full` de 3 em 3 dias por fonte) e corre o `pipeline:daily` no warehouse de hora a hora. É o **único** processo que escreve no warehouse. |
+| `.github/workflows/publicacao.yml` | runner self-hosted `warehouse` (mesma máquina) | 05:00 UTC: publica a montra na Supabase (`pipeline:publish:apply`) e depois corre o alarme por fonte (`pipeline:fontes`). |
+| `.github/workflows/frescura.yml` | runner da GitHub | 09:00 UTC: fica vermelho se os dados que a app serve tiverem mais de 36 h. Apanha "a máquina está desligada". |
+
+**Alarme por fonte** (`scripts/pipeline/check-sources.ts`). A frescura mede a base inteira, por
+isso uma fonte a devolver zero passa despercebida enquanto as outras trazem dados — foi o que
+aconteceu ao AutoTrader.nl durante meses (`MVP.md`). O alarme lê os `<fonte>-summary.json` que
+cada `run-*` escreve em `COLLECTOR_OUT_DIR` e falha (sai com 1) quando, na última corrida de uma
+fonte:
+
+- a contagem é **zero**; ou
+- é **menos de 50 % da média das 7 corridas anteriores**.
+
+Como cada corrida reescreve o summary, o histórico das contagens fica em
+`COLLECTOR_OUT_DIR/check-sources-history.json` (8 corridas por fonte, alguns KB; o mesmo summary
+lido duas vezes não conta duas vezes). Os mercados do autouncle contam cada um como fonte; o
+catálogo ultimatespecs fica de fora. Uma fonte sem corrida nova há mais de 7 dias só dá aviso
+(as fontes corridas à mão, como o piscapisca, ficariam vermelhas para sempre). Os limiares são
+constantes com nome no topo do script. À mão: `pnpm pipeline:fontes [--dir <arquivo>]`.
+
+**Ligar a automação** (precisa de uma máquina sempre ligada — mini-PC ou VPS — com a Postgres
+do warehouse, o arquivo NDJSON e o daemon a correr com `--sync-db`):
+
+1. **Runner:** no GitHub, Settings → Actions → Runners → New self-hosted runner; seguir as
+   instruções na máquina, acrescentar a label `warehouse` e instalá-lo como serviço
+   (`./svc.sh install && ./svc.sh start`) para sobreviver a reinícios.
+2. **Segredos e variável:** Settings → Secrets and variables → Actions — secrets `WAREHOUSE_URL`
+   (a Postgres local, `127.0.0.1`) e `DATABASE_URL` (a Supabase); variable `COLLECTOR_OUT_DIR`
+   (caminho absoluto do arquivo NDJSON nessa máquina).
+3. **Ligar o agendamento:** correr o workflow uma vez à mão (Actions → Publicação da montra →
+   Run workflow, sem `apply`) para confirmar o ensaio e o alarme; depois descomentar o
+   `schedule` no `publicacao.yml`. A GitHub avisa por email, quando uma corrida agendada
+   falha, quem fez o último commit à linha do `cron` — deve ser quem quer receber o alarme.
+
 ## Variáveis & segredos
 - 🔒 Nunca em commit. Geridos no painel do host + `.env.example` no repo.
 - ✏️ **Onde estão os segredos de produção:**
