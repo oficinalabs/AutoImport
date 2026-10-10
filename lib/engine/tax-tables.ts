@@ -1,14 +1,20 @@
 /**
  * Carrega as tabelas fiscais de um ano da BD (isv_tables) para a forma
- * TaxTables que o cost engine consome. Os kinds/payloads são os do seed
- * db/seed/isv-2026.ts.
+ * TaxTables que o cost engine consome. Os kinds/payloads são os dos seeds
+ * db/seed/isv-<ano>.ts.
  */
 import { eq } from "drizzle-orm";
 import type { db as Db } from "../../db";
 import { isvTables } from "../../db/schema";
 import type { TaxTables } from "../cost-engine/types";
 
-export async function loadTaxTables(db: typeof Db, year: number): Promise<TaxTables> {
+/**
+ * TaxTables + `provisional`: o ano foi semeado antes de o OE estar publicado em
+ * DR (kind `tabelas_meta`, opcional — sem ele o ano conta como definitivo).
+ */
+export type LoadedTaxTables = TaxTables & { provisional: boolean };
+
+export async function loadTaxTables(db: typeof Db, year: number): Promise<LoadedTaxTables> {
   const rows = await db.select().from(isvTables).where(eq(isvTables.year, year));
   const byKind = new Map(rows.map((r) => [r.kind, r.payload]));
 
@@ -31,8 +37,18 @@ export async function loadTaxTables(db: typeof Db, year: number): Promise<TaxTab
     return payload;
   };
 
+  const meta = byKind.get("tabelas_meta") as { provisional?: boolean } | undefined;
+  const provisional = meta?.provisional === true;
+  if (provisional) {
+    console.warn(
+      `isv_tables: as tabelas de ${year} são PROVISÓRIAS (OE ainda não publicado em DR). ` +
+        `Confirmar e atualizar db/seed/isv-${year}.ts.`,
+    );
+  }
+
   return {
     year,
+    provisional,
     isvCilindrada: need("isv_cilindrada") as TaxTables["isvCilindrada"],
     isvCo2GasolinaWltp: need("isv_co2_gasolina_wltp") as TaxTables["isvCo2GasolinaWltp"],
     isvCo2DieselWltp: need("isv_co2_diesel_wltp") as TaxTables["isvCo2DieselWltp"],

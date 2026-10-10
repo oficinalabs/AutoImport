@@ -1,7 +1,8 @@
 /**
  * Seed de desenvolvimento — idempotente (upsert por chave natural).
  *   pnpm db:seed
- * Popula: `sources` (fontes com coletor) e `isv_tables` (tabelas fiscais 2026).
+ * Popula: `sources` (fontes com coletor) e `isv_tables` (tabelas fiscais 2026 e
+ * 2027 — esta provisória, ver db/seed/isv-2027.ts).
  * Corre com tsx (imports de db/ e drizzle não passam no type-stripping do Node).
  */
 import { assertWritable, dbUrl } from "../../lib/db-url";
@@ -21,6 +22,7 @@ async function main() {
   const { db } = await import("../../db");
   const { isvTables, sources } = await import("../../db/schema");
   const { ISV_TABLES_2026 } = await import("../../db/seed/isv-2026");
+  const { ISV_TABLES_2027 } = await import("../../db/seed/isv-2027");
   const { SOURCES } = await import("../../db/seed/sources");
 
   for (const s of SOURCES) {
@@ -34,7 +36,8 @@ async function main() {
   }
   console.log(`sources: ${SOURCES.length} upserted`);
 
-  for (const t of ISV_TABLES_2026) {
+  const taxRows = [...ISV_TABLES_2026, ...ISV_TABLES_2027];
+  for (const t of taxRows) {
     await db
       .insert(isvTables)
       .values({ year: t.year, kind: t.kind, payload: t.payload, sourceUrl: t.sourceUrl })
@@ -43,7 +46,7 @@ async function main() {
         set: { payload: t.payload, sourceUrl: t.sourceUrl },
       });
   }
-  console.log(`isv_tables: ${ISV_TABLES_2026.length} upserted`);
+  console.log(`isv_tables: ${taxRows.length} upserted (2026, 2027 provisória)`);
 }
 
 main()

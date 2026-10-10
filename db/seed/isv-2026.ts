@@ -5,7 +5,8 @@
  * e a lei consolidada no DR — ver research (agente jul/2026) e sourceUrl por bloco.
  *
  * A forma de cada payload está em lib/cost-engine/types.ts (TaxTables).
- * Versionamento: quando o OE 2027 mudar taxas, acrescentar linhas year=2027.
+ * Versionamento: cada ano tem o seu ficheiro (db/seed/isv-2027.ts, provisório
+ * até à publicação do OE 2027 em DR).
  */
 import type {
   AgeReductionBracket,
@@ -104,7 +105,7 @@ const isvTaxasIntermedias: IntermediateRates = {
   phevUsado: { pct: 25, minRangeKm: 25, fromYear: 2015, toYear: 2020 },
 };
 
-/** ISV art. 9.º — agravamento partículas gasóleo (isento se < 0,001 g/km). */
+/** ISV art. 7.º n.º 3 — agravamento partículas gasóleo (isento se < 0,001 g/km). */
 const isvAgravamentoDiesel = 500;
 
 /** IUC categoria B — componente cilindrada. */
