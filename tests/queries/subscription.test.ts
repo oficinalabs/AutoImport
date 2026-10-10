@@ -18,6 +18,13 @@
  * ⚠️ `process.env.WAREHOUSE_URL` tem de ser definido ANTES de qualquer
  * `await import` do `db/`: o db/index.ts congela a connection string no import.
  * Por isso os módulos são importados dentro dos testes.
+ *
+ * Checkout e portal (P10): a Polar é um `fetch` simulado que regista o pedido.
+ * O que se prova é a nossa metade — o checkout leva o `stand_id` que o webhook
+ * procura, só o dono passa, não há segundo checkout com subscrição a correr, e
+ * o ciclo checkout → webhook → acesso → cancelar fecha. A metade da Polar
+ * (que copia o metadata para a subscrição, que assina como dizemos) só a
+ * sandbox prova — ver a descrição do PR.
  */
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
@@ -37,6 +44,14 @@ try {
 } catch {
   /* CI: variáveis do ambiente */
 }
+
+// Checkout/portal (fim do ficheiro): sessões reais do Better Auth. Sem chave do
+// Resend nada sai do processo; a Polar é sempre um `fetch` simulado.
+// biome-ignore lint/performance/noDelete: tem de sair do ambiente, não ficar vazia
+delete process.env.RESEND_API_KEY;
+process.env.BETTER_AUTH_SECRET ||= "segredo-so-para-os-testes-da-subscricao";
+process.env.BETTER_AUTH_URL ||= "http://localhost:3000";
+for (const v of ["POLAR_ACCESS_TOKEN", "POLAR_PRODUCT_ID", "POLAR_SERVER"]) delete process.env[v];
 
 const DB_URL = dbUrl();
 const skip = skipUnlessLocalDb("o teste da subscrição");
@@ -378,4 +393,255 @@ test("cancelada com período a correr ainda tem acesso", { skip }, async () => {
   // entregar (ver /legal/subscricao).
   assert.equal(temAcesso(estado as "cancelada"), true);
   assert.equal(temAcesso("expirada"), false);
+});
+
+// ── Checkout e portal (P10) ──────────────────────────────────────
+
+/** Um `fetch` falso que regista o pedido e devolve `resposta`. */
+function polarFalsa(resposta: Record<string, unknown>, status = 200) {
+  const pedidos: { url: string; init: RequestInit; corpo: Record<string, unknown> }[] = [];
+  const impl = (async (url: string | URL, init: RequestInit = {}) => {
+    pedidos.push({ url: String(url), init, corpo: JSON.parse(String(init.body)) });
+    return new Response(JSON.stringify(resposta), { status });
+  }) as typeof fetch;
+  return { impl, pedidos };
+}
+
+const CFG = {
+  token: "polar_oat_teste",
+  productId: "prod_teste",
+  baseUrl: "https://sandbox-api.polar.sh",
+};
+
+test("polarConfig: sem token ou produto é null; a omissão é a sandbox", async () => {
+  const { polarConfig } = await import("../../lib/billing");
+  assert.equal(polarConfig({}), null);
+  assert.equal(polarConfig({ POLAR_ACCESS_TOKEN: "t" }), null, "sem produto não há checkout");
+  assert.equal(polarConfig({ POLAR_PRODUCT_ID: "p" }), null);
+  assert.equal(
+    polarConfig({ POLAR_ACCESS_TOKEN: "t", POLAR_PRODUCT_ID: "p" })?.baseUrl,
+    "https://sandbox-api.polar.sh",
+    "ninguém cobra a sério sem escrever production",
+  );
+  assert.equal(
+    polarConfig({ POLAR_ACCESS_TOKEN: "t", POLAR_PRODUCT_ID: "p", POLAR_SERVER: "production" })
+      ?.baseUrl,
+    "https://api.polar.sh",
+  );
+});
+
+test("criarCheckout manda o stand_id que o webhook procura", async () => {
+  const { criarCheckout } = await import("../../lib/billing");
+  const { standIdDe, subscricaoSchema } = await import("../../lib/polar-webhook");
+  const polar = polarFalsa({ id: "chk_1", url: "https://sandbox.polar.sh/checkout/chk_1" });
+
+  const url = await criarCheckout(
+    CFG,
+    { standId: "stand-x", email: "dono@x.pt", origem: "https://app.exemplo" },
+    polar.impl,
+  );
+  assert.equal(url, "https://sandbox.polar.sh/checkout/chk_1");
+
+  const [pedido] = polar.pedidos;
+  assert.equal(pedido.url, "https://sandbox-api.polar.sh/v1/checkouts/");
+  assert.equal(pedido.init.method, "POST");
+  assert.equal(
+    (pedido.init.headers as Record<string, string>).Authorization,
+    "Bearer polar_oat_teste",
+  );
+  assert.deepEqual(pedido.corpo.products, ["prod_teste"]);
+  assert.equal(pedido.corpo.customer_email, "dono@x.pt");
+  assert.equal(pedido.corpo.success_url, "https://app.exemplo/stand?checkout=ok");
+
+  // A prova que interessa: uma subscrição com o metadata e o cliente que este
+  // checkout cria é atribuída ao stand certo — pelos dois caminhos.
+  const viaMetadata = subscricaoSchema.parse({
+    id: "s",
+    status: "active",
+    metadata: pedido.corpo.metadata,
+  });
+  assert.equal(standIdDe(viaMetadata), "stand-x");
+  const viaCliente = subscricaoSchema.parse({
+    id: "s",
+    status: "active",
+    customer: { external_id: pedido.corpo.external_customer_id },
+  });
+  assert.equal(standIdDe(viaCliente), "stand-x");
+});
+
+test("criarSessaoDoPortal usa o customer_id; erro da Polar não passa em silêncio", async () => {
+  const { criarSessaoDoPortal, PolarApiError } = await import("../../lib/billing");
+  const polar = polarFalsa({ customer_portal_url: "https://sandbox.polar.sh/portal/x" });
+  const url = await criarSessaoDoPortal(CFG, "cus_1", "https://app.exemplo", polar.impl);
+  assert.equal(url, "https://sandbox.polar.sh/portal/x");
+  assert.equal(polar.pedidos[0].url, "https://sandbox-api.polar.sh/v1/customer-sessions/");
+  assert.deepEqual(polar.pedidos[0].corpo, {
+    customer_id: "cus_1",
+    return_url: "https://app.exemplo/stand",
+  });
+
+  const recusa = polarFalsa({ detail: "token inválido" }, 401);
+  await assert.rejects(
+    criarSessaoDoPortal(CFG, "cus_1", "https://app.exemplo", recusa.impl),
+    PolarApiError,
+  );
+});
+
+test("aviso do trial: só nos últimos 5 dias, e só no trial", async () => {
+  const { diasParaAvisoDoTrial } = await import("../../lib/billing");
+  const agora = new Date("2026-10-10T12:00:00Z");
+  const daqui = (dias: number) => new Date(agora.getTime() + dias * DIA).toISOString();
+
+  assert.equal(diasParaAvisoDoTrial("trial", daqui(10), agora), null);
+  assert.equal(diasParaAvisoDoTrial("trial", daqui(5), agora), 5);
+  assert.equal(diasParaAvisoDoTrial("trial", daqui(4.2), agora), 5, "arredonda para cima");
+  assert.equal(diasParaAvisoDoTrial("trial", daqui(0.5), agora), 1);
+  assert.equal(diasParaAvisoDoTrial("trial", daqui(-1), agora), null);
+  assert.equal(diasParaAvisoDoTrial("ativa", daqui(2), agora), null, "quem paga não é avisado");
+});
+
+test("segredo no formato whsec_<base64> também verifica", async () => {
+  const { assinaturaValida } = await import("../../lib/polar-webhook");
+  const chave = Buffer.from("chave-binaria-de-teste");
+  const segredo = `whsec_${chave.toString("base64")}`;
+  const corpo = eventoDeSubscricao();
+  const segundos = Math.floor(Date.now() / 1000);
+  const assinar = (k: Buffer) =>
+    createHmac("sha256", k).update(`msg_1.${segundos}.${corpo}`).digest("base64");
+  const headers = (assinatura: string) =>
+    new Headers({
+      "webhook-id": "msg_1",
+      "webhook-timestamp": String(segundos),
+      "webhook-signature": `v1,${assinatura}`,
+    });
+
+  // Chave descodificada (Standard Webhooks clássico) e bytes do texto (Polar).
+  assert.equal(assinaturaValida(headers(assinar(chave)), corpo, segredo), true);
+  assert.equal(assinaturaValida(headers(assinar(Buffer.from(segredo))), corpo, segredo), true);
+  assert.equal(assinaturaValida(headers(assinar(Buffer.from("outra"))), corpo, segredo), false);
+});
+
+/** Conta + stand + sessão, como no registo a sério. Devolve os headers e o stand. */
+async function donoComSessao(email: string, standName: string) {
+  const { auth } = await import("../../lib/auth");
+  const db = sql as ReturnType<typeof postgres>;
+  await auth.api.signUpEmail({
+    body: { name: "Dono", email, password: "Subscrever!Forte9", standName } as never,
+  });
+  await db`update "user" set email_verified = true where email = ${email}`;
+  const res = await auth.api.signInEmail({
+    body: { email, password: "Subscrever!Forte9" },
+    asResponse: true,
+  });
+  const cookie = res.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  const [org] = await db`select id from organization where name = ${standName}`;
+  return { headers: { cookie }, standId: org.id as string };
+}
+
+async function pedir(rota: "checkout" | "portal", headers: Record<string, string> = {}) {
+  const { POST } =
+    rota === "checkout"
+      ? await import("../../app/api/polar/checkout/route")
+      : await import("../../app/api/polar/portal/route");
+  return POST(new Request(`https://app.exemplo/api/polar/${rota}`, { method: "POST", headers }));
+}
+
+test(
+  "checkout → webhook → acesso → portal → cancelar, com a Polar simulada",
+  { skip },
+  async () => {
+    const { getStandQuery } = await import("../../lib/queries");
+    const { temAcesso } = await import("../../lib/subscription");
+    process.env.POLAR_WEBHOOK_SECRET = SEGREDO;
+    const dono = await donoComSessao("dono-checkout@exemplo-de-teste.pt", "Stand do Checkout");
+    const fetchOriginal = globalThis.fetch;
+
+    try {
+      // Sem configuração: 503, e a Polar nem é chamada.
+      assert.equal((await pedir("checkout", dono.headers)).status, 503);
+
+      process.env.POLAR_ACCESS_TOKEN = "polar_oat_teste";
+      process.env.POLAR_PRODUCT_ID = "prod_teste";
+
+      // Sem sessão não há checkout.
+      assert.equal((await pedir("checkout")).status, 401);
+
+      const polar = polarFalsa({ id: "chk_1", url: "https://sandbox.polar.sh/checkout/chk_1" });
+      globalThis.fetch = polar.impl;
+      const res = await pedir("checkout", dono.headers);
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { url: "https://sandbox.polar.sh/checkout/chk_1" });
+      const metadata = polar.pedidos[0].corpo.metadata as Record<string, string>;
+      assert.equal(metadata.stand_id, dono.standId, "o stand vem da sessão, não do cliente");
+      assert.equal(polar.pedidos[0].corpo.success_url, "https://app.exemplo/stand?checkout=ok");
+
+      // O stand paga; a Polar avisa com o metadata do checkout.
+      const fim = new Date(Date.now() + 30 * DIA).toISOString();
+      const ativa = eventoDeSubscricao(
+        { id: "sub_checkout", customer_id: "cus_checkout", metadata, current_period_end: fim },
+        "subscription.active",
+      );
+      assert.equal((await entregar(ativa, headersAssinados(ativa))).status, 200);
+      const stand = await getStandQuery(dono.standId);
+      assert.equal(stand?.subscription.status, "ativa");
+      assert.equal(temAcesso("ativa"), true);
+
+      // Já paga: um segundo checkout seria uma segunda cobrança.
+      assert.equal((await pedir("checkout", dono.headers)).status, 409);
+
+      // O portal abre com o cliente que o webhook gravou.
+      const portal = polarFalsa({ customer_portal_url: "https://sandbox.polar.sh/portal/x" });
+      globalThis.fetch = portal.impl;
+      const resPortal = await pedir("portal", dono.headers);
+      assert.equal(resPortal.status, 200);
+      assert.equal(
+        ((await resPortal.json()) as { url: string }).url,
+        "https://sandbox.polar.sh/portal/x",
+      );
+      assert.equal(portal.pedidos[0].corpo.customer_id, "cus_checkout");
+
+      // Cancela no portal: a Polar manda `cancel_at_period_end`, o acesso fica até ao fim.
+      const cancelada = eventoDeSubscricao(
+        {
+          id: "sub_checkout",
+          customer_id: "cus_checkout",
+          metadata,
+          current_period_end: fim,
+          cancel_at_period_end: true,
+        },
+        "subscription.canceled",
+      );
+      assert.equal((await entregar(cancelada, headersAssinados(cancelada))).status, 200);
+      assert.equal((await linha(dono.standId))?.cancel_at_period_end, true);
+      assert.equal((await getStandQuery(dono.standId))?.subscription.status, "cancelada");
+      assert.equal(temAcesso("cancelada"), true);
+    } finally {
+      globalThis.fetch = fetchOriginal;
+    }
+  },
+);
+
+test("só o dono abre checkout ou portal; sem subscrição não há portal", { skip }, async () => {
+  process.env.POLAR_ACCESS_TOKEN = "polar_oat_teste";
+  process.env.POLAR_PRODUCT_ID = "prod_teste";
+  const fetchOriginal = globalThis.fetch;
+  const polar = polarFalsa({ url: "https://nunca", customer_portal_url: "https://nunca" });
+  globalThis.fetch = polar.impl;
+
+  try {
+    const colega = await donoComSessao("colega-checkout@exemplo-de-teste.pt", "Stand do Colega");
+    // Ainda dono do próprio stand e sem subscrição: checkout sim, portal não.
+    assert.equal((await pedir("portal", colega.headers)).status, 404);
+
+    await (sql as ReturnType<typeof postgres>)`
+      update member set role = 'member' where organization_id = ${colega.standId}`;
+    assert.equal((await pedir("checkout", colega.headers)).status, 403);
+    assert.equal((await pedir("portal", colega.headers)).status, 403);
+    assert.equal(polar.pedidos.length, 0, "a Polar nunca pode ter sido chamada");
+  } finally {
+    globalThis.fetch = fetchOriginal;
+  }
 });

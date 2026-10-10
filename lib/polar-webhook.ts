@@ -5,7 +5,9 @@
  * sozinho, sem HTTP.
  *
  * ⚠️ **Por confirmar contra a sandbox real da Polar** — ver o cabeçalho de
- * app/api/polar/webhook/route.ts.
+ * app/api/polar/webhook/route.ts. O formato foi conferido com o verificador do
+ * `@polar-sh/sdk` 1.0.2 (`verifySignature`) e com os campos do `Subscription`
+ * da API "2026-10".
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
@@ -65,10 +67,12 @@ export function standIdDe(sub: SubscricaoDaPolar): string | null {
  * `v<versão>,<assinatura>` — mais do que uma durante a rotação do segredo, e
  * basta uma bater.
  *
- * A chave são os **bytes UTF-8 do segredo tal como está no ambiente**: o
- * `@polar-sh/sdk` faz `Buffer.from(secret,"utf-8").toString("base64")` antes de
- * entregar à biblioteca `standardwebhooks`, que faz `Buffer.from(secret,
- * "base64")` — as duas anulam-se.
+ * A chave: a Polar mostra o segredo como texto e assina com os **bytes UTF-8**
+ * desse texto (era o que o `@polar-sh/sdk` 0.x fazia, ao codificar em base64
+ * antes de entregar à `standardwebhooks`, que voltava a descodificar). O SDK
+ * 1.0.2 (`hmacKeys`) aceita também a forma clássica do Standard Webhooks —
+ * `whsec_<base64>`, chave = bytes descodificados — e aqui faz-se o mesmo: um
+ * segredo copiado de outra ferramenta de teste continua a verificar.
  *
  * Os nomes `svix-*` são aceites porque são os do protocolo original e há
  * ferramentas de teste que ainda os mandam; a Polar usa os `webhook-*`.
@@ -88,17 +92,30 @@ export function assinaturaValida(
   if (!Number.isFinite(segundos)) return false;
   if (Math.abs(agora / 1000 - segundos) > TOLERANCIA_SEGUNDOS) return false;
 
-  const esperada = createHmac("sha256", Buffer.from(secret, "utf-8"))
-    .update(`${id}.${timestamp}.${corpo}`)
-    .digest();
+  const esperadas = chavesDoSegredo(secret).map((chave) =>
+    createHmac("sha256", chave).update(`${id}.${timestamp}.${corpo}`).digest(),
+  );
 
   for (const parte of assinaturas.split(" ")) {
     const [versao, valor] = parte.split(",");
     if (versao !== "v1" || !valor) continue;
     const recebida = Buffer.from(valor, "base64");
-    // timingSafeEqual rebenta com tamanhos diferentes; comparar o tamanho antes
-    // não vaza nada — vem no header, é público.
-    if (recebida.length === esperada.length && timingSafeEqual(recebida, esperada)) return true;
+    for (const esperada of esperadas) {
+      // timingSafeEqual rebenta com tamanhos diferentes; comparar o tamanho antes
+      // não vaza nada — vem no header, é público.
+      if (recebida.length === esperada.length && timingSafeEqual(recebida, esperada)) return true;
+    }
   }
   return false;
+}
+
+/** As chaves HMAC a experimentar — ver o comentário de `assinaturaValida`. */
+function chavesDoSegredo(secret: string): Buffer[] {
+  const utf8 = Buffer.from(secret, "utf-8");
+  const resto = secret.startsWith("whsec_") ? secret.slice(6) : secret;
+  // Só se for base64 a sério: o Buffer.from ignora caracteres inválidos em
+  // silêncio, e uma chave "meio descodificada" não pode entrar na lista.
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(resto) || resto.length % 4 !== 0) return [utf8];
+  const descodificada = Buffer.from(resto, "base64");
+  return descodificada.length > 0 && !descodificada.equals(utf8) ? [utf8, descodificada] : [utf8];
 }
