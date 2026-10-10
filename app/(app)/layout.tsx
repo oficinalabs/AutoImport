@@ -1,10 +1,12 @@
 import { TopBar } from "@/components/top-bar";
 import { auth } from "@/lib/auth";
+import { diasParaAvisoDoTrial } from "@/lib/billing";
 import { getDataFreshness, getNotifications, getStand } from "@/lib/data";
 import { formatDate } from "@/lib/format";
 import type { SubscriptionStatus } from "@/lib/types";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Link from "next/link";
 
 // A app fica fora dos motores de busca até haver autenticação real.
 export const metadata: Metadata = {
@@ -43,6 +45,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const sub = stand?.subscription;
   const subscriptionLabel = sub ? ETIQUETA[sub.status](formatDate(sub.renewsAt)) : "";
+  // Aviso nos últimos dias do trial — sem ele o stand só descobria ao ficar
+  // trancado fora da app.
+  const diasDeTrial = sub ? diasParaAvisoDoTrial(sub.status, sub.renewsAt) : null;
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -53,6 +58,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         notifications={notifications}
         lastSeenAt={lastSeenAt}
       />
+      {diasDeTrial !== null && (
+        <div className="border-b border-line bg-amber-soft px-4 py-2 text-center text-sm text-amber-ink">
+          O teu mês grátis termina {`daqui a ${diasDeTrial} ${diasDeTrial === 1 ? "dia" : "dias"}`}.{" "}
+          <Link href="/stand" className="font-semibold underline">
+            Subscrever
+          </Link>{" "}
+          para não perderes o acesso.
+        </div>
+      )}
       <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

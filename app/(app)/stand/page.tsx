@@ -1,8 +1,9 @@
 import { AccountForm } from "@/components/account-form";
 import { StandForm } from "@/components/stand-form";
+import { SubscriptionActions } from "@/components/subscription-actions";
 import { TeamCard } from "@/components/team-card";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { polarConfig } from "@/lib/billing";
 import { getPendingInvites, getSessionUser, getStand, getStandRole } from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
 import type { SubscriptionStatus } from "@/lib/types";
@@ -113,12 +114,11 @@ export default async function StandPage() {
                 voltam assim que a subscrição for reativada.
               </p>
             )}
-            {/* Continua desativado: o checkout da Polar precisa do
-                POLAR_ACCESS_TOKEN, que ainda não existe. Ligar um botão que dá
-                erro é pior do que um botão que diz que ainda não dá. */}
-            <Button variant="primary" disabled title="Ainda não disponível">
-              Gerir subscrição
-            </Button>
+            <SubscriptionActions
+              status={stand.subscription.status}
+              isOwner={isOwner}
+              configured={polarConfig() !== null}
+            />
           </CardContent>
         </Card>
       </div>
