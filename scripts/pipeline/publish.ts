@@ -23,8 +23,10 @@
  * apaga um listing — o que morre leva `deleted_at`, e a `favoritesQuery` mostra os
  * mortos de propósito (docs/08).
  *
- * O QUE NÃO ATRAVESSA: `listings.raw`, `listings.match_evidence` e
- * `import_cost_estimates.inputs` — auditoria do pipeline, lida só no warehouse.
+ * O QUE NÃO ATRAVESSA: `listings.raw`, `listings.match_evidence` e o resto do
+ * `import_cost_estimates.inputs` — auditoria do pipeline, lida só no warehouse. Do
+ * `inputs` só vai a chave `isv` (as parcelas do ISV que a ficha mostra), já cortada
+ * na leitura: no destino o `inputs` é `{ isv }` ou null.
  * `listings.plate` também não: a matrícula só serve para a consulta à RDW, que corre
  * no warehouse, e a app não tem razão para a guardar. As tabelas `stand_cost_settings`
  * e `trial_email_log` são dados de utilizador e só existem na base da app.
@@ -67,6 +69,10 @@ const ESTIMATE_DATA = (
   "origin_price_net vat_deposit preparation despachante output_vat gross_margin gross_margin_pct " +
   "pt_sample"
 ).split(" ");
+/** Do `inputs` só a chave `isv` (ver o cabeçalho). Lido com esta expressão, escrito
+ *  como a coluna `inputs`. */
+const ESTIMATE_INPUTS = `case when jsonb_typeof(e.inputs->'isv') = 'object'
+  then jsonb_build_object('isv', e.inputs->'isv') end as inputs`;
 
 // `stand_id` não vai: o publicador só trata das oportunidades GLOBAIS. As por stand,
 // se existirem um dia, são dados de utilizador e vivem só no destino.
@@ -225,7 +231,8 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
       ${src.unsafe(MONTRA_FROM)}
     `;
     const estimateRows = await src`
-      select l.id as src_listing_id, ${src.unsafe(prefixed("e", ESTIMATE_DATA))}
+      select l.id as src_listing_id, ${src.unsafe(prefixed("e", ESTIMATE_DATA))},
+             ${src.unsafe(ESTIMATE_INPUTS)}
       ${src.unsafe(MONTRA_FROM)}
     `;
     const opportunityRows = await src`
@@ -520,7 +527,7 @@ export async function publish(opts: PublishOptions = {}): Promise<PublishReport>
           tx,
           "import_cost_estimates",
           ESTIMATE_KEY,
-          ESTIMATE_DATA,
+          [...ESTIMATE_DATA, "inputs"],
           estimateRows.map((r) => ({ ...r, listing_id: remoteListingId.get(r.src_listing_id) })),
         );
         written.opportunities = await upsert(

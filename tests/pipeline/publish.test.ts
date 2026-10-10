@@ -61,6 +61,16 @@ const DEAD_AT = "2026-07-01 10:00:00";
 type Sql = ReturnType<typeof postgres>;
 
 const KM_CHECK = { source: "RDW", verdict: "coerente", checkedAt: "2026-10-01T00:00:00.000Z" };
+const ISV = {
+  cilindrada: 830.12,
+  ambiental: 2650.4,
+  agravamentoDiesel: 0,
+  taxaPct: 100,
+  reducaoPct: 20,
+  norm: "wltp",
+  total: 2784.41,
+  assumptions: [],
+};
 const PT_SAMPLE = [
   {
     t: "Pubmarke P100",
@@ -206,6 +216,7 @@ async function seedSource(sql: Sql): Promise<void> {
             gross_margin: 1388,
             gross_margin_pct: 5.34,
             pt_sample: sql.json(PT_SAMPLE),
+            inputs: sql.json({ cc: 999, matchKind: "exato", versionId: "PF-V1", isv: ISV }),
           }
         : {};
     await sql`insert into import_cost_estimates ${sql({ ...row, ...extra })}`;
@@ -484,10 +495,13 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     const [p01] = await tgt`
       select l.vat_regime, l.price_net, l.image_urls, l.km_check, l.plate,
              e.vat_regime as e_vat_regime, e.origin_price_net, e.vat_deposit, e.preparation,
-             e.despachante, e.output_vat, e.gross_margin, e.gross_margin_pct, e.pt_sample
+             e.despachante, e.output_vat, e.gross_margin, e.gross_margin_pct, e.pt_sample,
+             e.inputs
       from listings l join import_cost_estimates e on e.listing_id = l.id
       where l.external_id = 'pub-fixture-1'
     `;
+    // Do `inputs` só atravessa o ISV; a auditoria (cc, versão, matchKind) fica.
+    assert.deepEqual(p01.inputs, { isv: ISV });
     assert.equal(p01.vat_regime, "dedutivel");
     assert.equal(p01.price_net, 15126);
     assert.deepEqual(p01.image_urls, ["https://example.test/a.jpg", "https://example.test/b.jpg"]);
@@ -517,7 +531,7 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
     assert.deepEqual(p01.pt_sample, PT_SAMPLE);
     const [legacy] = await tgt`
       select l.vat_regime, l.image_urls, l.km_check, e.vat_regime as e_vat_regime,
-             e.origin_price_net, e.preparation, e.pt_sample
+             e.origin_price_net, e.preparation, e.pt_sample, e.inputs
       from listings l join import_cost_estimates e on e.listing_id = l.id
       where l.external_id = 'pub-fixture-6'
     `;
@@ -531,6 +545,7 @@ test("publicação: montra completa, idempotente, com o id do destino a mandar",
         origin_price_net: null,
         preparation: 0,
         pt_sample: null,
+        inputs: null,
       },
       "sem os campos novos: null e defaults",
     );
