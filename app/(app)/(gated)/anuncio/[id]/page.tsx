@@ -1,14 +1,34 @@
 import { CarImage } from "@/components/car-image";
 import { CostBreakdown } from "@/components/cost-breakdown";
 import { CountryFlag } from "@/components/country-flag";
-import { KmTrustBadge } from "@/components/km-trust-badge";
+import { ImportChecklist } from "@/components/import-checklist";
+import { IsvDetail } from "@/components/isv-detail";
+import { KmTrustAdvice, KmTrustBadge } from "@/components/km-trust-badge";
 import { ListingActions } from "@/components/listing-actions";
 import { PriceChart } from "@/components/price-chart";
+import { PtComparables } from "@/components/pt-comparables";
 import { SavingsBadge } from "@/components/savings-badge";
+import { SellerMessage } from "@/components/seller-message";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { VatRegimeNote } from "@/components/vat-regime-note";
 import { VerdictBadge } from "@/components/verdict-badge";
+import { COUNTRY_GUIDES } from "@/lib/country-guides";
 import { getListing } from "@/lib/data";
-import { formatCc, formatEuro, formatKm, formatNumber, relativeDay } from "@/lib/format";
-import type { Listing } from "@/lib/types";
+import {
+  formatCc,
+  formatEuro,
+  formatKm,
+  formatNumber,
+  formatPercent,
+  relativeDay,
+} from "@/lib/format";
+import type { Listing, Verdict } from "@/lib/types";
 import { cn, isUuid } from "@/lib/utils";
 import { ArrowLeft, PackageX } from "lucide-react";
 import Link from "next/link";
@@ -36,6 +56,47 @@ function AvisoIndisponivel({ seenAt }: { seenAt: string }) {
         </p>
       </div>
     </div>
+  );
+}
+
+const MARGIN_TONE: Record<Verdict, string> = {
+  compensa: "text-good",
+  marginal: "text-steel",
+  nao_compensa: "text-bad",
+};
+
+/** Fotos do anúncio (até 8). Com uma só, a imagem de sempre; com várias, um
+ *  carrossel com setas e contador. */
+function Galeria({ listing }: { listing: Listing }) {
+  const fotos = listing.images.slice(0, 8);
+  if (fotos.length <= 1)
+    return (
+      <CarImage
+        photo={fotos[0]}
+        catalog={listing.catalogImage}
+        label={listing.title}
+        className="aspect-[16/9] w-full"
+      />
+    );
+  return (
+    <Carousel aria-label={`Fotos de ${listing.title}`}>
+      <CarouselContent>
+        {fotos.map((foto, i) => (
+          <CarouselItem key={foto}>
+            <CarImage
+              photo={foto}
+              label={`${listing.title} (${i + 1} de ${fotos.length})`}
+              className="aspect-[16/9] w-full"
+            />
+          </CarouselItem>
+        ))}
+      </CarouselContent>
+      <CarouselPrevious className="left-2" />
+      <CarouselNext className="right-2" />
+      <span className="pointer-events-none absolute right-2 bottom-2 rounded-full bg-[#08090b]/70 px-2 py-0.5 text-[11px] text-white">
+        {fotos.length} fotos
+      </span>
+    </Carousel>
   );
 }
 
@@ -81,7 +142,7 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         {/* Coluna esquerda: fotos + ficha */}
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="mb-2 flex items-center gap-2">
@@ -96,18 +157,7 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
 
-          {/* Galeria */}
-          <div className="grid grid-cols-4 gap-2">
-            <CarImage
-              photo={listing.images[0]}
-              catalog={listing.catalogImage}
-              label={listing.title}
-              className="col-span-4 aspect-[16/9] w-full"
-            />
-            {listing.images.slice(1, 5).map((img) => (
-              <CarImage key={img} className="aspect-square w-full" />
-            ))}
-          </div>
+          <Galeria listing={listing} />
 
           {/* Ficha técnica */}
           <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
@@ -150,11 +200,13 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
             </div>
             <PriceChart data={listing.ptMarket.history} />
           </div>
+
+          <PtComparables sample={listing.ptSample} sampleSize={listing.ptMarket.sampleSize} />
         </div>
 
         {/* Coluna direita: dinheiro + ações */}
-        <div className="flex flex-col gap-4">
-          {/* Poupança em destaque. Num anúncio que já saiu do mercado isto é
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* Margem (ou, nas estimativas antigas, poupança) em destaque. Num anúncio que já saiu do mercado isto é
               referência histórica, não uma oferta — daí o rótulo diferente e o
               destaque atenuado. Um "−9070 € POUPANÇA" verde e garrido sobre um
               carro que já não se compra contradiz o aviso lá em cima. */}
@@ -177,16 +229,42 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
                   Portugal
                 </div>
               </div>
-              <SavingsBadge
-                savings={listing.savings}
-                savingsPct={listing.savingsPct}
-                verdict={listing.verdict}
-                size="lg"
-              />
+              {/* Com o motor novo o número que decide é a margem bruta (plano §5,
+                  DEFAULT): "poupança" só nas estimativas antigas, sem margem. */}
+              {listing.cost.grossMargin !== undefined ? (
+                <div
+                  className={cn(
+                    "tnum text-right font-display leading-none",
+                    MARGIN_TONE[listing.verdict],
+                  )}
+                >
+                  <div className="text-3xl font-bold">{formatEuro(listing.cost.grossMargin)}</div>
+                  <div className="mt-1 font-sans text-xs font-medium uppercase tracking-wide text-ink-soft">
+                    margem bruta
+                    {listing.cost.grossMarginPct !== undefined &&
+                      ` · ${formatPercent(listing.cost.grossMarginPct, false)}`}
+                  </div>
+                </div>
+              ) : (
+                <SavingsBadge
+                  savings={listing.savings}
+                  savingsPct={listing.savingsPct}
+                  verdict={listing.verdict}
+                  size="lg"
+                />
+              )}
             </div>
           </div>
 
-          <CostBreakdown cost={listing.cost} />
+          <VatRegimeNote
+            source={listing.sourceVatRegime}
+            cost={listing.cost}
+            country={listing.country}
+          />
+
+          <CostBreakdown cost={listing.cost} ptPrice={listing.ptMarket.estimatedPrice} />
+
+          <IsvDetail listing={listing} />
 
           {/* Confiança */}
           <div className="rounded-[10px] border border-line bg-surface p-4">
@@ -194,14 +272,26 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
               Confiança
             </h3>
             <KmTrustBadge trust={listing.kmTrust} />
-            <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-              Confirma sempre o histórico de quilometragem antes de fechar — o risco de fraude é
-              maior em importados.
-            </p>
+            {/* Sem `kmCheck`: o Listing ainda não o expõe (ver o PR do P07). */}
+            <KmTrustAdvice country={listing.country} year={listing.year} />
           </div>
 
           {/* Ações */}
           <ListingActions listing={listing} />
+        </div>
+      </div>
+
+      {/* O que fazer a seguir: abaixo das duas colunas, para no telemóvel não
+          empurrar a conta para o fundo da página. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ImportChecklist country={listing.country} />
+        <div className="min-w-0">
+          <SellerMessage
+            messages={COUNTRY_GUIDES[listing.country].messages}
+            car={listing.title}
+            price={formatEuro(listing.cost.originPrice)}
+            link={listing.sourceUrl}
+          />
         </div>
       </div>
     </div>
