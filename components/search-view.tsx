@@ -171,6 +171,24 @@ export function SearchView({
             />
             Só oportunidades
           </label>
+          {/* Com IVA dedutível o stand compra pelo líquido (o IVA da origem é
+              caução, não custo) e revende em regime normal — outra conta. */}
+          <label
+            className={cn(
+              "flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border px-3 text-sm font-medium transition-colors",
+              f.vatDeductible
+                ? "border-good bg-good-soft text-good"
+                : "border-line-strong text-ink-soft hover:text-ink",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(f.vatDeductible)}
+              onChange={(e) => aplicar({ vatDeductible: e.target.checked })}
+              className="sr-only"
+            />
+            Só IVA dedutível
+          </label>
           <button
             type="button"
             onClick={() => setShowMore((v) => !v)}
@@ -196,8 +214,8 @@ export function SearchView({
               className="h-10 rounded-[6px] border border-line-strong bg-surface px-3 text-sm"
               aria-label="Ordenar"
             >
-              <option value="savings">Maior poupança</option>
-              <option value="savingsPct">Maior poupança (%)</option>
+              <option value="margin">Maior margem</option>
+              <option value="marginPct">Maior margem (%)</option>
               <option value="recent">Mais recentes</option>
               <option value="price">Preço mais baixo</option>
             </select>

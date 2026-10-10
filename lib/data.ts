@@ -81,7 +81,11 @@ export interface SearchFilters {
   maxPrice?: number;
   fuel?: FuelType;
   gearbox?: Transmission;
-  sort?: "savings" | "savingsPct" | "recent" | "price";
+  /** Só anúncios que declaram IVA dedutível (`listings.vat_regime`). */
+  vatDeductible?: boolean;
+  /** `margin`/`marginPct` = margem bruta estimada (€ / % do preço PT); enquanto o
+   *  motor novo não preencher a margem, caem na poupança antiga (ver `ordemSql`). */
+  sort?: "margin" | "marginPct" | "recent" | "price";
   /** 1-based. Acima do teto (`MAX_PAGE` em lib/queries.ts) fica preso ao teto. */
   page?: number;
 }

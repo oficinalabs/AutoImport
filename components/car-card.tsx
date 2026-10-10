@@ -14,6 +14,19 @@ import { Heart } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
+/**
+ * "há 5 horas" — quando o anúncio foi visto pela última vez na fonte. Em horas e
+ * não em dias porque a recolha corre várias vezes ao dia, e um carro barato visto
+ * há 2 horas ou há 20 é a diferença entre ainda estar à venda ou não.
+ */
+function vistoHa(iso: string): string {
+  const horas = Math.floor((Date.now() - new Date(iso).getTime()) / 3_600_000);
+  if (horas < 1) return "há menos de 1 hora";
+  if (horas === 1) return "há 1 hora";
+  if (horas < 24) return `há ${horas} horas`;
+  return relativeDay(iso);
+}
+
 export function CarCard({ listing }: { listing: Listing }) {
   const [fav, setFav] = useState(listing.isFavorite);
   // Só chega aqui pelos favoritos: a pesquisa nunca devolve anúncios mortos.
@@ -79,6 +92,16 @@ export function CarCard({ listing }: { listing: Listing }) {
           <span>{listing.source}</span>
         </div>
 
+        {!indisponivel && (
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[11px] text-ink-soft">
+            {/* Só a hora relativa difere entre servidor e browser, e por minutos. */}
+            <span suppressHydrationWarning>Visto na fonte {vistoHa(listing.seenAt)}</span>
+            {listing.sourceVatRegime === "dedutivel" && (
+              <Badge className="bg-good-soft px-2 text-[11px] text-good">IVA dedutível</Badge>
+            )}
+          </div>
+        )}
+
         {indisponivel ? (
           <p className="text-xs text-ink-soft">
             Sem sinal {relativeDay(listing.seenAt)}. Pode ter sido vendido ou retirado.
@@ -108,6 +131,8 @@ export function CarCard({ listing }: { listing: Listing }) {
             <SavingsBadge
               savings={listing.savings}
               savingsPct={listing.savingsPct}
+              grossMargin={listing.cost.grossMargin}
+              grossMarginPct={listing.cost.grossMarginPct}
               verdict={listing.verdict}
             />
           )}

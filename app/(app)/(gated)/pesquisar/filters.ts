@@ -1,5 +1,5 @@
 /**
- * As nove chaves da pesquisa no URL — o URL é a fonte de verdade, e isto é a
+ * As dez chaves da pesquisa no URL — o URL é a fonte de verdade, e isto é a
  * fronteira onde o texto que qualquer pessoa pode escrever na barra de endereço
  * vira `SearchFilters`.
  *
@@ -8,7 +8,7 @@
  * haver um dicionário a manter entre o URL e a BD.
  *
  *   ?texto=golf&pais=DE,FR&oportunidades=1&ano=2021&km=100000
- *   &preco=30000&combustivel=diesel&caixa=manual&ordenar=savingsPct
+ *   &preco=30000&combustivel=diesel&caixa=manual&iva=dedutivel&ordenar=margin
  *
  * **Um valor inválido é ignorado, nunca rebenta a página nem vira filtro.** Um
  * `?ano=abc` ou `?pais=ZZ` tem de dar a montra, não um 500 — o URL é público e
@@ -28,7 +28,14 @@ type Sort = NonNullable<SearchFilters["sort"]>;
 const COUNTRIES: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
 const FUELS: FuelType[] = ["gasolina", "diesel", "híbrido", "phev", "elétrico"];
 const GEARBOXES: Transmission[] = ["manual", "automática"];
-const SORTS: Sort[] = ["savings", "savingsPct", "recent", "price"];
+const SORTS: Sort[] = ["margin", "marginPct", "recent", "price"];
+
+/**
+ * Os nomes antigos da ordenação, de quando o número principal era a poupança.
+ * Há links guardados (favoritos do browser, emails) com `ordenar=savings`; em vez
+ * de os deixar cair na ordem de omissão, levam à ordem que os substituiu.
+ */
+const SORTS_ANTIGOS: Record<string, Sort> = { savings: "margin", savingsPct: "marginPct" };
 
 /**
  * Ordenação por omissão — a MESMA que o servidor aplica quando não vem `?ordenar`
@@ -37,8 +44,11 @@ const SORTS: Sort[] = ["savings", "savingsPct", "recent", "price"];
  * "savings" e mostrava "Maior poupança" enquanto a lista vinha ordenada por
  * percentagem — a caixa mentia sobre a ordem ativa, escolher "Maior poupança (%)"
  * parecia não fazer nada, e escolher "Maior poupança" é que mudava a ordem.
+ *
+ * Percentagem e não euros pela mesma razão de quando era poupança: em euros o
+ * topo enche-se de supercarros, e o público são stands de usados.
  */
-export const DEFAULT_SORT: Sort = "savingsPct";
+export const DEFAULT_SORT: Sort = "marginPct";
 
 /** `?pais=DE&pais=FR` — o Next dá array; fica a primeira, que é o que o link diz. */
 function first(value: string | string[] | undefined): string | undefined {
@@ -60,6 +70,10 @@ function umDe<T extends string>(raw: string | undefined, validos: T[]): T | unde
   return validos.includes(raw as T) ? (raw as T) : undefined;
 }
 
+function ordem(raw: string | undefined): Sort | undefined {
+  return umDe(raw && Object.hasOwn(SORTS_ANTIGOS, raw) ? SORTS_ANTIGOS[raw] : raw, SORTS);
+}
+
 export function parseSearchFilters(params: SearchParams): SearchFilters {
   // Vários países num só parâmetro (`?pais=DE,FR`) em vez da chave repetida:
   // mantém compatível o `?pais=DE` que já existia e é mais fácil de ler no link.
@@ -77,7 +91,8 @@ export function parseSearchFilters(params: SearchParams): SearchFilters {
     maxPrice: inteiroPositivo(first(params.preco)),
     fuel: umDe(first(params.combustivel), FUELS),
     gearbox: umDe(first(params.caixa), GEARBOXES),
-    sort: umDe(first(params.ordenar), SORTS),
+    vatDeductible: first(params.iva) === "dedutivel",
+    sort: ordem(first(params.ordenar)),
     page: inteiroPositivo(first(params.pagina)),
   };
 }
@@ -88,7 +103,7 @@ export function parseSearchFilters(params: SearchParams): SearchFilters {
  * (components/search-view.tsx), quem o lê é o servidor, e um desalinhamento
  * entre os dois seria um filtro que se perde ao recarregar.
  *
- * O que está no valor por omissão não vai para o URL (nem `ordenar=savings`, nem
+ * O que está no valor por omissão não vai para o URL (nem `ordenar=marginPct`, nem
  * um `oportunidades=0`): links curtos, e o que lá está é o que foi escolhido.
  */
 export function searchFiltersToQuery(f: SearchFilters): string {
@@ -101,8 +116,9 @@ export function searchFiltersToQuery(f: SearchFilters): string {
   if (f.maxPrice) p.set("preco", String(f.maxPrice));
   if (f.fuel) p.set("combustivel", f.fuel);
   if (f.gearbox) p.set("caixa", f.gearbox);
-  // `savingsPct` é o default do servidor — não suja o URL. Ordenar por poupança
-  // ABSOLUTA enchia o topo de supercarros (preço médio dos 60 primeiros:
+  if (f.vatDeductible) p.set("iva", "dedutivel");
+  // `marginPct` é o default do servidor — não suja o URL. Ordenar em euros
+  // ABSOLUTOS enchia o topo de supercarros (preço médio dos 60 primeiros:
   // 147 169 €) quando 87% das oportunidades estão abaixo dos 40 000 €, e o
   // público-alvo são stands de usados.
   if (f.sort && f.sort !== DEFAULT_SORT) p.set("ordenar", f.sort);

@@ -414,8 +414,18 @@ function caixaSql(gearbox: Transmission): SQL {
 }
 
 /**
+ * O número principal do cartão, em SQL: a margem bruta quando o motor novo a
+ * calculou, a poupança antiga enquanto não (anúncios publicados antes do motor
+ * novo têm `gross_margin` a null). É o mesmo critério do `SavingsBadge`, que mostra
+ * a margem quando existe e a poupança quando não — a ordem e o cartão não podem
+ * discordar sobre qual é o número.
+ */
+const MARGEM = sql<number>`coalesce(${importCostEstimates.grossMargin}, ${importCostEstimates.savings})`;
+const MARGEM_PCT = sql<number>`coalesce(${importCostEstimates.grossMarginPct}, ${importCostEstimates.savingsPct})`;
+
+/**
  * ORDER BY com **ordem total**: sem o `id` no fim, linhas com o mesmo valor
- * (savings é inteiro em euros, repete muito) podiam trocar de posição entre
+ * (a margem é inteira em euros, repete muito) podiam trocar de posição entre
  * pedidos, e a paginação por offset saltava ou repetia carros em silêncio.
  */
 function ordemSql(sort: SearchFilters["sort"]): SQL[] {
@@ -424,9 +434,9 @@ function ordemSql(sort: SearchFilters["sort"]): SQL[] {
       ? asc(importCostEstimates.totalPt)
       : sort === "recent"
         ? desc(listings.lastSeenAt)
-        : sort === "savings"
-          ? desc(importCostEstimates.savings)
-          : desc(importCostEstimates.savingsPct);
+        : sort === "margin"
+          ? desc(MARGEM)
+          : desc(MARGEM_PCT);
   return [criterio, asc(listings.id)];
 }
 
@@ -448,6 +458,10 @@ export async function searchListingsQuery(
     conds.push(sql`coalesce(${listings.fuel}, ${vehicleModels.fuel}) = ${filters.fuel}`);
   }
   if (filters.gearbox) conds.push(caixaSql(filters.gearbox));
+  // O que o ANÚNCIO declara, não o regime aplicado na conta: esse depende do VIES
+  // do stand e, nos Países Baixos, de haver preço líquido publicado (P02). Quem
+  // filtra por "IVA dedutível" quer os vendedores que o anunciam.
+  if (filters.vatDeductible) conds.push(eq(listings.vatRegime, "dedutivel"));
 
   const page = Math.min(Math.max(filters.page ?? 1, 1), MAX_PAGE);
 
@@ -501,7 +515,8 @@ export async function topOpportunitiesQuery(
   limit: number,
   standId: string | null,
   /** `savings` para a landing, que precisa de leque largo de valores absolutos
-   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). */
+   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). A
+   *  landing continua na poupança de propósito: a página pública não muda. */
   sort: "percentagem" | "savings" = "percentagem",
 ): Promise<Listing[]> {
   const rows = await baseSelect(standId)
@@ -510,20 +525,17 @@ export async function topOpportunitiesQuery(
       and(eq(opportunities.listingId, listings.id), isNull(opportunities.deletedAt)),
     )
     .where(and(isNull(listings.deletedAt), COM_CATALOGO))
-    // Por omissão, percentagem — pela mesma razão que a pesquisa: ordenar por
-    // poupança absoluta enche o topo de supercarros, e o painel é a primeira
-    // coisa que um stand de usados vê de manhã. Os KPIs em euros ao lado
-    // continuam a apontar para `ordenar=savings`, que é o que os explica.
+    // Por omissão, margem em percentagem — pela mesma razão que a pesquisa:
+    // ordenar em euros absolutos enche o topo de supercarros, e o painel é a
+    // primeira coisa que um stand de usados vê de manhã. Os KPIs em euros ao lado
+    // apontam para `ordenar=margin`, que é o que os explica.
     //
     // A percentagem vem de `import_cost_estimates`, não da cópia em
     // `opportunities`: é o mesmo valor por que a pesquisa ordena, e o painel e a
     // pesquisa a discordarem sobre qual é o melhor negócio do dia seria pior do
     // que qualquer das duas ordens. A cópia em `opportunities` é um instantâneo
     // do último `flag-opportunities` e envelhece entre corridas.
-    .orderBy(
-      sort === "savings" ? desc(opportunities.savings) : desc(importCostEstimates.savingsPct),
-      asc(listings.id),
-    )
+    .orderBy(sort === "savings" ? desc(opportunities.savings) : desc(MARGEM_PCT), asc(listings.id))
     .limit(limit);
   return rows.map((r) => toListing(r));
 }
@@ -531,6 +543,8 @@ export async function topOpportunitiesQuery(
 export interface DashboardCounts {
   activeOpportunities: number;
   newThisWeek: number;
+  /** Mediana do número principal (margem bruta; poupança enquanto o motor novo
+   *  não a calcular — ver `MARGEM`). O nome fica o do `DashboardStats`. */
   medianSavings: number;
   bestSavings: number;
 }
@@ -543,9 +557,12 @@ export interface DashboardCounts {
  * esse filtro aqui).
  *
  * `totalPotentialSavings` (soma de tudo) saiu: era dinheiro de fantasia — ninguém
- * compra todas as oportunidades ao mesmo tempo. Em vez disso, `medianSavings` dá
- * a poupança típica de UMA compra (resistente a outliers) e `bestSavings` mostra
- * o topo do momento.
+ * compra todas as oportunidades ao mesmo tempo. Em vez disso, a mediana dá a
+ * margem típica de UMA compra (resistente a outliers) e o máximo mostra o topo
+ * do momento.
+ *
+ * A margem vem de `import_cost_estimates` (a cópia em `opportunities` só tem a
+ * poupança): é o mesmo número que o cartão mostra e por que a pesquisa ordena.
  *
  * `opportunities` são globais — standId não entra aqui de propósito: uma
  * oportunidade compensa independentemente de qual stand a está a ver.
@@ -555,11 +572,13 @@ export async function dashboardCountsQuery(): Promise<DashboardCounts> {
     .select({
       active: sql<number>`count(*)::int`,
       newWeek: sql<number>`count(*) filter (where ${opportunities.flaggedAt} > now() - interval '7 days')::int`,
-      median: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${opportunities.savings}), 0)::int`,
-      best: sql<number>`coalesce(max(${opportunities.savings}), 0)::int`,
+      median: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${MARGEM}), 0)::int`,
+      best: sql<number>`coalesce(max(${MARGEM}), 0)::int`,
     })
     .from(opportunities)
     .innerJoin(listings, eq(listings.id, opportunities.listingId))
+    // left: a contagem é das oportunidades; a estimativa só dá a margem.
+    .leftJoin(importCostEstimates, J_ESTIMATE)
     .where(and(isNull(opportunities.deletedAt), isNull(listings.deletedAt)));
   return {
     activeOpportunities: row.active,
