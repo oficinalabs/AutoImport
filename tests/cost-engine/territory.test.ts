@@ -67,3 +67,38 @@ test("país nulo ou não-ES → nunca excluído", () => {
   assert.equal(isExcludedTerritory(null, "Las Palmas", "35001"), false);
   assert.equal(isExcludedTerritory("FR", null, "07001"), false);
 });
+
+// ── Fora do território IVA da UE e Córsega (P02) ─────────────────
+
+test("Ceuta (51) e Melilla (52) → excluídos, por CP e por região", () => {
+  assert.equal(isExcludedTerritory("ES", null, "51001"), true);
+  assert.equal(isExcludedTerritory("ES", null, "52001"), true);
+  assert.equal(isExcludedTerritory("ES", "Ceuta", null), true);
+  assert.equal(isExcludedTerritory("ES", "Melilla", null), true);
+});
+
+test("DOM franceses (971–976) → excluídos", () => {
+  for (const cp of ["97110", "97200", "97300", "97400", "97600"]) {
+    assert.equal(isExcludedTerritory("FR", null, cp), true, cp);
+  }
+  assert.equal(isExcludedTerritory("FR", "Guadeloupe", null), true);
+  assert.equal(isExcludedTerritory("FR", "La Réunion", null), true);
+});
+
+test("Córsega (20xxx, 2A/2B) → excluída", () => {
+  assert.equal(isExcludedTerritory("FR", null, "20000"), true);
+  assert.equal(isExcludedTerritory("FR", null, "20200"), true);
+  assert.equal(isExcludedTerritory("FR", null, "2A"), true);
+  assert.equal(isExcludedTerritory("FR", "Haute-Corse", null), true);
+});
+
+test("França continental → incluída", () => {
+  assert.equal(isExcludedTerritory("FR", "Île-de-France", "75008"), false);
+  assert.equal(isExcludedTerritory("FR", null, "13001"), false);
+  assert.equal(isExcludedTerritory("FR", null, null), false);
+});
+
+test("CP 51/52 fora de Espanha não é Ceuta/Melilla", () => {
+  assert.equal(isExcludedTerritory("DE", null, "52062"), false); // Aachen
+  assert.equal(isExcludedTerritory("FR", null, "51100"), false); // Reims
+});
