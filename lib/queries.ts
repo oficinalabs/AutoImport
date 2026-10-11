@@ -42,7 +42,7 @@ import type { SearchFilters, SearchResults } from "./data";
 import { carIdentitySql } from "./engine/car-identity";
 import { ptPriceHistory } from "./engine/pt-market";
 import { CONDICOES } from "./legal";
-import { estadoEfetivo } from "./subscription";
+import { estadoEfetivo, temAcessoVitalicio } from "./subscription";
 import type {
   Alert,
   AlertModelOption,
@@ -838,9 +838,12 @@ export async function getStandQuery(standId: string): Promise<Stand | null> {
   fimDoTrial.setDate(fimDoTrial.getDate() + CONDICOES.trialDias);
 
   const fimDoPeriodo = sub ? (sub.currentPeriodEnd ?? fimDoTrial) : fimDoTrial;
-  const estado = sub
-    ? estadoEfetivo(sub.status as SubscriptionStatus, sub.currentPeriodEnd)
-    : estadoEfetivo("trial", fimDoTrial);
+  const vitalicio = temAcessoVitalicio(rows.filter((r) => r.role === "owner").map((r) => r.email));
+  const estado: SubscriptionStatus = vitalicio
+    ? "ativa"
+    : sub
+      ? estadoEfetivo(sub.status as SubscriptionStatus, sub.currentPeriodEnd)
+      : estadoEfetivo("trial", fimDoTrial);
 
   return {
     id: org.id,
