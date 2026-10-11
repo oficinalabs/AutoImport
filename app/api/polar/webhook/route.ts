@@ -12,10 +12,10 @@
  * a cadeia de codificações do segredo estão em lib/polar-webhook.ts. Se a
  * verificação falhar na sandbox, é aí que se olha.
  *
- * O que este ficheiro NÃO faz (de propósito, não por esquecimento): não cria
- * checkouts nem abre o portal de faturação. Isso precisa do POLAR_ACCESS_TOKEN
- * e de produtos criados do lado deles; enquanto não existirem, o botão "Gerir
- * subscrição" em /stand fica honestamente desativado.
+ * O checkout e o portal vivem ao lado (app/api/polar/{checkout,portal}). O
+ * checkout põe `metadata.stand_id` e `external_customer_id = standId`, que são
+ * os dois caminhos de `standIdDe`. Este ficheiro continua a ser o único que
+ * escreve em `subscriptions`.
  */
 import { db } from "@/db";
 import { organization, subscriptions } from "@/db/schema";
