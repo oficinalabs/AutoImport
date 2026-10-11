@@ -1,10 +1,17 @@
 import { AccountForm } from "@/components/account-form";
+import { StandCostsForm } from "@/components/stand-costs-form";
 import { StandForm } from "@/components/stand-form";
 import { SubscriptionActions } from "@/components/subscription-actions";
 import { TeamCard } from "@/components/team-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { polarConfig } from "@/lib/billing";
-import { getPendingInvites, getSessionUser, getStand, getStandRole } from "@/lib/data";
+import {
+  getPendingInvites,
+  getSessionUser,
+  getStand,
+  getStandCosts,
+  getStandRole,
+} from "@/lib/data";
 import { formatDate, formatEuroCents } from "@/lib/format";
 import type { SubscriptionStatus } from "@/lib/types";
 
@@ -39,11 +46,12 @@ const SUB_LABEL: Record<SubscriptionStatus, { label: string; className: string; 
 };
 
 export default async function StandPage() {
-  const [stand, role, utilizador, invites] = await Promise.all([
+  const [stand, role, utilizador, invites, custos] = await Promise.all([
     getStand(),
     getStandRole(),
     getSessionUser(),
     getPendingInvites(),
+    getStandCosts(),
   ]);
 
   // Só acontece com sessão inválida (a rota é protegida) — estado honesto.
@@ -81,6 +89,13 @@ export default async function StandPage() {
           <Card>
             <CardContent className="pt-6">
               <StandForm stand={stand} canEdit={isOwner} />
+            </CardContent>
+          </Card>
+
+          {/* Os teus custos (P09) */}
+          <Card>
+            <CardContent className="pt-6">
+              <StandCostsForm settings={custos} canEdit={isOwner} />
             </CardContent>
           </Card>
 

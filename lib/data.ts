@@ -19,6 +19,8 @@ import { cache } from "react";
 import { auth } from "./auth";
 import * as inv from "./invites";
 import * as q from "./queries";
+import { type ListingWithStandCosts, type StandCostSettings, applyStandCosts } from "./stand-costs";
+import { getStandCostsQuery, saveStandCostsAsOwner } from "./stand-costs-queries";
 import { checkStandFields } from "./stand-fields";
 import type {
   Alert,
@@ -60,6 +62,29 @@ const activeStandId = cache(async (): Promise<string | null> => {
     return null;
   }
 });
+
+/**
+ * Custos próprios do stand da sessão (P09); null sem sessão ou sem definições.
+ * Memoizado por pedido como o `activeStandId`: uma página que lê anúncios e o
+ * cartão do stand pede-os uma vez só. Se a leitura falhar, a app mostra os
+ * números publicados em vez de rebentar — são a conta média, não uma mentira.
+ */
+const standCostsCached = cache(async (): Promise<StandCostSettings | null> => {
+  const standId = await activeStandId();
+  if (!standId) return null;
+  try {
+    return await getStandCostsQuery(standId);
+  } catch (error) {
+    console.error("[custos do stand] falha a ler:", error);
+    return null;
+  }
+});
+
+/** Aplica os custos do stand a uma lista de anúncios (recálculo à leitura). */
+async function comCustosDoStand(list: Listing[]): Promise<ListingWithStandCosts[]> {
+  const settings = await standCostsCached();
+  return settings ? list.map((l) => applyStandCosts(l, settings)) : list;
+}
 
 // ── Pesquisa / anúncios ─────────────────────────────────────────
 /**
@@ -107,16 +132,23 @@ export interface SearchResults {
   hasMore: boolean;
 }
 
+/**
+ * Com custos próprios, os números de cada cartão são os do stand, mas a ordem e
+ * os filtros por margem continuam pela margem PUBLICADA (o recálculo é à
+ * leitura, não republica a montra). A pesquisa di-lo em texto pequeno.
+ */
 export async function searchListings(filters: SearchFilters = {}): Promise<SearchResults> {
-  return q.searchListingsQuery(filters, await activeStandId());
+  const results = await q.searchListingsQuery(filters, await activeStandId());
+  return { ...results, listings: await comCustosDoStand(results.listings) };
 }
 
-export async function getListing(id: string): Promise<Listing | null> {
-  return q.getListingQuery(id, await activeStandId());
+export async function getListing(id: string): Promise<ListingWithStandCosts | null> {
+  const listing = await q.getListingQuery(id, await activeStandId());
+  return listing ? (await comCustosDoStand([listing]))[0] : null;
 }
 
-export async function getListingsByIds(ids: string[]): Promise<Listing[]> {
-  return q.getListingsByIdsQuery(ids, await activeStandId());
+export async function getListingsByIds(ids: string[]): Promise<ListingWithStandCosts[]> {
+  return comCustosDoStand(await q.getListingsByIdsQuery(ids, await activeStandId()));
 }
 
 // ── Landing (público, sem sessão) ───────────────────────────────
@@ -253,8 +285,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   return q.dashboardCountsQuery();
 }
 
-export async function getTopOpportunities(limit = 4): Promise<Listing[]> {
-  return q.topOpportunitiesQuery(limit, await activeStandId());
+export async function getTopOpportunities(limit = 4): Promise<ListingWithStandCosts[]> {
+  return comCustosDoStand(await q.topOpportunitiesQuery(limit, await activeStandId()));
 }
 
 export async function getCountryInsights(): Promise<CountryInsight[]> {
@@ -262,9 +294,9 @@ export async function getCountryInsights(): Promise<CountryInsight[]> {
 }
 
 // ── Favoritos ───────────────────────────────────────────────────
-export async function getFavorites(): Promise<Listing[]> {
+export async function getFavorites(): Promise<ListingWithStandCosts[]> {
   const standId = await activeStandId();
-  return standId ? q.favoritesQuery(standId) : [];
+  return standId ? comCustosDoStand(await q.favoritesQuery(standId)) : [];
 }
 
 export async function toggleFavorite(id: string): Promise<void> {
@@ -362,6 +394,39 @@ const standCached = cache(async (): Promise<Stand | null> => {
 /** O stand da sessão, ou null se não houver sessão/organização. */
 export async function getStand(): Promise<Stand | null> {
   return standCached();
+}
+
+// ── Custos do stand (P09) ───────────────────────────────────────
+/** Os custos próprios do stand da sessão; null = usa as médias. */
+export async function getStandCosts(): Promise<StandCostSettings | null> {
+  return standCostsCached();
+}
+
+/**
+ * Grava os custos próprios do stand. Server Action — chamada do cartão "Os teus
+ * custos" em /stand. Mesmo padrão de `updateStand`: o standId vem da SESSÃO,
+ * só o dono grava, e os valores são validados no servidor (`saveStandCostsAsOwner`).
+ */
+export async function updateStandCosts(input: unknown): Promise<UpdateStandResult> {
+  if (!hasDb()) return { ok: false, error: "Base de dados indisponível." };
+
+  const standId = await activeStandId();
+  if (!standId) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user) return { ok: false, error: "Sessão inválida. Entra outra vez." };
+
+    const result = await saveStandCostsAsOwner(standId, session.user.id, input);
+    if (!result.ok) return result;
+    // Os números mudam em todas as páginas que mostram contas.
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (error) {
+    // Nunca devolver o erro cru ao cliente (pode trazer SQL/tabelas) — ver CLAUDE.md.
+    console.error("[custos do stand] falha ao gravar:", error);
+    return { ok: false, error: "Não foi possível gravar. Tenta outra vez." };
+  }
 }
 
 // ── Equipa / convites ───────────────────────────────────────────
