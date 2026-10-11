@@ -130,6 +130,8 @@ const CARROS: [string, Record<string, unknown>][] = [
       country: "FR",
       price: 16_000,
       us_version_id: null,
+      // o único que anuncia IVA dedutível ("TVA récupérable")
+      vat_regime: "dedutivel",
     },
   ],
   [
@@ -276,7 +278,9 @@ test("pesquisa no servidor: filtros, texto livre e total", async (t) => {
     return;
   }
 
-  const { searchListingsQuery } = await import("../../lib/queries");
+  const { searchListingsQuery, dashboardCountsQuery, topOpportunitiesQuery } = await import(
+    "../../lib/queries"
+  );
   const porId = new Map(
     (await sql<{ id: string; external_id: string }[]>`select id, external_id from listings`).map(
       (r) => [r.id, r.external_id],
@@ -407,6 +411,87 @@ test("pesquisa no servidor: filtros, texto livre e total", async (t) => {
       const { ext, total } = await pesquisar({ query: "%" });
       assert.deepEqual(ext, []);
       assert.equal(total, 0);
+    });
+
+    await t.test("só IVA dedutível isola o que o anuncia", async () => {
+      const { ext, total } = await pesquisar({ vatDeductible: true });
+      assert.deepEqual(ext, ["s-diesel"]);
+      assert.equal(total, 1);
+      const { res } = await pesquisar({ vatDeductible: true });
+      assert.equal(res.listings[0].sourceVatRegime, "dedutivel");
+    });
+
+    await t.test("sem margem calculada, a ordem por margem cai na poupança", async () => {
+      // Antes do motor novo `gross_margin` está a null em todas as linhas: a
+      // pesquisa tem de continuar a ordenar como ordenava, não ao acaso.
+      const porPct = await pesquisar({ sort: "marginPct" });
+      const porEuros = await pesquisar({ sort: "margin" });
+      assert.deepEqual(porPct.ext.slice(0, 4), [
+        "s-catalogo",
+        "s-diesel",
+        "s-hibrido",
+        "s-eletrico",
+      ]);
+      assert.deepEqual(porEuros.ext.slice(0, 4), [
+        "s-catalogo",
+        "s-diesel",
+        "s-hibrido",
+        "s-eletrico",
+      ]);
+      assert.equal(porPct.res.listings[0].cost.grossMargin, undefined);
+    });
+
+    // A partir daqui as estimativas dos quatro visíveis têm margem (o motor novo
+    // correu). A ordem por margem tem de discordar da ordem por poupança de
+    // propósito — senão a asserção não provava nada. O enchimento fica sem margem
+    // (cai na poupança, 10–69 €) e por isso continua no fundo.
+    const MARGENS: Record<string, [number, number]> = {
+      "s-catalogo": [1_000, 4],
+      "s-diesel": [6_000, 15],
+      "s-hibrido": [3_000, 20],
+      "s-eletrico": [500, 2],
+    };
+    for (const [ext, [margem, pct]] of Object.entries(MARGENS)) {
+      await sql`
+        update import_cost_estimates e
+        set gross_margin = ${margem}, gross_margin_pct = ${pct}, origin_price_net = l.price
+        from listings l
+        where l.id = e.listing_id and l.external_id = ${ext}
+      `;
+    }
+
+    await t.test("ordenar por margem (€) usa a margem bruta, não a poupança", async () => {
+      const { ext } = await pesquisar({ sort: "margin" });
+      assert.deepEqual(ext.slice(0, 4), ["s-diesel", "s-hibrido", "s-catalogo", "s-eletrico"]);
+    });
+
+    await t.test("por omissão, margem em percentagem", async () => {
+      const { ext, res } = await pesquisar({});
+      assert.deepEqual(ext.slice(0, 4), ["s-hibrido", "s-diesel", "s-catalogo", "s-eletrico"]);
+      assert.equal(res.listings[0].cost.grossMargin, 3_000, "o cartão recebe a margem");
+      assert.equal(res.listings[0].cost.grossMarginPct, 20);
+    });
+
+    await t.test("painel: KPIs e topo em margem", async () => {
+      // Oportunidades: as duas que "compensam" (s-catalogo e s-hibrido), com a
+      // poupança copiada como o flag-opportunities a copia.
+      await sql`
+        insert into opportunities (listing_id, savings, savings_pct)
+        select e.listing_id, e.savings, e.savings_pct
+        from import_cost_estimates e join listings l on l.id = e.listing_id
+        where l.external_id in ('s-catalogo', 's-hibrido')
+      `;
+      const kpis = await dashboardCountsQuery();
+      assert.equal(kpis.activeOpportunities, 2);
+      assert.equal(kpis.bestSavings, 3_000, "a melhor margem, não a melhor poupança (5 000)");
+      assert.equal(kpis.medianSavings, 2_000, "mediana de 1 000 e 3 000");
+
+      const topo = await topOpportunitiesQuery(3, null);
+      assert.deepEqual(
+        topo.map((l) => porId.get(l.id)),
+        ["s-hibrido", "s-catalogo"],
+        "o painel ordena pela mesma margem (%) que a pesquisa",
+      );
     });
   } finally {
     const { closeDb } = await import("../../db");

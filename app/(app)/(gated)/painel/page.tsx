@@ -1,5 +1,6 @@
 import { CarCard } from "@/components/car-card";
 import { CountryInsights } from "@/components/country-insights";
+import { numeroPrincipal } from "@/components/savings-badge";
 import { StatCard } from "@/components/stat-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +31,10 @@ export default async function PainelPage() {
     getCountryInsights(),
     getSessionUser(),
   ]);
+  // Os KPIs são margem quando o motor novo já a calculou e poupança enquanto não
+  // (o mesmo `coalesce` da query). Os anúncios da montra são recalculados todos
+  // de uma vez, por isso as oportunidades do topo dizem qual dos dois é.
+  const emMargem = opportunities.some((l) => numeroPrincipal(l).kind === "margem");
 
   return (
     <div className="flex flex-col gap-8">
@@ -60,17 +65,17 @@ export default async function PainelPage() {
           href="/pesquisar?oportunidades=1&ordenar=recent"
         />
         <StatCard
-          label="Poupança típica"
+          label={emMargem ? "Margem típica" : "Poupança típica"}
           value={formatEuro(stats.medianSavings)}
           icon={PiggyBank}
           accent
-          href="/pesquisar?oportunidades=1&ordenar=savings"
+          href="/pesquisar?oportunidades=1&ordenar=margin"
         />
         <StatCard
-          label="Melhor agora"
+          label={emMargem ? "Melhor margem" : "Melhor agora"}
           value={formatEuro(stats.bestSavings)}
           icon={Award}
-          href="/pesquisar?oportunidades=1&ordenar=savings"
+          href="/pesquisar?oportunidades=1&ordenar=margin"
         />
       </div>
 

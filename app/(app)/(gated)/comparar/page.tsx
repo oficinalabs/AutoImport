@@ -1,5 +1,6 @@
 import { CarImage } from "@/components/car-image";
 import { CountryFlag } from "@/components/country-flag";
+import { numeroPrincipal } from "@/components/savings-badge";
 import { VerdictBadge } from "@/components/verdict-badge";
 import { getListingsByIds } from "@/lib/data";
 import { formatEuro, formatKm, formatPercent } from "@/lib/format";
@@ -42,7 +43,12 @@ export default async function CompararPage({
     );
   }
 
-  const bestSavings = Math.max(...list.map((l) => l.savings));
+  // O vencedor é o de maior margem (poupança nos anúncios que o motor novo
+  // ainda não calculou — o mesmo número que o cartão mostra).
+  const numeros = new Map(list.map((l) => [l.id, numeroPrincipal(l)]));
+  const melhor = Math.max(...list.map((l) => numeros.get(l.id)?.value ?? 0));
+  const ganha = (l: Listing) => numeros.get(l.id)?.value === melhor;
+  const emMargem = [...numeros.values()].some((n) => n.kind === "margem");
 
   return (
     <div className="flex flex-col gap-5">
@@ -62,7 +68,7 @@ export default async function CompararPage({
             <tr>
               <th className="sticky left-0 bg-surface-2 p-3 text-left align-bottom" />
               {list.map((l) => {
-                const winner = l.savings === bestSavings;
+                const winner = ganha(l);
                 return (
                   <th
                     key={l.id}
@@ -100,7 +106,7 @@ export default async function CompararPage({
                     className={cn(
                       "p-3",
                       row.highlight ? "tnum font-mono font-semibold" : "",
-                      l.savings === bestSavings && "bg-good-soft/40",
+                      ganha(l) && "bg-good-soft/40",
                     )}
                   >
                     {row.label === "País" ? <CountryFlag code={l.country} /> : row.get(l)}
@@ -108,31 +114,38 @@ export default async function CompararPage({
                 ))}
               </tr>
             ))}
-            {/* Poupança */}
+            {/* Margem (ou poupança, antes do motor novo) */}
             <tr className="border-t border-line">
-              <td className="sticky left-0 bg-surface p-3 text-ink-soft">Poupança</td>
-              {list.map((l) => (
-                <td
-                  key={l.id}
-                  className={cn("p-3", l.savings === bestSavings && "bg-good-soft/40")}
-                >
-                  <span className="tnum font-mono font-bold text-good">
-                    −{formatEuro(l.savings)}
-                  </span>
-                  <span className="ml-1 text-xs text-ink-soft">
-                    {formatPercent(l.savingsPct, false)}
-                  </span>
-                </td>
-              ))}
+              <td className="sticky left-0 bg-surface p-3 text-ink-soft">
+                {emMargem ? "Margem estimada" : "Poupança"}
+              </td>
+              {list.map((l) => {
+                const n = numeros.get(l.id) ?? numeroPrincipal(l);
+                return (
+                  <td key={l.id} className={cn("p-3", ganha(l) && "bg-good-soft/40")}>
+                    {/* Sem sinal quando é a favor: "−" lia-se como prejuízo. */}
+                    <span
+                      className={cn(
+                        "tnum font-mono font-bold",
+                        n.value > 0 ? "text-good" : "text-bad",
+                      )}
+                    >
+                      {n.value > 0 ? "" : "−"}
+                      {formatEuro(Math.abs(n.value))}
+                    </span>
+                    <span className="ml-1 text-xs text-ink-soft">
+                      {formatPercent(Math.abs(n.pct), false)}
+                      {emMargem && n.kind === "poupanca" && " poupança"}
+                    </span>
+                  </td>
+                );
+              })}
             </tr>
             {/* Veredito */}
             <tr className="border-t border-line">
               <td className="sticky left-0 bg-surface p-3 text-ink-soft">Veredito</td>
               {list.map((l) => (
-                <td
-                  key={l.id}
-                  className={cn("p-3", l.savings === bestSavings && "bg-good-soft/40")}
-                >
+                <td key={l.id} className={cn("p-3", ganha(l) && "bg-good-soft/40")}>
                   <VerdictBadge verdict={l.verdict} />
                 </td>
               ))}

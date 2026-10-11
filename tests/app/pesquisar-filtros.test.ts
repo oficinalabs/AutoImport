@@ -1,5 +1,5 @@
 /**
- * As nove chaves de `/pesquisar` no URL — a fronteira entre o que qualquer
+ * As dez chaves de `/pesquisar` no URL — a fronteira entre o que qualquer
  * pessoa pode escrever na barra de endereço e o `SearchFilters` que vai para a
  * query. Função pura, sem Next e sem base de dados: dá para testar a sério e
  * barato, ao contrário do resto da página.
@@ -33,15 +33,16 @@ test("URL vazio não filtra nada", () => {
     maxPrice: undefined,
     fuel: undefined,
     gearbox: undefined,
+    vatDeductible: false,
     sort: undefined,
   });
 });
 
-test("os nove filtros vêm do URL", () => {
+test("os dez filtros vêm do URL", () => {
   const f = parseSearchFilters(
     params(
       "texto=golf+gti&pais=DE,FR&oportunidades=1&ano=2021&km=100000" +
-        "&preco=30000&combustivel=diesel&caixa=manual&ordenar=savingsPct",
+        "&preco=30000&combustivel=diesel&caixa=manual&iva=dedutivel&ordenar=margin",
     ),
   );
   assert.deepEqual(f, {
@@ -54,7 +55,8 @@ test("os nove filtros vêm do URL", () => {
     maxPrice: 30_000,
     fuel: "diesel",
     gearbox: "manual",
-    sort: "savingsPct",
+    vatDeductible: true,
+    sort: "margin",
   });
 });
 
@@ -63,7 +65,7 @@ test("valores inválidos são ignorados, não rebentam nem filtram", () => {
   const f = parseSearchFilters(
     params(
       "texto=+++&pais=ZZ,XX&oportunidades=talvez&ano=abc&km=-1" +
-        "&preco=0&combustivel=nuclear&caixa=cvt&ordenar=drop+table",
+        "&preco=0&combustivel=nuclear&caixa=cvt&iva=sim&ordenar=drop+table",
     ),
   );
   assert.deepEqual(f, {
@@ -76,6 +78,7 @@ test("valores inválidos são ignorados, não rebentam nem filtram", () => {
     maxPrice: undefined,
     fuel: undefined,
     gearbox: undefined,
+    vatDeductible: false,
     sort: undefined,
   });
 });
@@ -102,7 +105,17 @@ test("os links do painel continuam a dizer o que diziam", () => {
   assert.equal(opps.sort, undefined, "sem ordenar no link, a ordenação é a de omissão");
 
   assert.equal(parseSearchFilters(params("oportunidades=1&ordenar=recent")).sort, "recent");
-  assert.equal(parseSearchFilters(params("oportunidades=1&ordenar=savings")).sort, "savings");
+  assert.equal(parseSearchFilters(params("oportunidades=1&ordenar=margin")).sort, "margin");
+});
+
+test("links antigos com ordenar=savings levam à ordem por margem que a substituiu", () => {
+  // Antes da margem, o número principal era a poupança. Links guardados com os
+  // nomes antigos não podem cair na ordem de omissão sem aviso.
+  assert.equal(parseSearchFilters(params("ordenar=savings")).sort, "margin");
+  assert.equal(parseSearchFilters(params("ordenar=savingsPct")).sort, "marginPct");
+  // Só os dois nomes antigos — o resto do Object.prototype não é ordenação.
+  assert.equal(parseSearchFilters(params("ordenar=constructor")).sort, undefined);
+  assert.equal(parseSearchFilters(params("ordenar=toString")).sort, undefined);
 });
 
 test("ida e volta: o que o cliente escreve no URL é o que o servidor lê", () => {
@@ -113,6 +126,7 @@ test("ida e volta: o que o cliente escreve no URL é o que o servidor lê", () =
     { minYear: 2022, maxKm: 60_000, maxPrice: 40_000 },
     { fuel: "elétrico", gearbox: "automática" },
     { fuel: "híbrido", sort: "price", countries: ["ES"] },
+    { vatDeductible: true, sort: "margin" },
   ];
   for (const original of casos) {
     const lido = parseSearchFilters(params(searchFiltersToQuery(original)));
@@ -127,14 +141,16 @@ test("ida e volta: o que o cliente escreve no URL é o que o servidor lê", () =
 });
 
 test("o valor de omissão não vai para o URL — links curtos", () => {
-  // O default passou a ser `savingsPct`: ordenar por poupança ABSOLUTA punha
+  // O default é a margem em percentagem: ordenar em euros ABSOLUTOS punha
   // supercarros no topo (preço médio dos 60 primeiros: 147 169 €) quando 87%
-  // das oportunidades estão abaixo dos 40 000 €. `savings` continua a existir —
+  // das oportunidades estão abaixo dos 40 000 €. `margin` continua a existir —
   // é para lá que apontam os KPIs do painel, que são em euros.
-  assert.equal(searchFiltersToQuery({ sort: "savingsPct" }), "");
+  assert.equal(searchFiltersToQuery({ sort: "marginPct" }), "");
   assert.equal(searchFiltersToQuery({ onlyOpportunities: false }), "");
+  assert.equal(searchFiltersToQuery({ vatDeductible: false }), "");
+  assert.equal(searchFiltersToQuery({ vatDeductible: true }), "iva=dedutivel");
   assert.equal(searchFiltersToQuery({ sort: "recent" }), "ordenar=recent");
-  assert.equal(searchFiltersToQuery({ sort: "savings" }), "ordenar=savings");
+  assert.equal(searchFiltersToQuery({ sort: "margin" }), "ordenar=margin");
   // A página 1 também não suja o URL.
   assert.equal(searchFiltersToQuery({ page: 1 }), "");
   assert.equal(searchFiltersToQuery({ page: 3 }), "pagina=3");
@@ -143,11 +159,11 @@ test("o valor de omissão não vai para o URL — links curtos", () => {
 test("DEFAULT_SORT é o que o servidor faz sem `?ordenar` — e não suja o URL", () => {
   // O invariante que amarra os dois lados: a ordenação por omissão é a MESMA no
   // `select` do search-view, no serializador do URL e no `orderBy` do lib/queries
-  // (o `else` final, savingsPct). Divergiram uma vez — o dropdown dizia "Maior
+  // (o `else` final, marginPct). Divergiram uma vez — o dropdown dizia "Maior
   // poupança" com a lista ordenada por percentagem — e este teste é o que impede
   // que voltem a divergir sem alguém dar por isso.
-  assert.equal(DEFAULT_SORT, "savingsPct");
+  assert.equal(DEFAULT_SORT, "marginPct");
   assert.equal(searchFiltersToQuery({ sort: DEFAULT_SORT }), "");
   // Qualquer OUTRA ordenação tem de ficar explícita no URL.
-  assert.equal(searchFiltersToQuery({ sort: "savings" }), "ordenar=savings");
+  assert.equal(searchFiltersToQuery({ sort: "margin" }), "ordenar=margin");
 });
