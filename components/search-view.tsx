@@ -26,11 +26,14 @@ const DEBOUNCE_TEXTO_MS = 400;
 export function SearchView({
   results,
   filters,
+  standCosts = false,
 }: {
   /** A página que o servidor mandou, já filtrada e ordenada, com o total real. */
   results: SearchResults;
   /** O que o URL diz. É a fonte de verdade; os controlos são o espelho dele. */
   filters: SearchFilters;
+  /** O stand tem custos próprios (P09): os números são dele, a ordem é a publicada. */
+  standCosts?: boolean;
 }) {
   const { listings, total, page, pageSize, hasMore } = results;
   const router = useRouter();
@@ -142,6 +145,11 @@ export function SearchView({
             )}{" "}
             · custo final já com ISV
           </p>
+          {standCosts && (
+            <p className="mt-0.5 text-xs text-ink-soft" data-testid="custos-do-stand">
+              Os números usam os teus custos. A ordem e os filtros de margem seguem a conta média.
+            </p>
+          )}
         </div>
       </div>
 
