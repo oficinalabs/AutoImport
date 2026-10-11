@@ -6,6 +6,8 @@
  * Onlogisch ou Geen oordeel. Os coletores NL guardam a matrícula (`listings.plate`) quando
  * o anúncio a mostra; este script consulta a RDW e grava `listings.km_check`.
  *   pnpm exec tsx scripts/pipeline/enrich-nl-rdw.ts [--limit N]
+ * Corre todos os dias no `run-daily` (passo 5, antes do compute-costs, com o limite
+ * RDW_DAILY_LIMIT); à mão só para recuperar atrasos.
  *
  * Fonte: https://opendata.rdw.nl/resource/m9d7-ebf2.json (Gekentekende voertuigen; estudo
  * NL §6.1 e §7.2, 10/10/2026). Sem chave; ritmo baixo de propósito.

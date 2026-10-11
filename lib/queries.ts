@@ -50,6 +50,9 @@ import type {
   CountryCode,
   CountryInsight,
   FuelType,
+  IsvParts,
+  KmCheck,
+  KmTrust,
   Listing,
   Notification,
   PtComparable,
@@ -138,6 +141,29 @@ function ptSampleFrom(rows: PtSampleRow[] | null): PtComparable[] | undefined {
     source: r.s,
     url: r.u,
   }));
+}
+
+/** `inputs.isv` da estimativa → parcelas do ISV. As estimativas publicadas antes de o
+ * publish levar o `inputs` não o têm, e aí a ficha mostra só os dados e as regras. */
+function isvPartsFrom(inputs: unknown): IsvParts | undefined {
+  const isv = (inputs as { isv?: Partial<IsvParts> } | null)?.isv;
+  if (typeof isv?.cilindrada !== "number" || typeof isv.ambiental !== "number") return undefined;
+  return {
+    cilindrada: isv.cilindrada,
+    ambiental: isv.ambiental,
+    agravamentoDiesel: isv.agravamentoDiesel ?? 0,
+    taxaPct: isv.taxaPct ?? 100,
+    reducaoPct: isv.reducaoPct ?? 0,
+    norm: isv.norm ?? "n/a",
+    assumptions: isv.assumptions ?? [],
+  };
+}
+
+/** Selo de km: "verificado" só quando um registo oficial disse que os km batem certo.
+ * Sem isso, mantém-se a regra do VIN (ver o comentário em `rowToListing`). */
+function kmTrustFrom(vin: string | null, kmCheck: KmCheck | null): KmTrust {
+  if (kmCheck?.verdict === "coerente") return { level: "verificado", source: kmCheck.source };
+  return vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" };
 }
 
 function rowToListing(
@@ -236,11 +262,13 @@ function rowToListing(
     // "Histórico disponível · VIN" sobre um carro sem VIN nenhum. Mentir é pior do
     // que o ruído que isto tem hoje. VIN real só virá de uma fonte que o publique
     // (ou de carVertical/autoDNA) — ver MVP.md P1-3.
-    kmTrust: l.vin ? { level: "disponivel", source: "VIN" } : { level: "por_verificar" },
+    kmTrust: kmTrustFrom(l.vin, l.kmCheck),
     seenAt: l.lastSeenAt.toISOString(),
     isFavorite,
     sourceVatRegime: (l.vatRegime as SourceVatRegime | null) ?? undefined,
     ptSample: ptSampleFrom(e.ptSample),
+    isvParts: isvPartsFrom(e.inputs),
+    kmCheck: l.kmCheck ?? undefined,
     unavailableSince: l.deletedAt?.toISOString(),
   };
 }

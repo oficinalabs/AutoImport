@@ -71,6 +71,26 @@ export interface KmCheck {
   checkedAt: string;
 }
 
+/**
+ * As parcelas do ISV como o motor as calculou (`import_cost_estimates.inputs.isv`,
+ * o único pedaço do `inputs` que a publicação leva para a base da app).
+ */
+export interface IsvParts {
+  /** componente cilindrada, antes da taxa intermédia e da redução */
+  cilindrada: number;
+  /** componente ambiental (CO₂), antes da taxa intermédia e da redução */
+  ambiental: number;
+  agravamentoDiesel: number;
+  /** % da taxa intermédia (100 = taxa normal) */
+  taxaPct: number;
+  /** % de redução por antiguidade */
+  reducaoPct: number;
+  /** tabela de CO₂ usada */
+  norm: "wltp" | "nedc" | "n/a";
+  /** o que o motor teve de assumir por falta de dados */
+  assumptions: string[];
+}
+
 /** Um anúncio PT usado na estimativa do preço PT (o que a ficha mostra). */
 export interface PtComparable {
   title: string;
@@ -175,6 +195,10 @@ export interface Listing {
   sourceVatRegime?: SourceVatRegime;
   /** comparáveis PT da estimativa (até 8); undefined antes de o pipeline os gravar */
   ptSample?: PtComparable[];
+  /** parcelas do ISV; undefined nas estimativas publicadas antes de o `inputs.isv` atravessar */
+  isvParts?: IsvParts;
+  /** veredito de um registo oficial de km (hoje só a RDW, nos NL); undefined = sem consulta */
+  kmCheck?: KmCheck;
   /**
    * ISO — quando o anúncio deixou de aparecer nas fontes; `undefined` se ainda
    * está no mercado. A engine marca isto ao fim de 14 dias sem sinal
