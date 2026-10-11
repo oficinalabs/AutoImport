@@ -15,12 +15,26 @@
 # normal, mede a idade dos dados que a app SERVE e fica vermelho quando ninguém
 # publica. Um mede a causa, o outro mede o sintoma; é o sintoma que interessa.
 #
-# COMO O LIGAR quando houver máquina (VPS, mini-PC, o portátil do operador):
+# O QUE FAZ, por esta ordem, na máquina do warehouse:
+#   1. Publica a montra (warehouse → Supabase). No `schedule` publica a sério;
+#      à mão, só com `apply` marcado (sem isso é ensaio).
+#   2. Alarme por fonte (`pnpm pipeline:fontes`): lê os `*-summary.json` dos
+#      coletores em COLLECTOR_OUT_DIR e fica vermelho se uma fonte trouxe zero
+#      ou menos de metade da média das últimas 7 corridas. Corre mesmo que a
+#      publicação falhe, e o job fica vermelho se qualquer um dos dois falhar.
+# A recolha e o `pipeline:daily` (ingest + custos no warehouse) NÃO são daqui:
+# são do daemon (`tools/collector/probe/collector-daemon.mjs --sync-db`), que é
+# o único processo a escrever no warehouse.
+#
+# COMO O LIGAR quando houver máquina sempre ligada (mini-PC ou VPS) com o
+# warehouse e o daemon (detalhe em docs/05-INFRA-E-DEPLOY.md):
 #   1. Settings → Actions → Runners → New self-hosted runner, com a label
-#      `warehouse`.
-#   2. No `.env.production.local` da máquina, a DATABASE_URL da Supabase e a
-#      WAREHOUSE_URL local (ver .env.example).
-#   3. Descomentar o `schedule` abaixo.
+#      `warehouse`, instalado como serviço na máquina.
+#   2. Settings → Secrets and variables → Actions: secrets WAREHOUSE_URL (a
+#      Postgres local) e DATABASE_URL (a Supabase); variable COLLECTOR_OUT_DIR
+#      (o arquivo NDJSON do daemon, caminho absoluto na máquina).
+#   3. Descomentar o `schedule` abaixo. Quem fizer esse commit é quem a GitHub
+#      avisa por email quando uma corrida agendada falha.
 #
 # ENTRETANTO, à mão, na máquina do warehouse:
 #   DB_TARGET=prod pnpm pipeline:publish          # ensaio (dry-run, faz rollback)
@@ -33,7 +47,8 @@
 name: Publicação da montra
 
 on:
-  # Descomentar quando existir um runner com a label `warehouse`.
+  # Descomentar quando existir um runner com a label `warehouse` (passos 1–3 do
+  # cabeçalho). Sem runner, cada disparo fica pendente e expira — ruído, não dano.
   # schedule:
   #   - cron: "0 5 * * *" # 05:00 UTC — antes dos alertas (06:00) e da frescura (09:00)
   workflow_dispatch:
@@ -43,6 +58,11 @@ on:
         type: boolean
         required: false
         default: false
+
+# Duas publicações ao mesmo tempo escreveriam a montra por cima uma da outra.
+concurrency:
+  group: publicacao
+  cancel-in-progress: false
 
 env:
   NEXT_TELEMETRY_DISABLED: "1"
@@ -76,9 +96,22 @@ jobs:
             echo "::error::faltam WAREHOUSE_URL (origem) ou DATABASE_URL (destino)."
             exit 1
           fi
-          if [ "${{ github.event.inputs.apply }}" = "true" ]; then
+          # O agendado publica a sério: um cron que só ensaia não atualiza nada.
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event.inputs.apply }}" = "true" ]; then
             pnpm pipeline:publish:apply
           else
             echo "::notice::Ensaio (dry-run). Corre com apply=true para publicar a sério."
             pnpm pipeline:publish
           fi
+
+      - name: Alarme por fonte
+        # Corre mesmo com a publicação vermelha: uma fonte partida é notícia à parte.
+        if: ${{ !cancelled() }}
+        env:
+          COLLECTOR_OUT_DIR: ${{ vars.COLLECTOR_OUT_DIR }}
+        run: |
+          if [ -z "$COLLECTOR_OUT_DIR" ]; then
+            echo "::error::falta a variable COLLECTOR_OUT_DIR (o arquivo NDJSON dos coletores nesta máquina)."
+            exit 1
+          fi
+          pnpm pipeline:fontes
