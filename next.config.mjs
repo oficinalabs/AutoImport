@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs/config";
+
 const isDev = process.env.NODE_ENV === "development";
 
 /**
@@ -129,4 +131,25 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+/**
+ * Sentry (ver MVP.md, P2). Só embrulha o config quando há DSN: sem ele o build
+ * é exatamente o de antes — sem plugin, sem source maps, sem rota `/monitoring`.
+ *
+ * - `tunnelRoute`: o browser envia os erros para `/monitoring` na nossa origem,
+ *   e o servidor reencaminha-os para o Sentry. Assim o `connect-src 'self'` da
+ *   CSP não muda. O `matcher` do `middleware.ts` não apanha `/monitoring`.
+ * - `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN`: só servem para enviar
+ *   os source maps. Sem token o build passa na mesma; os stack traces é que
+ *   ficam minificados.
+ */
+export default process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      tunnelRoute: "/monitoring",
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      telemetry: false,
+    })
+  : nextConfig;

@@ -19,6 +19,11 @@ export default function AppError({
 }) {
   useEffect(() => {
     console.error("[app error boundary]", error);
+    // Com DSN, segue para o Sentry (SDK carregado só nesse caso — ver
+    // instrumentation-client.ts).
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
+    }
   }, [error]);
 
   return (
