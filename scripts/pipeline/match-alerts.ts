@@ -1,8 +1,9 @@
 /**
  * Matching de alertas: liga as oportunidades do dia aos alertas ativos dos
  * stands. Por cada match novo cria uma linha em `alert_events` (que alimenta o
- * sino da topbar) e envia um email ao dono do stand — ambos com link direto
- * para o anúncio.
+ * sino da topbar) e, por cada STAND com matches novos, envia UM email de resumo
+ * ao dono (emails/digest.tsx) — no máximo um por dia, com link direto para cada
+ * anúncio.
  *
  *   pnpm exec tsx scripts/pipeline/match-alerts.ts
  *
@@ -37,25 +38,38 @@ try {
 // que activa o JSX automático. Não dá para forçar daqui: o tsx lê a variável no
 // arranque, antes deste ficheiro correr.
 
-/** Linha de match nova, já com tudo o que o email precisa. */
-interface NewMatch {
-  alertId: string;
-  alertName: string;
+/** Máximo de carros listados no email; o resto fica no sino. */
+export const DIGEST_MAX_ITEMS = 20;
+
+/** Um carro do resumo de um stand, já com tudo o que o email precisa. */
+interface DigestRow {
   listingId: string;
-  listingTitle: string;
+  alertName: string;
+  makeRaw: string | null;
+  modelRaw: string | null;
+  year: number | null;
   country: string;
   totalPt: number;
   savings: number;
-  ownerName: string | null;
-  ownerEmail: string;
+  grossMargin: number | null;
 }
 
-export async function matchAlerts() {
+/** Dia (UTC) do resumo — é a chave `digest:<yyyy-mm-dd>` do trial_email_log. */
+export function digestKind(now: Date = new Date()): string {
+  return `digest:${now.toISOString().slice(0, 10)}`;
+}
+
+export async function matchAlerts({
+  send,
+}: {
+  /** Injetável para os testes contarem envios sem falar com o Resend. */
+  send?: typeof import("../../lib/email").sendEmail;
+} = {}) {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const { alertModelKeys } = await import("../../lib/alert-criteria");
-  const { AlertMatchEmail } = await import("../../emails/alert-match");
-  const { sendEmail } = await import("../../lib/email");
+  const { DigestEmail } = await import("../../emails/digest");
+  const sendEmail = send ?? (await import("../../lib/email")).sendEmail;
   const { formatEuro } = await import("../../lib/format");
   const { country } = await import("../../lib/countries");
 
@@ -128,76 +142,161 @@ export async function matchAlerts() {
       on conflict (alert_id, listing_id) do nothing
       returning alert_id, listing_id
     )
-    select
-      n.alert_id      as "alertId",
-      a.name          as "alertName",
-      n.listing_id    as "listingId",
-      l.make_raw      as "makeRaw",
-      l.model_raw     as "modelRaw",
-      l.year          as "year",
-      l.country       as "country",
-      e.total_pt      as "totalPt",
-      e.savings       as "savings",
-      u.name          as "ownerName",
-      u.email         as "ownerEmail"
+    select a.stand_id as "standId"
     from novos n
     join alerts a on a.id = n.alert_id
-    join listings l on l.id = n.listing_id
-    join import_cost_estimates e on e.listing_id = n.listing_id
-    join member m on m.organization_id = a.stand_id and m.role = 'owner'
-    join "user" u on u.id = m.user_id
-  `)) as unknown as (Omit<NewMatch, "listingTitle" | "country"> & {
-    makeRaw: string | null;
-    modelRaw: string | null;
-    year: number | null;
-    country: string;
-  })[];
+  `)) as unknown as { standId: string }[];
 
   if (inserted.length === 0) {
     console.log("match-alerts: 0 matches novos");
     return { matched: 0, emailed: 0, failed: 0 };
   }
 
-  // 2. Um email por match novo. Um envio que falhe NÃO trava o pipeline nem os
-  //    outros emails — o evento já está criado, portanto a notificação aparece
-  //    no sino de qualquer forma.
+  // Uma linha por evento novo (o que o sino ganhou); os emails são por stand.
+  const matched = inserted.length;
+  const stands = [...new Set(inserted.map((r) => r.standId))];
+
+  // Sem chave o lib/email.ts só avisa e volta, e o resumo do dia ficava dado
+  // como enviado. O sino já tem tudo; o email fica para quando houver chave.
+  if (!send && !process.env.RESEND_API_KEY) {
+    console.warn(`match-alerts: ${matched} matches novos · RESEND_API_KEY em falta, sem resumos`);
+    return { matched, emailed: 0, failed: 0 };
+  }
+
+  // 2. Um RESUMO por stand, no máximo um por dia (trial_email_log com
+  //    unique(stand_id, kind) e kind = 'digest:<dia>'). Reserva-se a linha ANTES
+  //    de enviar: duas corridas no mesmo dia não mandam dois emails. Se o envio
+  //    falhar, a reserva sai, e a próxima corrida tenta outra vez.
+  //
+  //    O resumo leva tudo o que apareceu desde o resumo ANTERIOR, não só o desta
+  //    corrida: um match que chegue numa segunda corrida do mesmo dia (já sem
+  //    direito a email) entra no de amanhã. Sem resumo anterior, as últimas 24 h
+  //    (um stand antigo não recebe o histórico todo de uma vez).
+  //
+  //    Um envio que falhe NÃO trava os outros stands — os eventos já estão
+  //    criados, portanto as notificações aparecem no sino de qualquer forma.
   const base = process.env.BETTER_AUTH_URL ?? "https://autoimport.arestadigital.pt";
+  const kind = digestKind();
   let emailed = 0;
   let failed = 0;
 
-  for (const m of inserted) {
-    const title = [m.makeRaw, m.modelRaw, m.year].filter(Boolean).join(" ") || "Anúncio";
-    const countryName = country(m.country as Parameters<typeof country>[0])?.name ?? m.country;
-    const url = `${base}/anuncio/${m.listingId}`;
+  for (const standId of stands) {
+    const [owner] = (await db.execute(sql`
+      select u.name, u.email
+      from member m join "user" u on u.id = m.user_id
+      where m.organization_id = ${standId} and m.role = 'owner'
+      limit 1
+    `)) as unknown as { name: string | null; email: string }[];
+    if (!owner) continue;
+
+    const reserved = (await db.execute(sql`
+      insert into trial_email_log (stand_id, kind) values (${standId}, ${kind})
+      on conflict (stand_id, kind) do nothing
+      returning id
+    `)) as unknown as { id: string }[];
+    if (reserved.length === 0) continue; // já houve resumo hoje
+
+    // Um carro que case com dois alertas do mesmo stand aparece uma vez, e um
+    // carro que já foi num resumo anterior (por outro alerta) não volta.
+    const rows = (await db.execute(sql`
+      with desde as (
+        select coalesce(
+          (select max(t.sent_at) from trial_email_log t
+            where t.stand_id = ${standId} and t.kind like 'digest:%'
+              and t.id <> ${reserved[0].id}),  -- o de hoje, acabado de reservar, não conta
+          now() - interval '1 day'
+        ) as t
+      )
+      select distinct on (ae.listing_id)
+        ae.listing_id   as "listingId",
+        a.name          as "alertName",
+        l.make_raw      as "makeRaw",
+        l.model_raw     as "modelRaw",
+        l.year          as "year",
+        l.country       as "country",
+        e.total_pt      as "totalPt",
+        e.savings       as "savings",
+        e.gross_margin  as "grossMargin",
+        ae.sent_at      as "sentAt"
+      from desde, alert_events ae
+      join alerts a on a.id = ae.alert_id
+      join listings l on l.id = ae.listing_id and l.deleted_at is null
+      join import_cost_estimates e on e.listing_id = ae.listing_id
+      where a.stand_id = ${standId}
+        and ae.sent_at > desde.t
+        and not exists (
+          select 1 from alert_events ae2
+          join alerts a2 on a2.id = ae2.alert_id
+          where a2.stand_id = ${standId}
+            and ae2.listing_id = ae.listing_id
+            and ae2.sent_at <= desde.t
+        )
+      order by ae.listing_id, ae.sent_at
+    `)) as unknown as (DigestRow & { sentAt: Date })[];
+
+    if (rows.length === 0) {
+      await db.execute(sql`delete from trial_email_log where id = ${reserved[0].id}`);
+      continue;
+    }
+
+    // Os mais recentes primeiro; o corte do email fica com os mais novos.
+    rows.sort((x, y) => new Date(y.sentAt).getTime() - new Date(x.sentAt).getTime());
+    const items = rows.slice(0, DIGEST_MAX_ITEMS).map((m) => {
+      const title = [m.makeRaw, m.modelRaw, m.year].filter(Boolean).join(" ") || "Anúncio";
+      const countryName = country(m.country as Parameters<typeof country>[0])?.name ?? m.country;
+      // A margem bruta (P06) é o número principal quando já existe; até lá, a
+      // poupança que a montra ainda mostra.
+      const highlight =
+        m.grossMargin != null
+          ? `margem estimada ${formatEuro(m.grossMargin)}`
+          : `poupa cerca de ${formatEuro(m.savings)}`;
+      return {
+        title,
+        country: countryName,
+        alertName: m.alertName,
+        totalPt: formatEuro(m.totalPt),
+        highlight,
+        url: `${base}/anuncio/${m.listingId}`,
+      };
+    });
+    const moreCount = rows.length - items.length;
+    const subject =
+      rows.length === 1
+        ? `Apareceu um ${items[0].title} que encaixa nos teus alertas`
+        : `${rows.length} carros novos para os teus alertas`;
+
     try {
       await sendEmail({
-        to: m.ownerEmail,
-        subject: `Apareceu um ${title} que encaixa no teu alerta`,
-        react: AlertMatchEmail({
-          name: m.ownerName ?? undefined,
-          alertName: m.alertName,
-          listingTitle: title,
-          country: countryName,
-          totalPt: formatEuro(m.totalPt),
-          savings: formatEuro(m.savings),
-          listingUrl: url,
+        to: owner.email,
+        subject,
+        react: DigestEmail({
+          name: owner.name ?? undefined,
+          items,
+          moreCount,
+          alertsUrl: `${base}/alertas`,
         }),
-        text:
-          `O teu alerta "${m.alertName}" encontrou: ${title} (${countryName}). ` +
-          `Custo final estimado ${formatEuro(m.totalPt)}, poupa cerca de ${formatEuro(m.savings)}. ` +
-          `Ver: ${url}`,
+        text: [
+          `Carros novos para os teus alertas (${rows.length}):`,
+          ...items.map(
+            (i) =>
+              `- ${i.title} (${i.country}): custo final ${i.totalPt}, ${i.highlight}. ${i.url}`,
+          ),
+          ...(moreCount > 0 ? [`E mais ${moreCount} no sino da aplicação.`] : []),
+          `Gerir alertas: ${base}/alertas`,
+        ].join("\n"),
       });
       emailed++;
     } catch (error) {
       failed++;
-      console.error(`[match-alerts] falha ao enviar email do alerta ${m.alertId}:`, error);
+      await db.execute(sql`delete from trial_email_log where id = ${reserved[0].id}`);
+      console.error(`[match-alerts] falha ao enviar o resumo do stand ${standId}:`, error);
     }
   }
 
   console.log(
-    `match-alerts: ${inserted.length} matches novos · ${emailed} emails enviados${failed ? ` · ${failed} falharam` : ""}`,
+    `match-alerts: ${matched} matches novos · ${emailed} resumos enviados${failed ? ` · ${failed} falharam` : ""}`,
   );
-  return { matched: inserted.length, emailed, failed };
+  return { matched, emailed, failed };
 }
 
 if (process.argv[1]?.endsWith("match-alerts.ts")) {

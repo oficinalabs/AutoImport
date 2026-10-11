@@ -18,14 +18,18 @@
  * `await import("../../db")`: o db/index.ts congela a connection string no
  * import. Por isso os módulos são importados dentro dos testes.
  *
- * ⚠️ EMAILS: o `matchAlerts` envia um email por match novo. Aqui a
- * `RESEND_API_KEY` é APAGADA do ambiente antes de qualquer import — sem chave o
- * lib/email.ts não envia nada. Este teste nunca pode falar com o mundo.
+ * ⚠️ EMAILS: o `matchAlerts` envia um resumo por stand e o `sendTrialEmails`
+ * os emails do trial. Aqui a `RESEND_API_KEY` é APAGADA do ambiente antes de
+ * qualquer import — sem chave nenhum dos dois envia nada. Os testes dos emails
+ * (P13, no fim) injetam um `send` falso que só regista e renderiza. Este teste
+ * nunca pode falar com o mundo.
  */
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
+import { render } from "@react-email/components";
 import postgres from "postgres";
 import { dbUrl } from "../../lib/db-url";
+import type { SendEmailOptions } from "../../lib/email";
 import {
   dropDatabases,
   migrate,
@@ -336,4 +340,182 @@ test("a lista de modelos do formulário só tem o que existe na montra", { skip 
     { makeKey: "opel", modelKey: "astra", label: "Opel Astra" },
     { makeKey: "volkswagen", modelKey: "golf", label: "Volkswagen Golf" },
   ]);
+});
+
+// ── P13: resumo diário por stand e emails do trial ─────────────────────────
+
+const STAND_C = "stand-dos-alertas-c";
+
+/** `send` falso: regista o email e renderiza-o (um template partido falha aqui). */
+function caixaDeCorreio() {
+  const enviados: (SendEmailOptions & { html: string })[] = [];
+  const send = async (o: SendEmailOptions) => {
+    enviados.push({ ...o, html: await render(o.react) });
+  };
+  return { enviados, send };
+}
+
+async function novoStand(id: string, email: string, idadeDias: number) {
+  await db()`insert into organization (id, name, slug, created_at)
+             values (${id}, ${id}, ${id}, now() - make_interval(hours => ${Math.round(idadeDias * 24)}))`;
+  await db()`insert into "user" (id, name, email, created_at, updated_at)
+             values (${`user-${id}`}, ${`Dono ${id}`}, ${email}, now(), now())`;
+  await db()`insert into member (id, organization_id, user_id, role, created_at)
+             values (${`member-${id}`}, ${id}, ${`user-${id}`}, 'owner', now())`;
+}
+
+async function novaOportunidade(ext: string, modelId: string, totalPt: number) {
+  const [row] = await db()`
+    insert into listings (
+      source_site, external_id, source_id, model_id, make_raw, model_raw,
+      year, km, fuel, country, price, detail_url, match_confidence,
+      first_seen_at, last_seen_at
+    ) values (
+      'testalerts.de', ${ext}, ${SOURCE}, ${modelId}, 'OPEL', 'Astra',
+      2023, 20000, 'diesel', 'DE', ${totalPt - 5000},
+      ${`https://testalerts.de/${ext}`}, 'exato', now(), now()
+    ) returning id`;
+  extPorId.set(row.id, ext);
+  await db()`
+    insert into import_cost_estimates (
+      listing_id, origin_price, transport, isv, iuc, legalization, total_pt,
+      pt_estimated_price, pt_sample_size, pt_confidence, savings, savings_pct,
+      verdict, isv_table_year
+    ) values (
+      ${row.id}, ${totalPt - 5000}, 1000, 3000, 200, 355, ${totalPt},
+      ${totalPt + 5000}, 8, 'normal', 5000, 20, 'compensa', 2026
+    )`;
+  await db()`insert into opportunities (listing_id, savings, savings_pct)
+             values (${row.id}, 5000, 20)`;
+}
+
+async function correrMatchingCom(send: (o: SendEmailOptions) => Promise<void>) {
+  const { matchAlerts } = await import("../../scripts/pipeline/match-alerts");
+  return matchAlerts({ send });
+}
+
+test("P13: vários carros para o mesmo stand → UM email de resumo", { skip }, async () => {
+  await novoStand(STAND_C, "dono-c@exemplo-de-teste.pt", 0);
+  await criarPelaPagina(STAND_C, { name: "Golf do C", makeKey: "volkswagen", modelKey: "golf" });
+
+  const { enviados, send } = caixaDeCorreio();
+  const r = await correrMatchingCom(send);
+
+  // 8 = os 4 Golfs para o C + os mesmos 4 para o "Golf do outro stand" (B),
+  // criado num teste acima e ainda por casar.
+  assert.equal(r.matched, 8, "o sino ganha um evento por carro e por alerta");
+  assert.equal(r.emailed, 2, "um resumo por stand");
+  const doC = enviados.filter((e) => e.to === "dono-c@exemplo-de-teste.pt");
+  assert.equal(doC.length, 1, "um resumo, não quatro emails");
+  assert.equal(doC[0].subject, "4 carros novos para os teus alertas");
+  for (const t of [
+    "VOLKSWAGEN Golf",
+    "Volkswagen Golf VII",
+    "VW Golf 8",
+    "Volkswagen Golf Variant",
+  ]) {
+    assert.ok(doC[0].html.includes(t), `o resumo lista ${t}`);
+  }
+});
+
+test("P13: segunda corrida no mesmo dia — o sino ganha, o email não", { skip }, async () => {
+  await criarPelaPagina(STAND_C, { name: "Astra do C", makeKey: "opel", modelKey: "astra" });
+
+  const { enviados, send } = caixaDeCorreio();
+  const r = await correrMatchingCom(send);
+  assert.equal(r.matched, 1, "o Astra entra no sino");
+  assert.equal(enviados.length, 0, "no máximo um resumo por dia");
+});
+
+test(
+  "P13: no dia seguinte, o resumo leva o que ficou de fora — e não repete",
+  { skip },
+  async () => {
+    // Recua o stand C um dia inteiro: o resumo de "hoje" passa a ser o de ontem.
+    await db()`update trial_email_log
+             set sent_at = sent_at - interval '1 day',
+                 kind = ${`digest:${new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)}`}
+             where stand_id = ${STAND_C}`;
+    await db()`update alert_events set sent_at = sent_at - interval '1 day'
+             where alert_id in (select id from alerts where stand_id = ${STAND_C})`;
+    await novaOportunidade("astra-novo", VM_ASTRA, 19_000);
+
+    const { enviados, send } = caixaDeCorreio();
+    await correrMatchingCom(send);
+
+    const doC = enviados.filter((e) => e.to === "dono-c@exemplo-de-teste.pt");
+    assert.equal(doC.length, 1);
+    assert.equal(
+      doC[0].subject,
+      "2 carros novos para os teus alertas",
+      "o Astra de ontem + o novo",
+    );
+    assert.ok(!doC[0].html.includes("Golf"), "os Golfs já foram no resumo anterior");
+  },
+);
+
+test("P13: emails do trial — dia 1, 7 e 25, nunca a quem pagou", { skip }, async () => {
+  await novoStand("trial-semana", "semana@exemplo-de-teste.pt", 6.5);
+  await novoStand("trial-fim", "fim@exemplo-de-teste.pt", 24.5);
+  await novoStand("trial-pago", "pago@exemplo-de-teste.pt", 6.5);
+  await novoStand("trial-fora", "fora@exemplo-de-teste.pt", 12);
+  await novoStand("trial-velho", "velho@exemplo-de-teste.pt", 40);
+  await db()`insert into subscriptions (stand_id, polar_subscription_id, status, current_period_end)
+             values ('trial-pago', 'sub_teste', 'ativa', now() + interval '30 days')`;
+
+  const { sendTrialEmails } = await import("../../scripts/pipeline/trial-emails");
+  const { enviados, send } = caixaDeCorreio();
+  const r = await sendTrialEmails({ send });
+
+  const para = (email: string) => enviados.filter((e) => e.to === email);
+  assert.equal(para("semana@exemplo-de-teste.pt").length, 1);
+  assert.match(para("semana@exemplo-de-teste.pt")[0].subject, /Uma semana/);
+  assert.equal(para("fim@exemplo-de-teste.pt").length, 1);
+  assert.match(para("fim@exemplo-de-teste.pt")[0].subject, /^O teu mês grátis acaba a \d+ de /);
+  assert.ok(para("fim@exemplo-de-teste.pt")[0].html.includes("/stand"), "link para gerir");
+  assert.equal(para("pago@exemplo-de-teste.pt").length, 0, "já pagou: nada");
+  assert.equal(para("fora@exemplo-de-teste.pt").length, 0, "dia 13: nenhum email toca");
+  assert.equal(para("velho@exemplo-de-teste.pt").length, 0, "trial acabado: nada");
+  // Os stands criados hoje pela fixture estão no dia 1.
+  assert.match(para("dono-a@exemplo-de-teste.pt")[0]?.subject ?? "", /Bem-vindo/);
+  assert.equal(r.sent, enviados.length);
+});
+
+test("P13: o email do dia 7 não sai duas vezes", { skip }, async () => {
+  const { sendTrialEmails } = await import("../../scripts/pipeline/trial-emails");
+
+  const outra = caixaDeCorreio();
+  await sendTrialEmails({ send: outra.send });
+  assert.equal(outra.enviados.length, 0, "mesmo dia: nada de novo");
+
+  // Dia seguinte, ainda dentro da janela do dia 7.
+  await db()`update organization set created_at = created_at - interval '1 day'
+             where id = 'trial-semana'`;
+  const amanha = caixaDeCorreio();
+  await sendTrialEmails({ send: amanha.send });
+  assert.equal(
+    amanha.enviados.filter((e) => e.to === "semana@exemplo-de-teste.pt").length,
+    0,
+    "o trial_email_log segura-o",
+  );
+});
+
+test("P13: um envio que falha não fica dado como enviado", { skip }, async () => {
+  await novoStand("trial-falha", "falha@exemplo-de-teste.pt", 0);
+  const { sendTrialEmails } = await import("../../scripts/pipeline/trial-emails");
+
+  const r = await sendTrialEmails({
+    send: async () => {
+      throw new Error("Resend em baixo");
+    },
+  });
+  assert.equal(r.failed, 1);
+
+  const { enviados, send } = caixaDeCorreio();
+  await sendTrialEmails({ send });
+  assert.deepEqual(
+    enviados.map((e) => e.to),
+    ["falha@exemplo-de-teste.pt"],
+    "a corrida seguinte tenta outra vez",
+  );
 });
