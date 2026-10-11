@@ -1,6 +1,8 @@
 import { formatEuro, formatPercent } from "@/lib/format";
+import type { StandCostField } from "@/lib/stand-costs";
 import type { CostBreakdown as Breakdown } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const LINES: {
   key: "originPrice" | "transport" | "isv" | "iuc" | "legalization";
@@ -16,10 +18,13 @@ const LINES: {
 function Row({
   label,
   value,
+  fromStand = false,
   className,
 }: {
   label: string;
   value: string;
+  /** o valor é o que o stand definiu, não a média publicada */
+  fromStand?: boolean;
   className?: string;
 }) {
   return (
@@ -29,7 +34,14 @@ function Row({
         className,
       )}
     >
-      <dt className="text-ink-soft">{label}</dt>
+      <dt className="text-ink-soft">
+        {label}
+        {fromStand && (
+          <span className="ml-1.5 rounded-sm bg-surface-2 px-1 py-px text-[11px] font-medium text-ink">
+            do stand
+          </span>
+        )}
+      </dt>
       <dd className="tnum font-mono">{value}</dd>
     </div>
   );
@@ -40,16 +52,42 @@ function Row({
  * (`grossMargin` definido), a margem bruta na revenda ao preço PT estimado.
  * Em IVA dedutível o preço de compra é o líquido (`originPriceNet`).
  */
-export function CostBreakdown({ cost, ptPrice }: { cost: Breakdown; ptPrice: number }) {
+export function CostBreakdown({
+  cost,
+  ptPrice,
+  standCosts = [],
+}: {
+  cost: Breakdown;
+  ptPrice: number;
+  /** parcelas que vêm dos custos do stand (P09); o resto são médias */
+  standCosts?: StandCostField[];
+}) {
+  const doStand = (field: StandCostField) => standCosts.includes(field);
   const dedutivel = cost.vatRegime === "dedutivel" && cost.originPriceNet != null;
-  const rows: { label: string; value: number }[] = LINES.map(({ key, label }) =>
-    key === "originPrice" && dedutivel
-      ? { label: "Preço de compra sem IVA", value: cost.originPriceNet as number }
-      : { label, value: cost[key] },
+  const rows: { label: string; value: number; fromStand?: boolean }[] = LINES.map(
+    ({ key, label }) =>
+      key === "originPrice" && dedutivel
+        ? { label: "Preço de compra sem IVA", value: cost.originPriceNet as number }
+        : {
+            label,
+            value: cost[key],
+            fromStand: (key === "transport" || key === "legalization") && doStand(key),
+          },
   );
-  if (cost.despachante) rows.push({ label: "Despachante", value: cost.despachante });
-  if (cost.preparation) rows.push({ label: "Preparação e garantia", value: cost.preparation });
+  if (cost.despachante)
+    rows.push({
+      label: "Despachante",
+      value: cost.despachante,
+      fromStand: doStand("despachante"),
+    });
+  if (cost.preparation)
+    rows.push({
+      label: "Preparação e garantia",
+      value: cost.preparation,
+      fromStand: doStand("preparation"),
+    });
   const temMargem = cost.grossMargin !== undefined;
+  const marcadas = rows.some((r) => r.fromStand);
 
   return (
     <div className="rounded-[10px] border border-line bg-surface p-4 sm:p-5">
@@ -58,13 +96,22 @@ export function CostBreakdown({ cost, ptPrice }: { cost: Breakdown; ptPrice: num
       </h3>
       <dl className="flex flex-col">
         {rows.map((r) => (
-          <Row key={r.label} label={r.label} value={formatEuro(r.value)} />
+          <Row key={r.label} label={r.label} value={formatEuro(r.value)} fromStand={r.fromStand} />
         ))}
         <div className="flex items-center justify-between pt-3">
           <dt className="font-display font-semibold">Total em Portugal</dt>
           <dd className="tnum font-mono text-lg font-bold">{formatEuro(cost.totalPt)}</dd>
         </div>
       </dl>
+      <p className="mt-2 text-xs text-ink-soft">
+        {marcadas
+          ? "As parcelas marcadas são os custos do teu stand; as outras são médias. "
+          : "Transporte, legalização e preparação são médias. "}
+        {doStand("threshold") && "O veredito usa o limiar de margem do stand. "}
+        <Link href="/stand" className="underline underline-offset-2 hover:text-ink">
+          {standCosts.length > 0 ? "Alterar custos do stand" : "Usar os custos do teu stand"}
+        </Link>
+      </p>
 
       {temMargem && (
         <>

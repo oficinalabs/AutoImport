@@ -262,7 +262,11 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
             country={listing.country}
           />
 
-          <CostBreakdown cost={listing.cost} ptPrice={listing.ptMarket.estimatedPrice} />
+          <CostBreakdown
+            cost={listing.cost}
+            ptPrice={listing.ptMarket.estimatedPrice}
+            standCosts={listing.standCosts}
+          />
 
           <IsvDetail listing={listing} />
 
