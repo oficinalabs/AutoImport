@@ -1,6 +1,7 @@
 import { Skeleton } from "@/components/skeleton";
 
-/** Skeleton do detalhe: galeria + ficha à esquerda, dinheiro à direita. */
+/** Skeleton do detalhe: galeria + ficha à esquerda, dinheiro à direita, e por
+ *  baixo a checklist e a mensagem ao vendedor. */
 export default function AnuncioLoading() {
   return (
     <div className="flex flex-col gap-5" aria-busy="true" aria-label="A carregar anúncio">
@@ -14,12 +15,7 @@ export default function AnuncioLoading() {
           </div>
 
           {/* Galeria */}
-          <div className="grid grid-cols-4 gap-2">
-            <Skeleton className="col-span-4 aspect-[16/9] w-full" />
-            {[0, 1, 2, 3].map((i) => (
-              <Skeleton key={i} className="aspect-square w-full" />
-            ))}
-          </div>
+          <Skeleton className="aspect-[16/9] w-full" />
 
           {/* Ficha técnica */}
           <div className="rounded-[10px] border border-line p-5">
@@ -38,9 +34,17 @@ export default function AnuncioLoading() {
         {/* Coluna do dinheiro */}
         <div className="flex flex-col gap-4">
           <Skeleton className="h-28 w-full rounded-[10px]" />
+          {/* Regime de IVA */}
+          <Skeleton className="h-36 w-full rounded-[10px]" />
           <Skeleton className="h-64 w-full rounded-[10px]" />
           <Skeleton className="h-24 w-full rounded-[10px]" />
         </div>
+      </div>
+
+      {/* Checklist e mensagem ao vendedor */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-72 w-full rounded-[10px]" />
+        <Skeleton className="h-72 w-full rounded-[10px]" />
       </div>
     </div>
   );
