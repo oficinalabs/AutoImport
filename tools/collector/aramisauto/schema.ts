@@ -11,6 +11,7 @@
 // ocasião vs. neuf (guardado como extra).
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { galleryUrls } from '../lib/vat-text-es.ts';
 import { BASE } from './http.ts';
 export { CAMPOS, toInt, cleanStr };
 
@@ -104,6 +105,9 @@ function detailUrl(v: RawVehicle): string | null {
 // Extras próprios: source_site, id (=vehicleId), offer_id, offer_type, status, power_ch, power_kw,
 // tax_horsepower, energy_id, category_id, battery_autonomy_wltp, catalog_price, discount_amount,
 // discount_percent, monthly_loan, promotions[].
+// P05: o Aramisauto não mostra regime de IVA (só preço TTC; estudo FR §3.2) → vat_regime fica null
+// (o motor trata como margem, que é o caso de quase todos os M1 em França, FR §3.1). A listagem só
+// traz uma foto (`photo.url`) → image_urls com essa.
 export function normalizeVehicle(v: RawVehicle, { collectedAt = null }: { collectedAt?: string | null } = {}): AramisautoRecord {
   return {
     make: cleanStr(v.maker),
@@ -143,5 +147,8 @@ export function normalizeVehicle(v: RawVehicle, { collectedAt = null }: { collec
     discount_percent: v.discount?.percent ?? null,
     monthly_loan: toInt(v.indicativeLoan?.monthlyInstallment),
     promotions: Array.isArray(v.promotions) ? v.promotions.map((p) => cleanStr(p.label)).filter(Boolean) : [],
+    // --- P05 ---
+    vat_regime: null,
+    image_urls: galleryUrls(v.photo?.url),
   };
 }

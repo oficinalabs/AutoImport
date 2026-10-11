@@ -12,6 +12,7 @@
 // dedupe é o `id` do anúncio (o `data-id` do card, também embutido no path da imagem).
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { galleryUrls, vatFromTextEs } from '../lib/vat-text-es.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do Trovit = os campos-base comuns + extras próprios do site.
@@ -94,6 +95,9 @@ function variantFrom(desc: string, cardTitle: unknown, name: unknown): string | 
 //   image                               -> image
 // Extras próprios: source_site, id (=data-id), power_cv (CV da description), updated_text +
 // updated_ago_min (recência do card), is_new (tag "nuevo"), title (título SEO do card).
+// P05: vat_regime/price_net das palavras do estudo ES §3.2 no mesmo "palheiro" (nas páginas de
+// cidade a `description` é o texto do stand, onde aparece "IVA deducible"/"REBU"); sem menção →
+// null. O Trovit não diz se o vendedor é particular. image (todas, até 8) -> image_urls.
 export function normalizeCar(car: RawCar, { extras = {}, collectedAt = null }: { extras?: Partial<CardExtras>; collectedAt?: string | null } = {}): TrovitRecord {
   const desc = (car.description as string) || '';
   const offer = (car.offers || {}) as Record<string, unknown>;
@@ -109,6 +113,7 @@ export function normalizeCar(car: RawCar, { extras = {}, collectedAt = null }: {
   const fuelM = FUEL_RE.exec(haystack);
   const gbM = GEARBOX_RE.exec(haystack);
   const powerM = POWER_RE.exec(haystack);
+  const vat = vatFromTextEs(haystack);
 
   return {
     make: cleanStr((car.brand as { name?: unknown } | undefined)?.name || car.brand),
@@ -139,5 +144,9 @@ export function normalizeCar(car: RawCar, { extras = {}, collectedAt = null }: {
     updated_ago_min: extras.updated_ago_min ?? null,
     is_new: Boolean(extras.is_new),
     title: cleanStr(extras.title),
+    // --- P05 ---
+    vat_regime: vat.regime,
+    price_net: vat.priceNet,
+    image_urls: galleryUrls(car.image),
   };
 }

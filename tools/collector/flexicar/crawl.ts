@@ -31,6 +31,7 @@ interface Stats {
   byFuel: Record<string, number>;
   price: { count: number; sum: number; min: number | null; max: number | null };
   nbResults: Record<string, number | null>;
+  byVatRegime?: Record<string, number>;
   maxId: number | null;
 }
 
@@ -50,7 +51,7 @@ interface CrawlConfig {
 }
 
 function statsVazias(): Stats {
-  return { records: 0, facets: 0, byCountry: {}, bySource: {}, byRegion: {}, byFuel: {}, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {}, maxId: null };
+  return { records: 0, facets: 0, byCountry: {}, bySource: {}, byRegion: {}, byFuel: {}, price: { count: 0, sum: 0, min: null, max: null }, nbResults: {}, byVatRegime: {}, maxId: null };
 }
 function atualizaStats(stats: Stats, r: FlexicarRecord) {
   stats.records++;
@@ -58,6 +59,8 @@ function atualizaStats(stats: Stats, r: FlexicarRecord) {
   stats.bySource[r.source || '?'] = (stats.bySource[r.source || '?'] || 0) + 1;
   stats.byRegion[r.region || '?'] = (stats.byRegion[r.region || '?'] || 0) + 1;
   stats.byFuel[r.fuel || '?'] = (stats.byFuel[r.fuel || '?'] || 0) + 1;
+  const vat = (stats.byVatRegime ??= {});   // ??=: checkpoints anteriores ao P05 não têm o bucket
+  vat[r.vat_regime || '?'] = (vat[r.vat_regime || '?'] || 0) + 1;
   if (r.id != null) stats.maxId = stats.maxId === null ? r.id : Math.max(stats.maxId, r.id);
   if (r.price != null && r.price > 0) { const p = stats.price; p.count++; p.sum += r.price; p.min = p.min === null ? r.price : Math.min(p.min, r.price); p.max = p.max === null ? r.price : Math.max(p.max, r.price); }
 }

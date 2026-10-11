@@ -81,7 +81,7 @@ function parseCardDealer(chunk: string) {
   };
 }
 
-// (2) Mapa identifier → extras do card {fuel, region, dealer, dealer_rating, certified}.
+// (2) Mapa identifier → extras do card {fuel, region, dealer, dealer_rating, certified, text, is_private}.
 // Dividimos o HTML nos inícios de cada `<article class="anuncio">` (mais fiável do que depender
 // da tag de fecho, frágil com aninhamento) e analisamos o pedaço de cada card.
 export function extractCardExtras(html: string): Map<number, CardExtras> {
@@ -97,7 +97,12 @@ export function extractCardExtras(html: string): Map<number, CardExtras> {
     const id = Number(idm[1]);
     const { fuel, region } = parseCardUl(chunk);
     const { dealer, dealer_rating } = parseCardDealer(chunk);
-    map.set(id, { fuel, region, dealer, dealer_rating, certified: /class="certificado"/.test(chunk) });
+    // Texto visível do card (P05): onde um stand escreve "IVA deducible"/"REBU". Ver schema.ts.
+    // Cortado no `</article>`: o pedaço do último card arrasta o rodapé/facetas da página, que
+    // podem ter links "IVA deducible" que não são deste carro.
+    const card = chunk.split(/<\/article>/i)[0];
+    const text = card.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    map.set(id, { fuel, region, dealer, dealer_rating, certified: /class="certificado"/.test(chunk), text, is_private: !/<div class="concesionario">/.test(card) });
   }
   return map;
 }

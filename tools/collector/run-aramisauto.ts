@@ -40,7 +40,7 @@ await defineRunCli({
       total: stats.records, pages: stats.pages, maxId: stats.maxId,
       price: { min: stats.price.min, max: stats.price.max, avg: avgPrice },
       byCountry: stats.byCountry, byOfferType: stats.byOfferType, byCategory: stats.byCategory,
-      byFuel: stats.byFuel, bySource: stats.bySource,
+      byFuel: stats.byFuel, byVatRegime: stats.byVatRegime ?? {}, bySource: stats.bySource,
       nbResults: stats.nbResults, ndjson: ndjsonPath,
     };
   },
@@ -50,6 +50,7 @@ await defineRunCli({
     console.log(`preço €: min ${stats.price.min} · máx ${stats.price.max} · média ${avgPrice}`);
     console.log(`top categorias: ${topN(stats.byCategory)}`);
     console.log(`top combustível: ${topN(stats.byFuel)}`);
+    console.log(`regime de IVA: ${topN(stats.byVatRegime ?? {})}`);
     console.log(`tipo de oferta: ${topN(stats.byOfferType)}`);
     console.log(`\nNDJSON → ${ndjsonPath}`);
     console.log(`resumo → ${summaryPath}`);
