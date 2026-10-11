@@ -5,7 +5,8 @@
  * Duas promessas: (1) com as colunas novas a null — o estado da produção logo a
  * seguir à migration 0009 — o `Listing` sai IGUAL ao de antes (só a capa em
  * `images`, sem campos de IVA/margem no `cost`); (2) quando o pipeline as preenche,
- * chegam à UI: galeria, IVA declarado, comparáveis PT e a decomposição da margem.
+ * chegam à UI: galeria, IVA declarado, comparáveis PT, a decomposição da margem,
+ * as parcelas do ISV e o veredito de km da RDW.
  *
  * Sem Postgres local (ou sem permissão para criar bases) o teste salta.
  */
@@ -100,6 +101,7 @@ test("colunas do P01: iguais a antes quando a null, e expostas quando preenchida
           vat_regime: "dedutivel",
           price_net: 16_807,
           image_urls: ["https://img.test/1.jpg", "/relativa.jpg", "https://img.test/2.jpg"],
+          km_check: sql.json({ source: "RDW", verdict: "coerente", checkedAt: "2026-10-01" }),
         }),
       )} returning id
     `;
@@ -115,6 +117,18 @@ test("colunas do P01: iguais a antes quando a null, e expostas quando preenchida
           output_vat: 5_610,
           gross_margin: 2_483,
           gross_margin_pct: 8.28,
+          inputs: sql.json({
+            isv: {
+              cilindrada: 830.12,
+              ambiental: 2650.4,
+              agravamentoDiesel: 0,
+              taxaPct: 100,
+              reducaoPct: 20,
+              norm: "wltp",
+              total: 2784.41,
+              assumptions: ["norma CO₂ assumida WLTP (matrícula 2019, transição)"],
+            },
+          }),
           pt_sample: sql.json([
             {
               t: "Mapmarke M1",
@@ -149,6 +163,9 @@ test("colunas do P01: iguais a antes quando a null, e expostas quando preenchida
     );
     assert.equal(a.sourceVatRegime, undefined);
     assert.equal(a.ptSample, undefined);
+    assert.equal(a.isvParts, undefined, "sem inputs.isv: a ficha fica só com as regras");
+    assert.equal(a.kmCheck, undefined);
+    assert.deepEqual(a.kmTrust, { level: "por_verificar" });
 
     const n = await getListingQuery(novo.id as string, null);
     assert.ok(n);
@@ -175,6 +192,17 @@ test("colunas do P01: iguais a antes quando a null, e expostas quando preenchida
       grossMarginPct: n.cost.grossMarginPct,
     });
     assert.ok(Math.abs((n.cost.grossMarginPct ?? 0) - 8.28) < 1e-4);
+    assert.deepEqual(n.isvParts, {
+      cilindrada: 830.12,
+      ambiental: 2650.4,
+      agravamentoDiesel: 0,
+      taxaPct: 100,
+      reducaoPct: 20,
+      norm: "wltp",
+      assumptions: ["norma CO₂ assumida WLTP (matrícula 2019, transição)"],
+    });
+    assert.deepEqual(n.kmCheck, { source: "RDW", verdict: "coerente", checkedAt: "2026-10-01" });
+    assert.deepEqual(n.kmTrust, { level: "verificado", source: "RDW" }, "RDW coerente: verificado");
     assert.deepEqual(n.ptSample, [
       {
         title: "Mapmarke M1",

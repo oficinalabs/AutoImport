@@ -1,7 +1,7 @@
 /**
  * Batch diário — orquestrador sequencial do pipeline completo:
  *   ingest NDJSON → match-models → pt-market → soft-delete de desaparecidos →
- *   verificar oportunidades (HEAD) → compute-costs (1.ª passagem) →
+ *   km da RDW (NL) → verificar oportunidades (HEAD) → compute-costs (1.ª passagem) →
  *   precio al contado (ES) → compute-costs (2.ª passagem) → flag-opportunities
  *   → match-alerts (sino + email)
  *   pnpm pipeline:daily [--dir tools/collector/out] [--stale-days 14]
@@ -9,7 +9,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { assertWritable, dbUrl } from "../../lib/db-url";
+import { assertWritable, dbUrl, warehouseUrl } from "../../lib/db-url";
 
 try {
   process.loadEnvFile(".env.local");
@@ -28,7 +28,7 @@ async function main() {
   const dir = arg("--dir", "tools/collector/out");
   const staleDays = Number(arg("--stale-days", "14"));
 
-  console.log("── 1/10 ingest ──");
+  console.log("── 1/11 ingest ──");
   if (existsSync(dir)) {
     // processo separado: o ingest gere a própria ligação/saída
     execFileSync("pnpm", ["exec", "tsx", "scripts/pipeline/ingest.ts", "--dir", dir], {
@@ -48,13 +48,13 @@ async function main() {
   const { checkGone } = await import("./check-gone");
   const { matchAlerts } = await import("./match-alerts");
 
-  console.log("── 2/10 match-models ──");
+  console.log("── 2/11 match-models ──");
   const match = await matchModels();
 
-  console.log("── 3/10 pt-market ──");
+  console.log("── 3/11 pt-market ──");
   await collectPtObservations();
 
-  console.log("── 4/10 desaparecidos ──");
+  console.log("── 4/11 desaparecidos ──");
   const stale = (await db.execute(sql`
     update listings set deleted_at = now()
     where deleted_at is null
@@ -63,33 +63,39 @@ async function main() {
   `)) as unknown as { id: string }[];
   console.log(`soft-delete: ${stale.length} anúncios sem sinal há ${staleDays}+ dias`);
 
+  // Antes do compute: o veredito de km da RDW (P04) entra na conta, porque o
+  // compute-costs exclui os carros com km incoerentes. Quem ganha `km_check` novo
+  // fica com `updated_at` > `computed_at` e é recalculado já nesta corrida.
+  console.log("── 5/11 km RDW (NL) ──");
+  await kmRdwStep();
+
   // Antes do compute: apanha as oportunidades ativas que já morreram (404/410)
   // para não recalcular veredito sobre um carro que já não existe.
-  console.log("── 5/10 verificar oportunidades (HEAD) ──");
+  console.log("── 6/11 verificar oportunidades (HEAD) ──");
   await checkGone();
 
-  console.log("── 6/10 compute-costs (1.ª passagem) ──");
+  console.log("── 7/11 compute-costs (1.ª passagem) ──");
   const costs = await computeCosts();
 
   // O preço de montra dos stands ES é o FINANCIADO; o contado (o que se paga)
   // está na descrição do detalhe. Corre DEPOIS da 1.ª passagem porque só visita
   // quem já parece negócio (ver enrich-es.ts) e ANTES do flag-opportunities —
   // assim nenhum anúncio é publicado como oportunidade ao preço financiado.
-  console.log("── 7/10 precio al contado (ES) ──");
+  console.log("── 8/11 precio al contado (ES) ──");
   await enrichEs();
 
   // 2.ª passagem: recalcula só os corrigidos acima (o `pending` do compute-costs
   // filtra por updated_at > computed_at, e o enrich só toca no updated_at de
   // quem corrigiu).
-  console.log("── 8/10 compute-costs (2.ª passagem) ──");
+  console.log("── 9/11 compute-costs (2.ª passagem) ──");
   const costsContado = await computeCosts();
 
-  console.log("── 9/10 flag-opportunities ──");
+  console.log("── 10/11 flag-opportunities ──");
   const opps = await flagOpportunities();
 
   // Depois do flag: parte das oportunidades já validadas (veredito + confiança
   // + dedupe), portanto nunca notifica algo que a montra não mostraria.
-  console.log("── 10/10 match-alerts ──");
+  console.log("── 11/11 match-alerts ──");
   const alertas = await matchAlerts();
 
   // Painel de saúde do pipeline (métricas de qualidade do matching)
@@ -119,6 +125,27 @@ async function main() {
 
   await versionHealthPanel(db, sql);
   process.exit(0);
+}
+
+/** DEFAULT: pedidos à RDW por corrida diária (1/s → ~25 min). A primeira corrida tem
+ *  o histórico todo; o resto fica para os dias seguintes, mais recentes primeiro. */
+export const RDW_DAILY_LIMIT = 1500;
+
+/**
+ * Passo da RDW. O `enrich-nl-rdw` só corre contra o warehouse local; sem
+ * `WAREHOUSE_URL` (CI, replay manual na base da app) o passo é saltado com aviso
+ * em vez de derrubar a corrida.
+ */
+export async function kmRdwStep(
+  enrich: (opts: { limit: number }) => Promise<unknown> = async (opts) =>
+    (await import("./enrich-nl-rdw")).enrichNlRdw(opts),
+): Promise<boolean> {
+  if (!warehouseUrl()) {
+    console.log("(sem WAREHOUSE_URL — consulta à RDW saltada)");
+    return false;
+  }
+  await enrich({ limit: RDW_DAILY_LIMIT });
+  return true;
 }
 
 /**

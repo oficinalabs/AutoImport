@@ -272,8 +272,11 @@ export default async function AnuncioPage({ params }: { params: Promise<{ id: st
               Confiança
             </h3>
             <KmTrustBadge trust={listing.kmTrust} />
-            {/* Sem `kmCheck`: o Listing ainda não o expõe (ver o PR do P07). */}
-            <KmTrustAdvice country={listing.country} year={listing.year} />
+            <KmTrustAdvice
+              country={listing.country}
+              year={listing.year}
+              kmCheck={listing.kmCheck}
+            />
           </div>
 
           {/* Ações */}

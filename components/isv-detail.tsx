@@ -1,18 +1,35 @@
 import { co2Norm } from "@/lib/cost-engine";
 import { formatCc, formatEuro } from "@/lib/format";
-import type { Listing } from "@/lib/types";
+import type { IsvParts, Listing } from "@/lib/types";
 import { ChevronDown } from "lucide-react";
 
+/** As parcelas como o motor as somou: (cilindrada + ambiental) × taxa + agravamento,
+ * menos a redução por antiguidade. Os zeros e a taxa normal não se mostram. */
+function partRows(p: IsvParts, norma: string): { label: string; value: string }[] {
+  const rows = [
+    { label: "Componente cilindrada", value: formatEuro(p.cilindrada) },
+    { label: `Componente ambiental (CO₂ ${norma})`, value: formatEuro(p.ambiental) },
+  ];
+  if (p.taxaPct !== 100) rows.push({ label: "Taxa intermédia", value: `${p.taxaPct} %` });
+  if (p.agravamentoDiesel > 0)
+    rows.push({ label: "Agravamento de partículas", value: formatEuro(p.agravamentoDiesel) });
+  if (p.reducaoPct > 0)
+    rows.push({ label: "Redução por antiguidade", value: `−${p.reducaoPct} %` });
+  return rows;
+}
+
 /**
- * Como se chegou ao ISV. O detalhe por componente (cilindrada, ambiental,
- * redução) é gravado pelo motor em `import_cost_estimates.inputs.isv`, mas a
- * publicação não leva o `inputs` para a base da app; por isso a ficha mostra os
- * dados do carro que entram na conta e as regras, não os valores de cada parcela.
+ * Como se chegou ao ISV: os dados do carro que entram na conta, as parcelas que o
+ * motor gravou em `import_cost_estimates.inputs.isv` (quando a estimativa já as
+ * trouxe na publicação) e as regras.
  */
 export function IsvDetail({ listing }: { listing: Listing }) {
   const m = listing.model;
   const eletrico = m.fuel === "elétrico";
-  const norma = co2Norm(listing.year) === "wltp" ? "WLTP" : "NEDC";
+  const parts = eletrico ? undefined : listing.isvParts;
+  // A norma que o motor usou (pela data da 1.ª matrícula) manda; sem ela, a do ano.
+  const norm = parts && parts.norm !== "n/a" ? parts.norm : co2Norm(listing.year);
+  const norma = norm === "wltp" ? "WLTP" : "NEDC";
   const rows: { label: string; value: string }[] = eletrico
     ? [{ label: "Combustível", value: "Elétrico" }]
     : [
@@ -52,6 +69,28 @@ export function IsvDetail({ listing }: { listing: Listing }) {
           </div>
         ))}
       </dl>
+      {parts && (
+        <dl className="mt-3 flex flex-col">
+          {partRows(parts, norma).map((r) => (
+            <div
+              key={r.label}
+              className="flex items-center justify-between border-b border-line py-2 text-sm"
+            >
+              <dt className="text-ink-soft">{r.label}</dt>
+              <dd className="tnum font-mono">{r.value}</dd>
+            </div>
+          ))}
+          <div className="flex items-center justify-between py-2 text-sm font-semibold">
+            <dt>ISV</dt>
+            <dd className="tnum font-mono">{formatEuro(listing.cost.isv)}</dd>
+          </div>
+        </dl>
+      )}
+      {parts && parts.assumptions.length > 0 && (
+        <p className="mt-1 text-xs leading-relaxed text-warn">
+          Assumimos: {parts.assumptions.join("; ")}.
+        </p>
+      )}
       {eletrico ? (
         <p className="mt-3 text-xs leading-relaxed text-ink-soft">
           Os elétricos estão isentos de ISV.
