@@ -15,6 +15,7 @@
 // research/autoline-investigacao.md.
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do autoline = os campos-base comuns + extras próprios do site.
@@ -170,6 +171,10 @@ export function normalizeCard(card: Card, p: Product | null = null, { collectedA
   const img = card.image || (Array.isArray(p?.image) ? p.image[0] : p?.image);
   const price = toInt(offer.price) ?? precoDoCard(card.priceText);
   const id = card.id || (/--(\d+)(?:$|[?#])/.exec(String(card.detail_url || p?.url || '')) || [])[1] || null;
+  // IVA (P04): o texto do preço do card ("1 850 € sem IVA", "TVA déductible") e a descrição /
+  // propriedades do JSON-LD. Marketplace de stands e leiloeiros → nunca particular.
+  const vat = resolveVat({ raw: p?.additionalProperty ?? null, priceLabel: card.priceText, texts: [desc], price });
+  const imgs = Array.isArray(p?.image) ? p.image : null;
 
   return {
     make,
@@ -192,6 +197,9 @@ export function normalizeCard(card: Card, p: Product | null = null, { collectedA
     detail_url: cleanStr(card.detail_url || p?.url || offer.url),
     image: cleanStr(img),
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime,                      // P04
+    price_net: vat.price_net,
+    image_urls: imageUrlList(imgs),
     // --- extras próprios do autoline ---
     source_site: 'autoline.pt',
     id: id ? String(id) : null,

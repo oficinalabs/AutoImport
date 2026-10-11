@@ -11,6 +11,7 @@
 // `source_site` = 'ooyyo.com' (o agregador onde recolhemos).
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do Ooyyo = os campos-base comuns + extras próprios do site (agregador).
@@ -76,6 +77,10 @@ export interface OoyyoCard {
 // `card` é o objeto de campos já parseado; `collectedAt` é injetado por quem chama.
 export function normalizeCard(card: OoyyoCard, { collectedAt = null }: { collectedAt?: string | null } = {}): OoyyoRecord {
   const cur = card.currencyId === '3' ? 'EUR' : (card.currency || 'EUR');
+  // IVA (P04): o card só tem título/variante; o vocabulário BE ("TVA déductible", "HTVA",
+  // "marge") às vezes vem lá. Galeria: o card só traz a 1.ª foto.
+  const price = toInt(card.price);
+  const vat = resolveVat({ priceLabel: card.price, texts: [card.title, card.variant], price });
   return {
     make: cleanStr(card.make),
     model: cleanStr(card.model),
@@ -88,7 +93,7 @@ export function normalizeCard(card: OoyyoCard, { collectedAt = null }: { collect
     color: cleanStr(card.color),                     // por vezes exposto na descrição (pode faltar)
     doors: null,                                     // não exposto na listagem
     category: cleanStr(card.category),
-    price: toInt(card.price),
+    price,
     currency: cur,
     country: 'BELGIUM',
     region: cleanStr(card.city),                     // cidade/localidade (pode faltar)
@@ -97,6 +102,8 @@ export function normalizeCard(card: OoyyoCard, { collectedAt = null }: { collect
     detail_url: cleanStr(card.detailUrl),
     image: cleanStr(card.image),
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime,                      // P04
+    price_net: vat.price_net,
     // --- extras próprios do Ooyyo ---
     source_site: 'ooyyo.com',
     id: cleanStr(card.id),

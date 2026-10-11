@@ -1,0 +1,326 @@
+{
+  "meinauto": [
+    {
+      "id": "ma-1",
+      "make": {
+        "name": "Volkswagen"
+      },
+      "model": {
+        "name": "T-Roc",
+        "bodyType": "SUV"
+      },
+      "seller": {
+        "name": "Autohaus Nord",
+        "slug": "ah-nord"
+      },
+      "vehicle": {
+        "initialRegistration": "2023-02-01T00:00:00Z",
+        "mileage": 12000,
+        "metaFuelType": "PETROL",
+        "conditionCategory": "PRE_OWNED"
+      },
+      "calculation": {
+        "purchasePrice": 26180.0,
+        "netPrice": 22000.0,
+        "isVatDeductible": true
+      },
+      "images": [
+        {
+          "path": "marketplace/stock/mara/a/1"
+        },
+        {
+          "path": "marketplace/stock/mara/a/2"
+        }
+      ]
+    },
+    {
+      "id": "ma-2",
+      "make": {
+        "name": "Opel"
+      },
+      "model": {
+        "name": "Corsa"
+      },
+      "seller": {
+        "name": "Autohaus Süd"
+      },
+      "vehicle": {
+        "initialRegistration": "2020-06-01T00:00:00Z",
+        "mileage": 48000
+      },
+      "calculation": {
+        "purchasePrice": 12990.0
+      },
+      "images": []
+    }
+  ],
+  "autohero": [
+    {
+      "id": "ah-1",
+      "manufacturer": "Mercedes-Benz",
+      "model": "C-Klasse",
+      "offerPrice": {
+        "amountMinorUnits": 3570000,
+        "conversionMajor": 100,
+        "currency": "EUR"
+      },
+      "vatType": "VAT_DEDUCTIBLE",
+      "carUrlTitle": "mercedes-c",
+      "mainImageUrl": "https://img.autohero.com/a/{size}.jpg"
+    },
+    {
+      "id": "ah-2",
+      "manufacturer": "Ford",
+      "model": "Focus",
+      "offerPrice": {
+        "amountMinorUnits": 1499000,
+        "conversionMajor": 100,
+        "currency": "EUR"
+      },
+      "vatType": "MARGIN",
+      "carUrlTitle": "ford-focus"
+    },
+    {
+      "id": "ah-3",
+      "manufacturer": "Audi",
+      "model": "A3",
+      "offerPrice": {
+        "amountMinorUnits": 2199000,
+        "conversionMajor": 100,
+        "currency": "EUR"
+      },
+      "carUrlTitle": "audi-a3"
+    }
+  ],
+  "quoka": [
+    {
+      "card": {
+        "id": "qk-1",
+        "articleId": null,
+        "detailUrl": "https://www.quoka.de/x/qk-1.html",
+        "title": "VW Golf 7 1.4 TSI",
+        "description": "Scheckheftgepflegt, TÜV neu",
+        "year": 2016,
+        "fuel": "Benzin",
+        "km": 98000,
+        "price": 11500,
+        "priceOld": null,
+        "city": "Köln",
+        "region": "NRW",
+        "listingDate": "heute",
+        "image": "https://img.quoka.de/1.jpg",
+        "images": 3,
+        "premium": false,
+        "verifiedPhone": true
+      },
+      "ld": {
+        "image": [
+          {
+            "contentUrl": "https://img.quoka.de/1.jpg"
+          },
+          {
+            "contentUrl": "https://img.quoka.de/2.jpg"
+          }
+        ]
+      }
+    },
+    {
+      "card": {
+        "id": "qk-2",
+        "articleId": null,
+        "detailUrl": "https://www.quoka.de/x/qk-2.html",
+        "title": "BMW 520d Touring – MwSt. ausweisbar",
+        "description": "Händlerfahrzeug, Netto: 21.000 €",
+        "year": 2020,
+        "fuel": "Diesel",
+        "km": 120000,
+        "price": 24990,
+        "priceOld": null,
+        "city": "Hamburg",
+        "region": "HH",
+        "listingDate": "heute",
+        "image": null,
+        "images": 0,
+        "premium": false,
+        "verifiedPhone": false
+      },
+      "ld": null
+    }
+  ],
+  "autoline": [
+    {
+      "card": {
+        "id": "26071015164238004900",
+        "make": "Peugeot",
+        "name": "Peugeot 308",
+        "year": "2019-05",
+        "km": "84 000 km",
+        "fuel": "Diesel",
+        "euro": "Euro 6",
+        "locText": "Bélgica, Lokeren",
+        "company": "Garage Exemple",
+        "image": "https://img.autoline.pt/1.jpg",
+        "detail_url": "https://autoline.pt/-/x--26071015164238004900",
+        "priceText": "9 900 € sem IVA",
+        "auction": false
+      },
+      "product": {
+        "name": "Peugeot 308",
+        "offers": {
+          "price": "9900",
+          "priceCurrency": "EUR"
+        },
+        "image": ["https://img.autoline.pt/1.jpg", "https://img.autoline.pt/2.jpg"],
+        "description": "TVA déductible"
+      }
+    },
+    {
+      "card": {
+        "id": "26071015164238004901",
+        "make": "Renault",
+        "name": "Renault Clio",
+        "year": "2018-01",
+        "km": "60 000 km",
+        "fuel": "Gasolina",
+        "euro": "Euro 6",
+        "locText": "Bélgica, Gent",
+        "company": "Auto Gent",
+        "image": null,
+        "detail_url": "https://autoline.pt/-/x--26071015164238004901",
+        "priceText": "8 500 €",
+        "auction": false
+      },
+      "product": null
+    }
+  ],
+  "theparking": [
+    {
+      "name": "Toyota Yaris 1.5 Hybrid",
+      "brand": {
+        "name": "Toyota"
+      },
+      "model": "Yaris",
+      "description": "Category CITY CAR. BTW auto, prijs excl. BTW € 14.000",
+      "offers": {
+        "price": "16940",
+        "priceCurrency": "EUR",
+        "url": "https://www.theparking.eu/x/1",
+        "availableAtOrFrom": {
+          "address": {
+            "addressCountry": {
+              "name": "NETHERLANDS"
+            }
+          }
+        }
+      },
+      "image": ["https://cdn.theparking.eu/1.jpg", "https://cdn.theparking.eu/2.jpg"]
+    },
+    {
+      "name": "Citroën C3",
+      "brand": {
+        "name": "Citroën"
+      },
+      "model": "C3",
+      "description": "Category CITY CAR. Régime de la marge",
+      "offers": {
+        "price": "8900",
+        "priceCurrency": "EUR",
+        "url": "https://www.theparking.eu/x/2",
+        "availableAtOrFrom": {
+          "address": {
+            "addressCountry": {
+              "name": "BELGIUM"
+            }
+          }
+        }
+      },
+      "image": "https://cdn.theparking.eu/3.jpg"
+    }
+  ],
+  "ooyyo": [
+    {
+      "id": "oy-1",
+      "price": "18 150",
+      "currency": "EUR",
+      "currencyId": "3",
+      "title": "Volvo XC40 T3 - TVA déductible",
+      "year": "2021",
+      "make": "Volvo",
+      "model": "XC40",
+      "engine": null,
+      "km": "40 000",
+      "category": "SUV",
+      "fuel": "Essence",
+      "color": null,
+      "city": "Liège",
+      "image": "https://img.ooyyo.com/1.jpg",
+      "source": "gocar.be",
+      "sourceHost": "gocar.be",
+      "detailUrl": "https://www.ooyyo.com/x/oy-1",
+      "deal": null,
+      "savePercent": null,
+      "imageCount": 5
+    },
+    {
+      "id": "oy-2",
+      "price": "9 990",
+      "currency": "EUR",
+      "currencyId": "3",
+      "title": "Fiat 500",
+      "year": "2017",
+      "make": "Fiat",
+      "model": "500",
+      "engine": null,
+      "km": "70 000",
+      "category": null,
+      "fuel": null,
+      "color": null,
+      "city": null,
+      "image": null,
+      "source": "2ememain",
+      "sourceHost": "2ememain.be",
+      "detailUrl": "https://www.ooyyo.com/x/oy-2",
+      "deal": null,
+      "savePercent": null,
+      "imageCount": 1
+    }
+  ],
+  "autouncle": [
+    {
+      "item": {
+        "@id": "https://www.autouncle.de/de/d/123-bmw-x1",
+        "offers": {
+          "price": "27900",
+          "priceCurrency": "EUR"
+        },
+        "brand": {
+          "name": "BMW"
+        },
+        "model": "X1",
+        "name": "BMW X1 sDrive18d MwSt. ausweisbar"
+      },
+      "extra": {
+        "sourceName": "mobile.de",
+        "isPrivate": false
+      }
+    },
+    {
+      "item": {
+        "@id": "https://www.autouncle.de/de/d/124-bmw-x1",
+        "offers": {
+          "price": "25900",
+          "priceCurrency": "EUR"
+        },
+        "brand": {
+          "name": "BMW"
+        },
+        "model": "X1",
+        "name": "BMW X1 sDrive18d"
+      },
+      "extra": {
+        "sourceName": "kleinanzeigen",
+        "isPrivate": true
+      }
+    }
+  ]
+}

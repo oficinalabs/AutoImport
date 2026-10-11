@@ -6,6 +6,7 @@
 // completo, localização, vendedor, potência, CO2, imagens. Ver research/autotrader-investigacao.md.
 
 import { toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 
 // Registo do AutoTrader = os campos-base comuns + extras próprios do site.
 export interface AutotraderRecord extends CollectorRecord {
@@ -31,7 +32,7 @@ interface RawListing {
   location?: Record<string, unknown>;
   seller?: Record<string, unknown>;
   vehicleDetails?: VehicleDetail[];
-  price?: { priceRaw?: unknown };
+  price?: { priceRaw?: unknown; priceFormatted?: unknown; [k: string]: unknown };
   tracking?: { firstRegistration?: unknown };
   wltpValues?: unknown[];
   images?: unknown;
@@ -60,6 +61,17 @@ export function normalizeListing(L: RawListing, { collectedAt = null }: { collec
   // CO2: de wltpValues, ex. "170 g/km (gem.)".
   const co2 = (L.wltpValues || []).map(String).find((x) => /g\/km/i.test(x)) || null;
 
+  // IVA (P04): "BTW verrekenbaar" / "excl. BTW" / "marge" no preço ou nos campos do anúncio
+  // (lib/vat-regime-text.ts). Mesma stack Scout24 do AutoScout24: o `isVatLabelLegallyRequired`
+  // não diz o regime e fica fora.
+  const price = toInt(L.price?.priceRaw);
+  const vat = resolveVat({
+    raw: { price: L.price, vehicle: v, vehicleDetails: vd },
+    priceLabel: L.price?.priceFormatted,
+    isPrivate: /private/i.test(String(seller.type || '')),
+    price,
+  });
+
   return {
     // --- campos comuns (uniformes entre coletores) ---
     make: cleanStr(v.make),
@@ -73,7 +85,7 @@ export function normalizeListing(L: RawListing, { collectedAt = null }: { collec
     color: null,                       // não exposto ao nível da listagem
     doors: null,                       // idem
     category: cleanStr(v.variant),     // no AutoTrader `variant` é a carroçaria (Sedan, SUV…)
-    price: toInt(L.price?.priceRaw),
+    price,
     currency: 'EUR',
     country: PAIS[String(loc.countryCode ?? '')] || cleanStr(loc.countryCode),
     region: null,                      // só há cidade
@@ -82,6 +94,11 @@ export function normalizeListing(L: RawListing, { collectedAt = null }: { collec
     detail_url: L.url ? new URL(L.url, 'https://www.autotrader.nl').href : null,
     image: cleanStr(Array.isArray(L.images) ? L.images[0] : L.images),
     collected_at: collectedAt,
+    // --- P04: IVA, galeria e matrícula (só NL; a chave da RDW) ---
+    vat_regime: vat.vat_regime,
+    price_net: vat.price_net,
+    image_urls: imageUrlList(Array.isArray(L.images) ? L.images : null),
+    plate: cleanStr(v.licensePlate),
 
     // --- extras próprios do AutoTrader ---
     source_site: 'autotrader.nl',

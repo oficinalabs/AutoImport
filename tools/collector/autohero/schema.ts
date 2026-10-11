@@ -13,6 +13,7 @@
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
 import { BASE, MARKET } from './http.ts';
+import { resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do autohero = os campos-base comuns + extras ricos que a API oferece de graça.
@@ -153,6 +154,11 @@ function imageUrl(a: RawAd): string | null {
 export function normalizeAd(a: RawAd, { collectedAt = null }: { collectedAt?: string | null } = {}): AutoheroRecord {
   const kw = a.kw != null ? Math.round(a.kw) : null;
   const variant = [a.subType, a.subTypeExtra].map(cleanStr).filter(Boolean).join(' ') || null;
+  // IVA (P04): o Autohero tem o filtro "Zeige nur Autos mit ausweisbarer MwSt." (DE §3.2) — o
+  // anúncio da API traz o sinal num campo de IVA; procuramo-lo em lib/vat-regime-text.ts.
+  // Galeria: esta projeção da API só traz a imagem principal, por isso não há `image_urls`.
+  const price = toMajor(a.offerPrice);
+  const vat = resolveVat({ raw: a, price });
   return {
     // --- campos comuns (uniformes entre coletores) ---
     make: cleanStr(a.manufacturer),
@@ -166,7 +172,7 @@ export function normalizeAd(a: RawAd, { collectedAt = null }: { collectedAt?: st
     color: null,                                         // não exposto nesta projeção
     doors: null,                                         // não exposto nesta projeção
     category: null,                                      // carroçaria não vem por anúncio
-    price: toMajor(a.offerPrice),
+    price,
     currency: cleanStr(a.offerPrice?.currency) || MARKET.currency,
     country: MARKET.countryLabel,
     region: null,                                        // retalhista nacional — sem local por anúncio
@@ -175,6 +181,8 @@ export function normalizeAd(a: RawAd, { collectedAt = null }: { collectedAt?: st
     detail_url: detailUrl(a),
     image: imageUrl(a),
     collected_at: collectedAt,
+    vat_regime: vat.vat_regime,                          // P04
+    price_net: vat.price_net,
 
     // --- extras próprios do autohero ---
     source_site: 'autohero.com',

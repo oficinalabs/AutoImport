@@ -7,6 +7,7 @@
 // (`/api/…`, GraphQL) é robots-disallowed e desnecessária. Ver research/autoscout24-investigacao.md.
 
 import { toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 
 // Registo do AutoScout24 = os campos-base comuns + extras ricos próprios do site.
 export interface Autoscout24Record extends CollectorRecord {
@@ -85,6 +86,19 @@ export function normalizeListing(L: RawListing, { collectedAt = null }: { collec
   const isPrivate = /private/i.test(String(seller.type || ''));
   const source = isPrivate ? 'Particular' : cleanStr(seller.companyName);
 
+  // IVA (P04): o rodapé "¹ MwSt. ausweisbar" do preço. `isVatLabelLegallyRequired` NÃO é isto
+  // (diz se a montra é obrigada a mostrar o rótulo de IVA, não qual é o regime) e o
+  // lib/vat-regime-text.ts ignora-o; lá procuramos no `price` e no resto do anúncio campos e
+  // textos de IVA.
+  const priceRaw = toInt(price.priceRaw);
+  const vat = resolveVat({
+    raw: { price, vehicle: v, vehicleDetails: vd },
+    priceLabel: price.priceFormatted,
+    isPrivate,
+    price: priceRaw,
+  });
+  const country = PAIS[String(loc.countryCode ?? '')] || cleanStr(loc.countryCode);
+
   return {
     // --- campos comuns (uniformes entre coletores) ---
     make: cleanStr(v.make),
@@ -98,15 +112,20 @@ export function normalizeListing(L: RawListing, { collectedAt = null }: { collec
     color: null,                       // não exposto ao nível da listagem (vem com --detail)
     doors: null,                       // idem
     category: cleanStr(v.variant),     // no AS24 `variant` é a carroçaria (Limousine, SUV, Kombi…)
-    price: toInt(price.priceRaw),
+    price: priceRaw,
     currency: 'EUR',
-    country: PAIS[String(loc.countryCode ?? '')] || cleanStr(loc.countryCode),
+    country,
     region: null,                      // só há cidade
     postalCode: cleanStr(loc.zip),
     source,                            // origem concreta = o stand/dealer (ou "Particular")
     detail_url: L.url ? new URL(L.url, 'https://www.autoscout24.de').href : null,
     image: cleanStr(Array.isArray(L.images) ? L.images[0] : L.images),
     collected_at: collectedAt,
+    // --- P04: IVA, galeria, matrícula NL (contrato em lib/normalize.ts) ---
+    vat_regime: vat.vat_regime,
+    price_net: vat.price_net,
+    image_urls: imageUrlList(Array.isArray(L.images) ? L.images : null),
+    plate: country === 'NETHERLANDS' ? cleanStr(v.licensePlate) : null,
 
     // --- extras próprios do AutoScout24 ---
     source_site: 'autoscout24.de',

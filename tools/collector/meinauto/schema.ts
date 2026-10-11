@@ -15,6 +15,7 @@
 
 import { CAMPOS_BASE as CAMPOS, toInt, cleanStr, type CollectorRecord } from '../lib/normalize.ts';
 import { BASE } from './http.ts';
+import { imageUrlList, resolveVat } from '../lib/vat-regime-text.ts';
 export { CAMPOS, toInt, cleanStr };
 
 // Registo do meinauto = os campos-base comuns + extras ricos próprios do site.
@@ -124,6 +125,11 @@ export function normalizeVehicle(r: RawVehicleData, { collectedAt = null }: { co
   const vehAddr: RawAddress = r.addresses?.vehicle || r.addresses?.seller || {};
   const img0 = Array.isArray(r.images) ? r.images[0] : null;
   const co2 = v.co2Emission != null ? `${String(v.co2Emission)} g/km` : null;
+  // P04: galeria (CDN + path) e IVA. Só stands; o regime vem dos campos do anúncio/calculation
+  // (preço líquido, flag de IVA dedutível) ou do vocabulário DE — lib/vat-regime-text.ts.
+  const imgs = Array.isArray(r.images) ? r.images.map((i) => (i?.path ? CDN + i.path : null)) : null;
+  const price = preco(r);
+  const vat = resolveVat({ raw: { calculation: r.calculation, vehicle: v }, price });
 
   return {
     // --- campos comuns (uniformes entre coletores) ---
@@ -138,7 +144,7 @@ export function normalizeVehicle(r: RawVehicleData, { collectedAt = null }: { co
     color: cleanStr(r.color?.carPaint || r.color?.base),
     doors: toInt(v.doors),
     category: cleanStr(r.model?.bodyType),
-    price: preco(r),
+    price,
     currency: 'EUR',
     country: 'GERMANY',
     region: cleanStr(vehAddr.region),
@@ -147,6 +153,10 @@ export function normalizeVehicle(r: RawVehicleData, { collectedAt = null }: { co
     detail_url: r.id ? `${BASE}/fahrzeugsuche/detail/${r.id}` : null,
     image: img0?.path ? CDN + img0.path : null,
     collected_at: collectedAt,
+    // --- P04 ---
+    vat_regime: vat.vat_regime,
+    price_net: vat.price_net,
+    image_urls: imageUrlList(imgs),
 
     // --- extras próprios do meinauto ---
     source_site: 'meinauto.de',
