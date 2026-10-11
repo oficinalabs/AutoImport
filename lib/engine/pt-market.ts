@@ -14,6 +14,7 @@
  */
 import { sql } from "drizzle-orm";
 import type { db as Db } from "../../db";
+import type { PtSampleRow } from "../types";
 import { carIdentitySql } from "./car-identity";
 import { kmBand } from "./normalize-vehicle";
 
@@ -23,7 +24,13 @@ export interface PtEstimate {
   estimatedPrice: number;
   sampleSize: number;
   confidence: PtConfidence;
+  /** Até `PT_SAMPLE_ROWS` carros da amostra que deu a mediana (os mais perto
+   * dela), na forma compacta de `import_cost_estimates.pt_sample`. */
+  sample: PtSampleRow[];
 }
+
+/** Quantos comparáveis PT se guardam por estimativa (contrato de dados, plano §2.2). */
+export const PT_SAMPLE_ROWS = 8;
 
 /**
  * Janela de geração do carro estrangeiro (derivada da versão confirmada do
@@ -129,27 +136,25 @@ const MAX_KM_RATIO = 1.6;
 /** Piso do rácio de km, em km — os +1000 dos dois lados (ver MAX_KM_RATIO). */
 const KM_RATIO_FLOOR = 1000;
 
-async function sample(
-  db: typeof Db,
-  modelId: string,
-  year: number,
-  band: number,
-  yearSpread: number,
-  kmSpread: number,
-  powerHp?: number | null,
-  genWindow?: GenWindow,
-  excludeMids?: string[],
-): Promise<{
-  median: number;
-  medianKm: number | null;
-  n: number;
-  distinctPrices: number;
-  distinctSellers: number;
-  min: number;
-  max: number;
-  p25: number;
-  p75: number;
-} | null> {
+/** Filtros de uma amostra: os mesmos para a mediana e para as linhas guardadas. */
+interface SampleQuery {
+  modelId: string;
+  year: number;
+  band: number;
+  yearSpread: number;
+  kmSpread: number;
+  powerHp?: number | null;
+  genWindow?: GenWindow;
+  excludeMids?: string[];
+}
+
+/**
+ * A observação mais recente de cada CARRO físico que entra na amostra. Partilhado
+ * pela mediana (`sample`) e pelos comparáveis guardados (`sampleRows`): os
+ * carros que a ficha mostra são exatamente os que fizeram a mediana.
+ */
+function latestObservations(q: SampleQuery) {
+  const { modelId, year, band, yearSpread, kmSpread, powerHp, genWindow, excludeMids } = q;
   // Interseção da janela year±yearSpread com a janela de geração (quando
   // presente): o guard NUNCA relaxa (só aperta) — mantém-se mesmo no fallback.
   // Interseção vazia (lo>hi) → o `between` não devolve nada.
@@ -178,27 +183,16 @@ async function sample(
     : sql``;
   // Dedupe por CARRO físico, não por anúncio (ver lib/engine/car-identity.ts):
   // grupos como Caetano/CarPlus listam o mesmo stock em vários sites — contar
-  // 2× inflaciona a amostra. min/max saem para o teto de spread do fallback;
-  // p25/p75 para o teto de dispersão robusta dos dois ramos (MAX_IQR_SPREAD); a
-  // mediana de km (do `listings`, que é onde os km em bruto vivem — a observação
-  // só guarda a banda) para o teto de excesso de km (MAX_KM_RATIO). Os km entram
-  // no `distinct on` como o preço: por CARRO, não por anúncio.
-  const rows = (await db.execute(sql`
-    select percentile_cont(0.5) within group (order by price)::int as median,
-           percentile_cont(0.25) within group (order by price)::int as p25,
-           percentile_cont(0.75) within group (order by price)::int as p75,
-           percentile_cont(0.5) within group (order by km)::int as median_km,
-           count(*)::int as n,
-           count(distinct price)::int as distinct_prices,
-           count(distinct seller_key)::int as distinct_sellers,
-           min(price)::int as min_price,
-           max(price)::int as max_price
-    from (
-      select distinct on (identity) price, seller_key, km
+  // 2× inflaciona a amostra. Os km entram no `distinct on` como o preço: por
+  // CARRO, não por anúncio. Título/ano/fonte/URL só servem os comparáveis.
+  return sql`(
+      select distinct on (identity) price, seller_key, km, title, year, source, url
       from (
         select ${carIdentitySql("l")} as identity,
                coalesce(l.seller_name, l.id::text) as seller_key,
-               o.price, o.observed_at, l.km
+               o.price, o.observed_at, l.km,
+               concat_ws(' ', l.make_raw, l.model_raw, l.variant) as title,
+               o.year, l.source_site as source, l.detail_url as url
         from pt_price_observations o
         join listings l on l.id = o.listing_id
         left join us_versions uv on uv.version_id = l.us_version_id
@@ -210,7 +204,38 @@ async function sample(
           ${midExclusion}
       ) obs
       order by identity, observed_at desc
-    ) latest
+    )`;
+}
+
+async function sample(
+  db: typeof Db,
+  q: SampleQuery,
+): Promise<{
+  median: number;
+  medianKm: number | null;
+  n: number;
+  distinctPrices: number;
+  distinctSellers: number;
+  min: number;
+  max: number;
+  p25: number;
+  p75: number;
+} | null> {
+  // min/max saem para o teto de spread do fallback; p25/p75 para o teto de
+  // dispersão robusta dos dois ramos (MAX_IQR_SPREAD); a mediana de km (do
+  // `listings`, que é onde os km em bruto vivem — a observação só guarda a
+  // banda) para o teto de excesso de km (MAX_KM_RATIO).
+  const rows = (await db.execute(sql`
+    select percentile_cont(0.5) within group (order by price)::int as median,
+           percentile_cont(0.25) within group (order by price)::int as p25,
+           percentile_cont(0.75) within group (order by price)::int as p75,
+           percentile_cont(0.5) within group (order by km)::int as median_km,
+           count(*)::int as n,
+           count(distinct price)::int as distinct_prices,
+           count(distinct seller_key)::int as distinct_sellers,
+           min(price)::int as min_price,
+           max(price)::int as max_price
+    from ${latestObservations(q)} latest
   `)) as unknown as {
     median: number | null;
     p25: number;
@@ -236,6 +261,35 @@ async function sample(
         p75: row.p75,
       }
     : null;
+}
+
+/**
+ * Os `PT_SAMPLE_ROWS` carros da amostra mais perto da mediana — os que melhor
+ * mostram ao stand "com que carros portugueses se comparou". Só corre depois de
+ * as guardas passarem: não mexe nelas.
+ */
+async function sampleRows(db: typeof Db, q: SampleQuery, median: number): Promise<PtSampleRow[]> {
+  const rows = (await db.execute(sql`
+    select title, year, km, price, source, url
+    from ${latestObservations(q)} latest
+    order by abs(price - ${median}), price
+    limit ${PT_SAMPLE_ROWS}
+  `)) as unknown as {
+    title: string;
+    year: number;
+    km: number | null;
+    price: number;
+    source: string;
+    url: string | null;
+  }[];
+  return rows.map((r) => ({
+    t: r.title,
+    y: r.year,
+    km: r.km ?? 0,
+    p: r.price,
+    s: r.source,
+    ...(r.url ? { u: r.url } : {}),
+  }));
 }
 
 /**
@@ -272,7 +326,9 @@ export async function estimatePtPrice(
   // dois valores têm de sair do MESMO número — passar banda e km em separado era
   // deixar o chamador contradizer-se.
   const band = kmBand(km);
-  const primary = await sample(db, modelId, year, band, 1, 1, powerHp, genWindow, excludeMids);
+  const base = { modelId, year, band, yearSpread: 1, powerHp, genWindow, excludeMids };
+  const primaryQ: SampleQuery = { ...base, kmSpread: 1 };
+  const primary = await sample(db, primaryQ);
   if (
     primary &&
     primary.n >= MIN_SAMPLE_NORMAL &&
@@ -281,13 +337,19 @@ export async function estimatePtPrice(
     iqrSpread(primary) <= MAX_IQR_SPREAD &&
     kmExcess(km, primary.medianKm) <= MAX_KM_RATIO
   ) {
-    return { estimatedPrice: primary.median, sampleSize: primary.n, confidence: "normal" };
+    return {
+      estimatedPrice: primary.median,
+      sampleSize: primary.n,
+      confidence: "normal",
+      sample: await sampleRows(db, primaryQ, primary.median),
+    };
   }
   // Fallback alargado: ano ±1 (como a primária), só a banda de km alarga para ±2.
   // As guardas de dispersão aplicam-se na mesma (incluindo a robusta e a de km,
   // ainda mais necessária aqui: a janela de km passa a 100 000), mais o
   // teto de spread absoluto — a alargada é a amostra mais fraca, leva-as todas.
-  const wide = await sample(db, modelId, year, band, 1, 2, powerHp, genWindow, excludeMids);
+  const wideQ: SampleQuery = { ...base, kmSpread: 2 };
+  const wide = await sample(db, wideQ);
   if (
     wide &&
     wide.n >= MIN_SAMPLE_WIDE &&
@@ -298,7 +360,12 @@ export async function estimatePtPrice(
     iqrSpread(wide) <= MAX_IQR_SPREAD &&
     kmExcess(km, wide.medianKm) <= MAX_KM_RATIO
   ) {
-    return { estimatedPrice: wide.median, sampleSize: wide.n, confidence: "alargada" };
+    return {
+      estimatedPrice: wide.median,
+      sampleSize: wide.n,
+      confidence: "alargada",
+      sample: await sampleRows(db, wideQ, wide.median),
+    };
   }
   return null;
 }

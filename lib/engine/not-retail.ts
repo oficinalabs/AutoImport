@@ -93,6 +93,76 @@ export const NOT_RETAIL_PATTERNS = [
   "gewerbe ?/ ?export",
   "nur export",
   "export only",
+
+  // ── Por país (estudos de out. 2026, secção 6 de cada um) ──
+  // "Export"/"Gewerbe" SOZINHOS ficam de fora, como já estava decidido acima
+  // (teste "Für Export"): um stand pode só dizer que exporta, e "Gewerbe" casa
+  // com "Gewerbeleasing". Entram as formas que dizem que o PREÇO é de
+  // exportação/profissional ou que o vendedor só vende a esse público.
+  //
+  // DE (estudo DE §6.3–6.4).
+  "exportpreis",
+  "h(ä|ae)ndlerpreis",
+  "kein privatverkauf",
+  "brief bei bank",
+  "ohne brief",
+  // Preço que só vale com financiamento ou retoma: só quando o anúncio o DECLARA
+  // ("Finanzierung möglich" e "Inzahlungnahme möglich" são anúncios normais).
+  "nur (bei|mit) finanzierung",
+  "finanzierungspreis",
+  "aktionspreis mit finanzierung",
+  "(preis|nur) (bei|mit) inzahlungnahme",
+  // FR (estudo FR §6). "VE" sozinho fica de fora: em francês é também
+  // "véhicule électrique". VGE/VEI só como palavra inteira.
+  "prix marchand",
+  "vo marchand",
+  "vente aux pro",
+  "pros uniquement",
+  "r[ée]serv[ée] aux professionnels",
+  "sans ct(?![a-z])",
+  "sans contr[ôo]le technique",
+  "moteur hs",
+  "bo[îi]te hs",
+  "pour pi[èe]ces",
+  "non roulant",
+  "ne d[ée]marre pas",
+  "(?<![a-z])(vge|vei)(?![a-z])",
+  // BE (estudo BE §6.3), em francês e neerlandês. O "export"/"marchand" do
+  // estudo entra pelas formas FR acima e pelas de exportação aqui.
+  "prix export",
+  "uniquement export",
+  "alleen export",
+  "handelaarsprijs",
+  "sans garantie",
+  "pas de garantie",
+  "geen garantie",
+  "zonder keuring",
+  "voor onderdelen",
+  "prix avec reprise",
+  "prijs met inruil",
+  // NL (estudo NL §6.3).
+  "alleen voor handel",
+  "handel ?/ ?export",
+  "meeneemprijs",
+  "zonder garantie",
+  "verkocht zoals gezien",
+  "motorschade",
+  "motor defect",
+  "loopt niet",
+  "versnellingsbak defect",
+  "schadeauto",
+  "geen apk",
+  "apk verlopen",
+  "nap onlogisch",
+  // ES (estudo ES §6). "avería"/"siniestro" sozinhos ficam de fora: "sin
+  // averías" e "sin siniestros" querem dizer o contrário.
+  "solo profesionales",
+  "venta a profesionales",
+  "para exportar",
+  "motor averiado",
+  "no arranca",
+  "sin itv",
+  "itv caducada",
 ] as const;
 
 /** Alternância única, para reutilizar no SQL do pipeline sem duplicar a lista. */

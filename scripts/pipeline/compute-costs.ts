@@ -1,7 +1,12 @@
 /**
- * Cálculo do negócio por anúncio estrangeiro: custo total de importação
- * (cost engine) + preço PT estimado (pt-market) → poupança e veredito →
- * upsert em import_cost_estimates.
+ * Cálculo do negócio por anúncio estrangeiro: preço PT estimado (pt-market) +
+ * conta do stand (`computeDeal` do cost engine: regime de IVA, custo efetivo,
+ * caução, IVA de saída, margem bruta) → veredito pela MARGEM → upsert em
+ * import_cost_estimates, com os comparáveis PT (`pt_sample`).
+ * A montra é calculada para um stand com n.º de IVA no VIES e com os custos por
+ * omissão (despachante, preparação — plano §5); o P09 recalcula para cada stand.
+ * `savings`/`savings_pct` (PVP PT − custo total) continuam a ser escritas para
+ * quem ainda as lê (cartões, ordenação, oportunidades).
  *   pnpm exec tsx scripts/pipeline/compute-costs.ts          # só os pendentes
  *   pnpm exec tsx scripts/pipeline/compute-costs.ts --all    # recomputa tudo
  * Recomputa quando: sem estimativa, anúncio atualizado depois do cálculo, ou o
@@ -32,6 +37,7 @@
  *  - resto: só o anúncio.
  * A norma do CO₂ segue sempre o ano de matrícula (isv.ts), sem cross-norma.
  */
+import type { SourceVatRegime } from "../../lib/cost-engine";
 import { assertWritable, dbUrl } from "../../lib/db-url";
 import type { DesignationFacts } from "../../lib/engine/match-version";
 import type { GenWindow } from "../../lib/engine/pt-market";
@@ -71,6 +77,13 @@ const FOREIGN: CountryCode[] = ["DE", "FR", "BE", "NL", "ES"];
  */
 const ISV_YEAR = Number(process.env.ISV_YEAR) || new Date().getFullYear();
 
+/**
+ * A montra é calculada para um stand com n.º de IVA válido no VIES (DEFAULT,
+ * plano §5: "é um stand"). Quem não tiver desliga-o nos seus custos (P09), que
+ * recalculam à leitura sem mexer no que aqui se grava.
+ */
+const STAND_VAT_REGISTERED = true;
+
 function flag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
@@ -81,10 +94,14 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   const { db } = await import("../../db");
   const { sql } = await import("drizzle-orm");
   const {
-    computeCostBreakdown,
+    computeDeal,
     co2Norm,
-    ES_ISLAND_POSTAL_PREFIXES,
-    ES_ISLAND_REGION_REGEX_SOURCE,
+    ES_EXCLUDED_POSTAL_PREFIXES,
+    ES_EXCLUDED_REGION_REGEX_SOURCE,
+    FR_EXCLUDED_POSTAL_PREFIXES,
+    FR_EXCLUDED_REGION_REGEX_SOURCE,
+    NEW_VEHICLE_MAX_KM,
+    NEW_VEHICLE_MAX_MONTHS,
   } = await import("../../lib/cost-engine");
   const { NOT_RETAIL_REGEX_SOURCE } = await import("../../lib/engine/not-retail");
   const { MAX_UNPROVEN_SAVINGS_PCT, MIN_ORIGIN_RATIO, estimateOriginPrice } = await import(
@@ -95,7 +112,7 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   );
   const { loadTaxTables } = await import("../../lib/engine/tax-tables");
   const { buildUsCatalog } = await import("../../lib/engine/us-catalog");
-  const { verdictFromSavings } = await import("../../lib/verdict");
+  const { verdictFromMargin } = await import("../../lib/verdict");
 
   const tables = await loadTaxTables(db, ISV_YEAR);
 
@@ -152,31 +169,41 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     and l.km is not null
     and l.fuel is not null
 
-    -- RITI: ≤6 000 km OU <6 meses desde a 1.ª matrícula = "meio de transporte
-    -- novo" → 23% de IVA em Portugal, que o motor NÃO modela (cost-engine soma
-    -- preço+transporte+ISV+IUC+legalização, sem IVA). Decisão do dono do
-    -- produto: excluir em vez de modelar — a semântica do IVA no preço anunciado
-    -- em ES/DE é ambígua (com/sem, regime de margem vs. geral) e não a sabemos
-    -- por anúncio; modelar era adivinhar. Nos casos do topo o IVA em falta era
-    -- maior que a "poupança" (F8 Tributo com 900 km: poupança 47.681, IVA
-    -- 69.667) — prejuízo apresentado como negócio.
-    and l.km > 6000
-    -- Matrícula desconhecida (~2/3 dos estrangeiros) não exclui: só a que se
-    -- SABE recente. O "is null or" mantém o predicado booleano (nunca NULL) —
-    -- a limpeza das órfãs abaixo lê not coalesce(…, false).
-    and (l.first_registration is null or l.first_registration <= now() - interval '6 months')
-    -- Ilhas espanholas (Canárias/Baleares): o motor não as sabe calcular
-    -- (transporte é um fixo de camião, e as Canárias estão fora do território
-    -- IVA da UE) → fora da montra. Ver lib/cost-engine/territory.ts.
+    -- "Meio de transporte novo" (RITI; isNewMeansOfTransport em
+    -- lib/cost-engine/new-vehicle.ts): ≤6 000 km OU ≤6 meses desde a 1.ª
+    -- matrícula → paga sempre IVA PT e não pode ir para a margem. Continua FORA
+    -- da montra: nos casos do topo o IVA era maior que a "poupança" (F8 Tributo
+    -- com 900 km: poupança 47.681, IVA 69.667). As constantes são as do motor,
+    -- para a regra SQL e a do TS não se afastarem.
+    and l.km > ${NEW_VEHICLE_MAX_KM}
+    -- Matrícula desconhecida (~2/3 dos estrangeiros) não exclui aqui: só a que
+    -- se SABE recente (o ciclo abaixo apanha a data ASSUMIDA). O "is null or"
+    -- mantém o predicado booleano (nunca NULL) — a limpeza das órfãs abaixo lê
+    -- not coalesce(…, false).
+    and (l.first_registration is null
+         or l.first_registration <= now() - make_interval(months => ${NEW_VEHICLE_MAX_MONTHS}))
+    -- Territórios que o motor não sabe calcular (lib/cost-engine/territory.ts):
+    -- ES ilhas + Ceuta e Melilla; FR DOM (97x) e Córsega (20xxx, 2A/2B). Fora do
+    -- território IVA da UE ou sem transporte conhecido → fora da montra.
     -- Os coalesce mantêm o fragmento estritamente booleano: sem CP nem região
     -- o predicado dá false (não excluir por falta de dados), nunca NULL.
     and not (
       coalesce(l.country, '') = 'ES'
       and (
-        left(coalesce(l.postal_code, ''), 2) = any(${`{${ES_ISLAND_POSTAL_PREFIXES.join(",")}}`}::text[])
-        or coalesce(l.region, '') ~* ${ES_ISLAND_REGION_REGEX_SOURCE}
+        left(coalesce(l.postal_code, ''), 2) = any(${`{${ES_EXCLUDED_POSTAL_PREFIXES.join(",")}}`}::text[])
+        or coalesce(l.region, '') ~* ${ES_EXCLUDED_REGION_REGEX_SOURCE}
       )
     )
+    and not (
+      coalesce(l.country, '') = 'FR'
+      and (
+        upper(left(trim(coalesce(l.postal_code, '')), 2)) = any(${`{${FR_EXCLUDED_POSTAL_PREFIXES.join(",")}}`}::text[])
+        or coalesce(l.region, '') ~* ${FR_EXCLUDED_REGION_REGEX_SOURCE}
+      )
+    )
+    -- Veredito oficial de km incoerente (RDW "onlogisch", NL §6.1): o conta-km
+    -- recuou. Não se faz a conta de um carro em que os km não merecem confiança.
+    and coalesce(l.km_check->>'verdict', '') <> 'incoerente'
   `;
 
   // Estimativas de anúncios que já não são elegíveis. `coalesce(…, false)`: um
@@ -213,6 +240,9 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
             and (l.designation_facts->>'derivative') is distinct from e.inputs->>'derivative')
         or (l.match_confidence = 'exato' and l.us_version_id is not null
             and e.inputs->>'derivative' is null)
+        -- estimativa da conta antiga (antes do motor de IVA/margem): recalcular
+        -- uma vez, sem precisar de --all.
+        or e.origin_price_net is null
       )`;
 
   // cc/CO₂ vêm SÓ do próprio anúncio — nada de fallback às medianas do modelo:
@@ -221,6 +251,7 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   // em vez de ~7k). Sem dados → sem estimativa (nunca adivinhar).
   const pending = (await db.execute(sql`
     select l.id, l.price, l.year, l.km, l.fuel, l.country, l.first_registration,
+           l.postal_code, l.vat_regime, l.price_net,
            l.displacement_cc as cc,
            l.co2 as co2,
            l.power_hp,
@@ -249,6 +280,9 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     fuel: string;
     country: string;
     first_registration: string | null;
+    postal_code: string | null;
+    vat_regime: SourceVatRegime | null;
+    price_net: number | null;
     cc: number | null;
     co2: number | null;
     power_hp: number | null;
@@ -276,7 +310,9 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
   let origemImplausivel = 0;
   let amostraFracaTopo = 0;
   let poupancaNaoProvada = 0;
+  let carroNovo = 0;
   const verdicts: Record<string, number> = {};
+  const regimes: Record<string, number> = {};
 
   // Apaga a estimativa pré-existente de um anúncio que, ao recomputar, deixou de
   // ser elegível (ex.: janela de geração cortou a amostra) — não deixar veredito
@@ -426,7 +462,9 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
       continue;
     }
 
-    const { breakdown, isvDetail } = computeCostBreakdown(
+    // A conta de um stand com VIES (DEFAULT, plano §5; o P09 recalcula para quem
+    // não tem) e com os custos por omissão do motor (despachante, preparação).
+    const deal = computeDeal(
       {
         originPrice: l.price,
         fuel: l.fuel as never,
@@ -434,11 +472,26 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
         co2: co2Efetivo ?? undefined,
         firstRegistration: firstReg,
         country: l.country as CountryCode,
+        sourceVatRegime: l.vat_regime,
+        priceNet: l.price_net,
+        postalCode: l.postal_code,
+        km: l.km,
       },
-      tables,
+      pt.estimatedPrice,
+      { tables, standVatRegistered: STAND_VAT_REGISTERED },
     );
 
-    const savings = pt.estimatedPrice - breakdown.totalPt;
+    // O `elegivel` já tirou os carros que se SABE serem novos; aqui fica o que só
+    // a data ASSUMIDA (1 de julho do ano) torna novo — um carro deste ano sem
+    // matrícula conhecida. O lado seguro é não o mostrar: a conta dele seria em
+    // regime normal, com IVA PT sobre o PVP todo.
+    if (deal.newMeansOfTransport) {
+      carroNovo++;
+      await dropStale(l.est_id);
+      continue;
+    }
+
+    const savings = pt.estimatedPrice - deal.totalPt;
     const savingsPct = Math.round((savings / pt.estimatedPrice) * 1000) / 10;
 
     // Poupança extrema que NINGUÉM pôde provar: o `origin` é null (n<5 no próprio
@@ -446,15 +499,20 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     // Ver MAX_UNPROVEN_SAVINGS_PCT em lib/engine/origin-market.ts — não é um tecto
     // cego à margem: quem está acima do limiar MAS tem amostra de origem que o
     // valida passa. Tem de vir aqui (e não junto do MIN_ORIGIN_RATIO acima) porque
-    // depende do savingsPct, que só existe depois do breakdown.
-    if (!origin && savingsPct >= MAX_UNPROVEN_SAVINGS_PCT) {
+    // depende da conta. Mede-se sobre o preço ANUNCIADO (a caução de IVA volta a
+    // somar-se): o limiar foi calibrado assim, e o desconto do IVA dedutível não
+    // é poupança — volta a pagar-se em IVA de saída na revenda.
+    const advertisedSavingsPct =
+      Math.round(((savings - deal.vatDeposit) / pt.estimatedPrice) * 1000) / 10;
+    if (!origin && advertisedSavingsPct >= MAX_UNPROVEN_SAVINGS_PCT) {
       poupancaNaoProvada++;
       await dropStale(l.est_id);
       continue;
     }
 
-    const verdict = verdictFromSavings(savingsPct);
+    const verdict = verdictFromMargin(deal.grossMargin, deal.grossMarginPct);
     verdicts[verdict] = (verdicts[verdict] ?? 0) + 1;
+    regimes[deal.vatRegime] = (regimes[deal.vatRegime] ?? 0) + 1;
 
     const inputs = {
       cc: ccEfetivo,
@@ -477,20 +535,25 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
         : matchKind === "designacao"
           ? { fromCatalog, genWindow: genWindow ?? null }
           : {}),
-      isv: isvDetail,
+      isv: deal.isvDetail,
     };
 
     await db.execute(sql`
       insert into import_cost_estimates (
         listing_id, origin_price, transport, isv, iuc, legalization, total_pt,
         pt_estimated_price, pt_sample_size, pt_confidence,
-        savings, savings_pct, verdict, isv_table_year, inputs, computed_at
+        savings, savings_pct, verdict, isv_table_year, inputs,
+        vat_regime, origin_price_net, vat_deposit, preparation, despachante,
+        output_vat, gross_margin, gross_margin_pct, pt_sample, computed_at
       ) values (
-        ${l.id}, ${breakdown.originPrice}, ${breakdown.transport}, ${breakdown.isv},
-        ${breakdown.iuc}, ${breakdown.legalization}, ${breakdown.totalPt},
+        ${l.id}, ${deal.originPrice}, ${deal.transport}, ${deal.isv},
+        ${deal.iuc}, ${deal.legalization}, ${deal.totalPt},
         ${pt.estimatedPrice}, ${pt.sampleSize}, ${pt.confidence},
         ${savings}, ${savingsPct}, ${verdict}, ${ISV_YEAR},
-        ${JSON.stringify(inputs)}::jsonb, now()
+        ${JSON.stringify(inputs)}::jsonb,
+        ${deal.vatRegime}, ${deal.originPriceNet}, ${deal.vatDeposit}, ${deal.preparation},
+        ${deal.despachante}, ${deal.outputVat}, ${deal.grossMargin}, ${deal.grossMarginPct},
+        ${JSON.stringify(pt.sample)}::jsonb, now()
       )
       on conflict (listing_id) do update set
         origin_price = excluded.origin_price,
@@ -507,13 +570,22 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
         verdict = excluded.verdict,
         isv_table_year = excluded.isv_table_year,
         inputs = excluded.inputs,
+        vat_regime = excluded.vat_regime,
+        origin_price_net = excluded.origin_price_net,
+        vat_deposit = excluded.vat_deposit,
+        preparation = excluded.preparation,
+        despachante = excluded.despachante,
+        output_vat = excluded.output_vat,
+        gross_margin = excluded.gross_margin,
+        gross_margin_pct = excluded.gross_margin_pct,
+        pt_sample = excluded.pt_sample,
         computed_at = now()
     `);
     computed++;
   }
 
   console.log(
-    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · preço de origem implausível ${origemImplausivel} · amostra fraca no topo ${amostraFracaTopo} · poupança não provada ${poupancaNaoProvada} · vereditos ${JSON.stringify(verdicts)}`,
+    `compute-costs: ${computed}/${pending.length} calculados · sem cc/CO₂ ${semDados} · sem amostra PT ${semAmostra} · preço de origem implausível ${origemImplausivel} · amostra fraca no topo ${amostraFracaTopo} · poupança não provada ${poupancaNaoProvada} · carro novo (data assumida) ${carroNovo} · vereditos ${JSON.stringify(verdicts)} · regimes ${JSON.stringify(regimes)}`,
   );
   return {
     pending: pending.length,
@@ -523,7 +595,9 @@ export async function computeCosts(opts: { all?: boolean } = {}) {
     origemImplausivel,
     amostraFracaTopo,
     poupancaNaoProvada,
+    carroNovo,
     verdicts,
+    regimes,
   };
 }
 

@@ -5,7 +5,8 @@
  * SINTÉTICA ("Testmarke", specs de um 320d) para ser hermética contra uma
  * BD de dev com dados reais: 20 anúncios PT do mesmo modelo (mediana
  * 30.000 €) + 3 DE com preços construídos para dar compensa/marginal/
- * nao_compensa + 1 modelo sem amostra PT.
+ * nao_compensa pela MARGEM bruta (P06: 20 000 / 22 000 / 26 000 € em margem,
+ * PLZ de Berlim) + 1 modelo sem amostra PT.
  * Sem DATABASE_URL (e sem docker) o teste é saltado.
  * Idempotente no fim: apaga tudo o que é `fixture-%`.
  */
@@ -123,7 +124,8 @@ test(
     // Vereditos por anúncio da fixture
     const estimates = (await db.execute(sql`
     select l.external_id, l.price, e.verdict, e.pt_confidence, e.pt_sample_size,
-           e.total_pt, e.pt_estimated_price, e.savings, e.isv, e.iuc, e.origin_price
+           e.total_pt, e.pt_estimated_price, e.savings, e.isv, e.iuc, e.origin_price,
+           e.vat_regime, e.gross_margin, e.despachante, e.preparation, e.pt_sample
     from listings l
     left join import_cost_estimates e on e.listing_id = l.id
     where l.external_id like 'fixture-de-%'
@@ -137,6 +139,11 @@ test(
       savings: number | null;
       isv: number | null;
       origin_price: number | null;
+      vat_regime: string | null;
+      gross_margin: number | null;
+      despachante: number | null;
+      preparation: number | null;
+      pt_sample: { t: string; p: number; s: string; u?: string }[] | null;
     }[];
 
     assert.equal(estimates.length, 8);
@@ -148,6 +155,17 @@ test(
     assert.equal(compensa?.pt_sample_size, 20);
     assert.ok((compensa?.savings ?? 0) > 0);
     assert.ok((compensa?.isv ?? 0) > 1000, "ISV (specs de 320d) deve ser substancial");
+    // P06: conta do stand — o anúncio não diz o IVA → margem; custos por omissão;
+    // veredito pela margem bruta (≥ 1 500 € e ≥ 6 %).
+    assert.equal(compensa?.vat_regime, "margem");
+    assert.equal(compensa?.despachante, 250);
+    assert.equal(compensa?.preparation, 300);
+    assert.ok((compensa?.gross_margin ?? 0) >= 1500, `margem ${compensa?.gross_margin}`);
+    // até 8 comparáveis PT, os mais perto da mediana (30 000 €) primeiro
+    assert.equal(compensa?.pt_sample?.length, 8);
+    assert.equal(compensa?.pt_sample?.[0]?.p, 30000);
+    assert.equal(compensa?.pt_sample?.[0]?.s, "standvirtual.com");
+    assert.ok(compensa?.pt_sample?.every((r) => r.t.includes("T900") && r.u?.startsWith("http")));
 
     assert.equal(byId.get("fixture-de-2")?.verdict, "marginal");
     assert.equal(byId.get("fixture-de-3")?.verdict, "nao_compensa");
@@ -992,6 +1010,174 @@ test(
       "o gémeo que passa está ACIMA do limiar — a guarda não é um tecto cego à margem",
     );
     assert.equal(res.poupancaNaoProvada, 1, "só o gémeo sem mercado próprio é recusado");
+  },
+);
+
+test(
+  "P06 — regime de IVA, margem e exclusões novas (carro novo, km incoerente, Ceuta, Córsega, DOM)",
+  { skip, timeout: 120_000 },
+  async () => {
+    const { db } = await import("../../db");
+    const { sql } = await import("drizzle-orm");
+    const { collectPtObservations } = await import("../../scripts/pipeline/pt-market");
+    const { computeCosts } = await import("../../scripts/pipeline/compute-costs");
+
+    await cleanup();
+
+    const [model] = (await db.execute(sql`
+      insert into vehicle_models (make, model, fuel, norm_key)
+      values ('testgen', 'ivamodel', 'gasóleo', 'testgen|ivamodel|gasóleo')
+      returning id
+    `)) as unknown as { id: string }[];
+
+    // Amostra PT sã: 9 stands, mediana 30 000 €.
+    for (const [i, price] of [
+      29_200, 29_400, 29_600, 29_800, 30_000, 30_200, 30_400, 30_600, 30_800,
+    ].entries()) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, price, country, seller_name, detail_url)
+        values
+          ('standvirtual.com', ${`fixture-iva-pt-${i}`}, ${model.id}, 'Testgen', 'IvaModel',
+           'Diesel', 'gasóleo', 'IvaModel 2.0d', 2021, 90000, 190, ${price}, 'PT',
+           ${`Stand Iva ${i}`}, ${`https://example.test/fixture-iva-pt-${i}`})
+      `);
+    }
+
+    // Estrangeiros: o mesmo carro (2021, 95 000 km, 2.0 diesel 132 g) e só o que o
+    // caso testa a mudar. Sem CP, salvo nos casos de território.
+    type Foreign = {
+      id: string;
+      country: string;
+      price: number;
+      vat?: string;
+      net?: number;
+      postal?: string;
+      region?: string;
+      firstReg?: string;
+      kmCheck?: string;
+      variant?: string;
+    };
+    const recent = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
+    const foreign: Foreign[] = [
+      { id: "fixture-iva-ded", country: "DE", price: 23_800, vat: "dedutivel" },
+      { id: "fixture-iva-mar", country: "DE", price: 20_000, vat: "margem" },
+      { id: "fixture-iva-part", country: "DE", price: 20_000, vat: "particular" },
+      { id: "fixture-iva-null", country: "DE", price: 20_000 },
+      // NL dedutível sem preço líquido: a BPM está no preço → margem (DEFAULT).
+      { id: "fixture-iva-nl-sem-net", country: "NL", price: 23_800, vat: "dedutivel" },
+      { id: "fixture-iva-nl-net", country: "NL", price: 23_800, vat: "dedutivel", net: 19_000 },
+      // O par do carro novo: igual ao -mar, mas matriculado há 3 meses.
+      { id: "fixture-iva-novo", country: "DE", price: 20_000, vat: "margem", firstReg: recent },
+      // O par do km: RDW coerente entra, incoerente sai.
+      { id: "fixture-iva-nl-coerente", country: "NL", price: 20_000, kmCheck: "coerente" },
+      { id: "fixture-iva-nl-incoerente", country: "NL", price: 20_000, kmCheck: "incoerente" },
+      // Territórios: Ceuta (51), Melilla pela região, Córsega (20), DOM pela região;
+      // controlos continentais (Madrid, Paris) entram.
+      { id: "fixture-iva-ceuta", country: "ES", price: 20_000, postal: "51001" },
+      { id: "fixture-iva-melilla", country: "ES", price: 20_000, region: "Melilla" },
+      { id: "fixture-iva-madrid", country: "ES", price: 20_000, postal: "28001" },
+      { id: "fixture-iva-corse", country: "FR", price: 20_000, postal: "20000" },
+      { id: "fixture-iva-guadeloupe", country: "FR", price: 20_000, region: "Guadeloupe" },
+      { id: "fixture-iva-paris", country: "FR", price: 20_000, postal: "75001" },
+      // Palavra nova do not-retail (DE §6.3): o preço é de exportação.
+      { id: "fixture-iva-export", country: "DE", price: 20_000, variant: "IvaModel Exportpreis" },
+    ];
+    for (const f of foreign) {
+      await db.execute(sql`
+        insert into listings
+          (source_site, external_id, model_id, make_raw, model_raw, fuel_raw, fuel, variant,
+           year, km, power_hp, displacement_cc, co2, price, country, detail_url, first_registration,
+           vat_regime, price_net, postal_code, region, km_check)
+        values
+          ('autoscout24.de', ${f.id}, ${model.id}, 'Testgen', 'IvaModel', 'Diesel', 'gasóleo',
+           ${f.variant ?? "IvaModel 2.0d"}, 2021, 95000, 190, 1995, 132, ${f.price}, ${f.country},
+           ${`https://example.test/${f.id}`}, ${f.firstReg ?? "2021-05-01"},
+           ${f.vat ?? null}, ${f.net ?? null}, ${f.postal ?? null}, ${f.region ?? null},
+           ${f.kmCheck ? JSON.stringify({ source: "RDW", verdict: f.kmCheck, checkedAt: "2026-10-01" }) : null}::jsonb)
+      `);
+    }
+
+    await collectPtObservations();
+    await computeCosts();
+
+    const rows = (await db.execute(sql`
+      select l.external_id, e.vat_regime, e.origin_price_net, e.vat_deposit, e.output_vat,
+             e.gross_margin, e.gross_margin_pct, e.total_pt, e.pt_estimated_price, e.verdict
+      from import_cost_estimates e join listings l on l.id = e.listing_id
+      where l.external_id like 'fixture-iva-%' and l.country <> 'PT'
+      order by l.external_id
+    `)) as unknown as {
+      external_id: string;
+      vat_regime: string;
+      origin_price_net: number;
+      vat_deposit: number;
+      output_vat: number;
+      gross_margin: number;
+      gross_margin_pct: number;
+      total_pt: number;
+      pt_estimated_price: number;
+      verdict: string;
+    }[];
+    const by = new Map(rows.map((r) => [r.external_id, r]));
+
+    // Exclusões: sem estimativa nenhuma.
+    for (const id of [
+      "fixture-iva-novo",
+      "fixture-iva-nl-incoerente",
+      "fixture-iva-ceuta",
+      "fixture-iva-melilla",
+      "fixture-iva-corse",
+      "fixture-iva-guadeloupe",
+      "fixture-iva-export",
+    ]) {
+      assert.equal(by.get(id), undefined, `${id} não pode ter estimativa`);
+    }
+    // Os controlos de cada par entram.
+    for (const id of [
+      "fixture-iva-mar",
+      "fixture-iva-nl-coerente",
+      "fixture-iva-madrid",
+      "fixture-iva-paris",
+    ]) {
+      assert.ok(by.get(id), `${id} devia ter estimativa`);
+    }
+
+    // Dedutível (stand com VIES): paga o líquido, caução = o IVA alemão, e revende
+    // em regime normal (IVA de saída sobre o PVP todo: 30 000 × 23/123 = 5 610).
+    const ded = by.get("fixture-iva-ded");
+    assert.equal(ded?.vat_regime, "dedutivel");
+    assert.equal(ded?.origin_price_net, 20_000); // 23 800 / 1,19
+    assert.equal(ded?.vat_deposit, 3_800);
+    assert.equal(ded?.output_vat, 5_610);
+
+    // Margem, particular e "a fonte não diz" dão a mesma conta: IVA só sobre a
+    // diferença (30 000 − 20 000) × 23/123 = 1 870.
+    for (const id of ["fixture-iva-mar", "fixture-iva-part", "fixture-iva-null"]) {
+      const r = by.get(id);
+      assert.equal(r?.vat_regime, "margem", id);
+      assert.equal(r?.origin_price_net, 20_000, id);
+      assert.equal(r?.vat_deposit, 0, id);
+      assert.equal(r?.output_vat, 1_870, id);
+    }
+    // O mesmo PVP, o mesmo custo líquido: a margem compensa, a dedutível não —
+    // o IVA de saída sobre o total come o desconto do IVA na compra.
+    assert.equal(by.get("fixture-iva-mar")?.verdict, "compensa");
+    assert.equal(ded?.verdict, "nao_compensa");
+
+    // NL: dedutível sem preço líquido conta como margem; com ele, dedutível.
+    assert.equal(by.get("fixture-iva-nl-sem-net")?.vat_regime, "margem");
+    assert.equal(by.get("fixture-iva-nl-sem-net")?.origin_price_net, 23_800);
+    assert.equal(by.get("fixture-iva-nl-net")?.vat_regime, "dedutivel");
+    assert.equal(by.get("fixture-iva-nl-net")?.origin_price_net, 19_000);
+
+    // A margem gravada é a conta toda: PVP − IVA de saída − custo total (±1 €
+    // de arredondamento).
+    for (const r of rows) {
+      const expected = r.pt_estimated_price - r.output_vat - r.total_pt;
+      assert.ok(Math.abs(r.gross_margin - expected) <= 1, `${r.external_id}: margem coerente`);
+    }
   },
 );
 

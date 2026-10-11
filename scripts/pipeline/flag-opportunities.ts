@@ -1,6 +1,8 @@
 /**
  * Marca oportunidades globais (stand_id null): estimativas com veredito
- * "compensa", confiança normal e match ao catálogo `exato`. Soft-delete das que
+ * "compensa", confiança normal e match ao catálogo `exato`. O veredito vem da
+ * MARGEM bruta (compute-costs → verdictFromMargin); `savings`/`savings_pct`
+ * continuam a ser copiadas para quem ainda as lê. Soft-delete das que
  * deixaram de compensar ou cujo anúncio desapareceu; reaparecer reativa.
  *   pnpm exec tsx scripts/pipeline/flag-opportunities.ts
  */
@@ -28,7 +30,8 @@ export async function flagOpportunities() {
   // (trovit/theparking) reindexam o mesmo anúncio, e caetano/carplus cross-listam
   // o mesmo stock — a identidade partilhada (VIN, senão chassis no URL, senão
   // modelo+ano+km+preço; ver lib/engine/car-identity.ts) colapsa-os. Fica só o
-  // listing com maior savings.
+  // listing com maior margem bruta (o mesmo carro pode ter margens diferentes
+  // em dois sites: o regime de IVA e o CP vêm de cada anúncio).
   //
   // O `match_confidence` é a regra da MONTRA (COM_CATALOGO em lib/queries.ts), e
   // tem de estar aqui: sem ele o KPI contava 11 766 oportunidades das quais só
@@ -47,7 +50,7 @@ export async function flagOpportunities() {
         and l.match_confidence = ${MONTRA_MATCH_CONFIDENCE}
         and l.deleted_at is null
         and l.is_damaged is not true
-      order by ${identity}, e.savings desc
+      order by ${identity}, e.gross_margin desc nulls last, e.savings desc
     )
   `;
 
