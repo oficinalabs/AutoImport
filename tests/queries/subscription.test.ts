@@ -645,3 +645,31 @@ test("só o dono abre checkout ou portal; sem subscrição não há portal", { s
     globalThis.fetch = fetchOriginal;
   }
 });
+
+// ── Acesso vitalício ─────────────────────────────────────────────
+
+test(
+  "acesso vitalício: o stand do dono fica ativo; um stand onde é só membro não",
+  {
+    skip,
+  },
+  async () => {
+    const db = sql as ReturnType<typeof postgres>;
+    const antigo = new Date(Date.now() - 400 * DIA);
+    for (const id of ["stand-vitalicio", "stand-alheio"]) {
+      await db`insert into organization (id, name, slug, created_at)
+             values (${id}, ${id}, ${id}, ${antigo})`;
+    }
+    await db`insert into "user" (id, name, email, created_at, updated_at)
+           values ('u-rui', 'Rui', 'RuiCosta607@gmail.com', now(), now()),
+                  ('u-outro', 'Outro', 'outro@exemplo.pt', now(), now())`;
+    await db`insert into member (id, organization_id, user_id, role, created_at) values
+           ('m1', 'stand-vitalicio', 'u-rui', 'owner', now()),
+           ('m2', 'stand-alheio', 'u-outro', 'owner', now()),
+           ('m3', 'stand-alheio', 'u-rui', 'member', now())`;
+
+    const { getStandQuery } = await import("../../lib/queries");
+    assert.equal((await getStandQuery("stand-vitalicio"))?.subscription.status, "ativa");
+    assert.equal((await getStandQuery("stand-alheio"))?.subscription.status, "expirada");
+  },
+);

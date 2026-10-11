@@ -86,3 +86,14 @@ export function estadoEfetivo(
 export function temAcesso(estado: SubscriptionStatus): boolean {
   return estado !== "expirada";
 }
+
+/**
+ * Contas com acesso vitalício, sem passar pela Polar: o dono do produto. Vale
+ * para os stands de que estes emails são DONOS (não membros convidados), para
+ * um convite não dar acesso grátis ao stand de outra pessoa.
+ */
+const ACESSO_VITALICIO = new Set(["ruicosta607@gmail.com"]);
+
+export function temAcessoVitalicio(emailsDosDonos: string[]): boolean {
+  return emailsDosDonos.some((e) => ACESSO_VITALICIO.has(e.trim().toLowerCase()));
+}
