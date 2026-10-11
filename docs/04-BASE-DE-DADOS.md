@@ -27,6 +27,45 @@
 - ✏️ **Seed de desenvolvimento:** 208 `sources` (dos relatórios), `isv_tables` de 2026, uma amostra de `vehicle_models` e `listings` fictícios para desenvolver a UI sem depender da engine.
 - 🔒 Índices nas colunas de filtro/junção mais usadas. _→ `listings(model_id, country, price)`, `listings(seen_at)`, `opportunities(stand_id, savings)`, `pt_price_observations(model_id, observed_at)`._
 
+## IVA, margem e custos do stand (migration 0009, P01)
+
+Colunas e tabelas criadas para a conta com IVA e margem bruta. Tudo opcional ou com
+default: com elas a `null`, a ficha e a pesquisa mostram exatamente o mesmo de antes.
+
+**`listings`** (escritas pelos coletores, através do `tools/collector/lib/db-sink.ts`,
+sempre com `coalesce` — um re-crawl sem o campo não apaga o valor):
+
+| coluna | tipo | significado |
+|---|---|---|
+| `vat_regime` | text | o que o **anúncio** diz: `dedutivel` · `margem` · `particular` · `null` (não diz) |
+| `price_net` | integer | preço sem IVA quando a fonte o publica ("Netto", "HTVA", "excl. BTW") |
+| `image_urls` | text[] | até 8 fotos; a 1.ª continua também em `image_url`. No registo do coletor o campo chama-se `image_urls` (`images` já é a contagem de fotos em vários coletores) |
+| `plate` | text | matrícula (só NL, para a RDW). **Não se publica**: fica no warehouse |
+| `km_check` | jsonb | `{ source: RDW·Car-Pass·HistoVec·DGT, verdict: coerente·incoerente·sem_juizo, checkedAt }` |
+
+**`import_cost_estimates`** (escritas pelo motor/pipeline): `vat_regime` (regime
+**aplicado**, default `margem`), `origin_price_net`, `vat_deposit` (caução, só
+informativa), `preparation` e `despachante` (default 0), `output_vat`, `gross_margin`,
+`gross_margin_pct` e `pt_sample` (até 8 comparáveis PT em forma compacta
+`{ t, y, km, p, s, u? }`). O `lib/queries.ts` só expõe os campos de IVA/margem no
+`Listing.cost` quando `origin_price_net` está preenchido — antes disso o default
+`margem` não é um facto, é só o valor da coluna.
+
+**Tabelas novas (só da base da app; o `publish.ts` não as toca):**
+- `stand_cost_settings` — uma linha por stand com o que ele afina (transporte por país,
+  legalização, despachante, preparação, limiares de margem, `vat_registered`). Sem
+  linha = defaults do motor. Tabela própria, não colunas na `organization` (o
+  `auth:generate` apagá-las-ia).
+- `trial_email_log` — emails de trial/digest já enviados; `unique (stand_id, kind)`.
+
+**Espaço (medido com `pg_column_size`, out/2026):** um `pt_sample` de 8 comparáveis
+ocupa **~1,1 KB sem URL** e **~1,9 KB com URL**; uma galeria de 8 fotos do CDN do
+AutoScout24 ocupa **~1,2 KB**. Com a montra atual (~40 000 anúncios) isso dá
+**~45 MB** (amostra sem URL) a **~75 MB** (com URL), mais **até ~50 MB** de galerias —
+bem acima dos 25 MB que o plano estimava. Cabe nos 500 MB se a base estiver longe dos
+400 MB, mas convém medir o tamanho real **antes** da primeira publicação com estas
+colunas preenchidas e, se apertar, guardar o `u` só quando for preciso ou menos fotos.
+
 ## Migrations & ambientes
 - 🔒 Migrations **versionadas no repo**. Nunca alterar produção à mão.
 - 🔒 Bases separadas por ambiente: dev · (staging) · prod.

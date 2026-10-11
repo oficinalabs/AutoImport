@@ -25,6 +25,9 @@
  *
  * O QUE NÃO ATRAVESSA: `listings.raw`, `listings.match_evidence` e
  * `import_cost_estimates.inputs` — auditoria do pipeline, lida só no warehouse.
+ * `listings.plate` também não: a matrícula só serve para a consulta à RDW, que corre
+ * no warehouse, e a app não tem razão para a guardar. As tabelas `stand_cost_settings`
+ * e `trial_email_log` são dados de utilizador e só existem na base da app.
  * (A `us_versions.specs` deixou de existir: era ~100 MB dos 116 do catálogo, sem
  * leitores, e passou a viver no NDJSON — ver db/schema.ts.)
  *
@@ -54,13 +57,15 @@ const LISTING_DATA = (
   "displacement_cc color doors category price currency country region postal_code detail_url " +
   "image_url co2 power_hp first_registration seller_name seller_type price_evaluation " +
   "is_damaged vin us_version_id match_confidence designation_facts first_seen_at last_seen_at " +
-  "deleted_at created_at updated_at"
+  "deleted_at created_at updated_at vat_regime price_net image_urls km_check"
 ).split(" ");
 
 const ESTIMATE_KEY = ["listing_id"];
 const ESTIMATE_DATA = (
   "origin_price transport isv iuc legalization total_pt pt_estimated_price pt_sample_size " +
-  "pt_confidence savings savings_pct verdict isv_table_year computed_at"
+  "pt_confidence savings savings_pct verdict isv_table_year computed_at vat_regime " +
+  "origin_price_net vat_deposit preparation despachante output_vat gross_margin gross_margin_pct " +
+  "pt_sample"
 ).split(" ");
 
 // `stand_id` não vai: o publicador só trata das oportunidades GLOBAIS. As por stand,

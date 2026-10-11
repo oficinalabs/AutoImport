@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 // Type-only (sem ciclo em runtime): tipa a coluna designation_facts.
 import type { DesignationFacts } from "../lib/engine/match-version";
+import type { KmCheck, PtSampleRow } from "../lib/types";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -331,6 +332,19 @@ export const listings = pgTable(
      * motor está provado mas a variante do catálogo não é única;
      * não-nulo ⟺ match_confidence='designacao' */
     designationFacts: jsonb("designation_facts").$type<DesignationFacts>(),
+    // ── IVA, fotos e quilómetros (P01; ver docs/04-BASE-DE-DADOS.md) ──
+    /** o que o ANÚNCIO diz do IVA: "dedutivel" ("MwSt. ausweisbar", "TVA récupérable",
+     * "BTW verrekenbaar", "IVA deducible") | "margem" (§25a, REBU, margeregeling…) |
+     * "particular" | null = a fonte não diz. Escrito pelos coletores. */
+    vatRegime: text("vat_regime"),
+    /** preço SEM IVA quando a fonte o publica ("Netto", "HTVA", "excl. BTW"); EUR inteiros */
+    priceNet: integer("price_net"),
+    /** até 8 fotos do anúncio; a 1.ª continua também em `image_url` */
+    imageUrls: text("image_urls").array(),
+    /** matrícula visível no anúncio (só NL, para a RDW). Fica no warehouse: não se publica. */
+    plate: text("plate"),
+    /** veredito de um registo oficial de km (RDW, Car-Pass, HistoVec, DGT) */
+    kmCheck: jsonb("km_check").$type<KmCheck>(),
     firstSeenAt: timestamp("first_seen_at").defaultNow().notNull(),
     lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
@@ -428,6 +442,25 @@ export const importCostEstimates = pgTable(
     isvTableYear: integer("isv_table_year").notNull(),
     /** auditoria: inputs usados pelo cost engine (cc, co2, defaults assumidos) */
     inputs: jsonb("inputs"),
+    // ── IVA e margem bruta (P01 cria; o motor do P02/P06 escreve) ──
+    /** regime APLICADO na conta: "dedutivel" | "margem" (VatRegime em lib/types.ts) */
+    vatRegime: text("vat_regime").default("margem").notNull(),
+    /** custo de compra efetivo: líquido se dedutível; = preço se margem */
+    originPriceNet: integer("origin_price_net"),
+    /** caução de IVA estimada (0 em margem) — dinheiro parado, só informativo */
+    vatDeposit: integer("vat_deposit"),
+    /** preparação/garantia */
+    preparation: integer("preparation").default(0).notNull(),
+    /** honorários de despachante */
+    despachante: integer("despachante").default(0).notNull(),
+    /** IVA a liquidar na revenda ao preço PT estimado */
+    outputVat: integer("output_vat"),
+    /** margem bruta estimada (€) */
+    grossMargin: integer("gross_margin"),
+    /** gross_margin / pt_estimated_price × 100 */
+    grossMarginPct: real("gross_margin_pct"),
+    /** até 8 comparáveis PT, em forma compacta (PtSampleRow) */
+    ptSample: jsonb("pt_sample").$type<PtSampleRow[]>(),
     computedAt: timestamp("computed_at").defaultNow().notNull(),
   },
   (table) => [index("import_cost_estimates_verdict_idx").on(table.verdict, table.savings)],
@@ -549,6 +582,46 @@ export const subscriptions = pgTable(
     uniqueIndex("subscriptions_stand_uidx").on(table.standId),
     uniqueIndex("subscriptions_polar_subscription_uidx").on(table.polarSubscriptionId),
   ],
+);
+
+/**
+ * Custos que o stand afina (P09). Ausência de linha = defaults do motor
+ * (lib/cost-engine). Tabela própria e não colunas na `organization`, pela mesma
+ * razão da `subscriptions`: o `pnpm auth:generate` apagá-las-ia.
+ * Base da app: NÃO se publica a partir do warehouse.
+ */
+export const standCostSettings = pgTable("stand_cost_settings", {
+  standId: text("stand_id")
+    .primaryKey()
+    .references(() => organization.id, { onDelete: "cascade" }),
+  /** transporte por país de origem, só os que o stand definiu: { "DE": 1100, … } */
+  transport: jsonb("transport").$type<Partial<Record<string, number>>>(),
+  /** custo oficial de legalização que o stand paga (substitui o default) */
+  legalization: integer("legalization"),
+  despachante: integer("despachante"),
+  preparation: integer("preparation"),
+  /** limiar "compensa" do stand */
+  minMarginEur: integer("min_margin_eur"),
+  minMarginPct: real("min_margin_pct"),
+  /** tem n.º de IVA válido no VIES (sem ele, nada é dedutível) */
+  vatRegistered: boolean("vat_registered").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/**
+ * Emails do trial/digest já enviados (P13) — o unique garante que cada um
+ * sai no máximo uma vez por stand. Base da app: NÃO se publica.
+ */
+export const trialEmailLog = pgTable(
+  "trial_email_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    standId: text("stand_id").references(() => organization.id, { onDelete: "cascade" }),
+    /** 'dia1' | 'dia7' | 'dia25' | 'digest:<yyyy-mm-dd>' */
+    kind: text("kind").notNull(),
+    sentAt: timestamp("sent_at").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("trial_email_log_stand_kind_uidx").on(table.standId, table.kind)],
 );
 
 // ── Catálogo ultimatespecs.com — referência de versões para o matching ──

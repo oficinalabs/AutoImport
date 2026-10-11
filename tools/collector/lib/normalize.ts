@@ -36,6 +36,30 @@ export interface CollectorRecord {
   detail_url: string | null;
   image: string | null;
   collected_at: string | null;
+  // ── Opcionais (P01): só os coletores que os sabem ler os preenchem. O sink
+  // (lib/db-sink.ts) grava-os com coalesce — um re-crawl sem o campo não apaga o valor.
+  /** o que o anúncio diz do IVA: 'dedutivel' ("MwSt. ausweisbar", "TVA récupérable",
+   *  "BTW verrekenbaar", "IVA deducible") | 'margem' (§25a, REBU, margeregeling) |
+   *  'particular'. Ausente/null = o anúncio não diz. */
+  vat_regime?: VatRegimeAnuncio | null;
+  /** preço SEM IVA quando a fonte o publica ("Netto", "HTVA", "excl. BTW"), EUR */
+  price_net?: number | null;
+  /** até 8 URLs de fotos (a 1.ª continua também em `image`). Chama-se `image_urls` e
+   *  não `images` porque vários coletores já usam `images` para a CONTAGEM de fotos. */
+  image_urls?: string[] | null;
+  /** matrícula visível no anúncio (só NL, para a RDW); fica no warehouse */
+  plate?: string | null;
+  /** veredito de um registo oficial de km (ex.: RDW/NAP) */
+  km_check?: KmCheckRegisto | null;
+}
+
+export type VatRegimeAnuncio = 'dedutivel' | 'margem' | 'particular';
+
+// Igual a KmCheck em lib/types.ts (os coletores não importam do frontend).
+export interface KmCheckRegisto {
+  source: 'RDW' | 'Car-Pass' | 'HistoVec' | 'DGT';
+  verdict: 'coerente' | 'incoerente' | 'sem_juizo';
+  checkedAt: string;
 }
 
 // toInt: extrai o inteiro de uma string com ruído ("217.828 km", "€ 1.975", "5 Doors").
