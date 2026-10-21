@@ -24,10 +24,22 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://autoimport.arestadigital.pt";
+
 export const metadata: Metadata = {
+  // Sem metadataBase, as imagens e os canonical relativos não viram URLs
+  // absolutos e os links partilhados (WhatsApp, LinkedIn) saem sem imagem.
+  metadataBase: new URL(BASE_URL),
   title: "AutoImport — importa com contas",
   description:
-    "Descobre que carros compensa importar da Europa, com o custo final real já com ISV, IUC e legalização.",
+    "Descobre que carros compensa importar da Europa, com o custo final estimado já com ISV, IUC, transporte e legalização.",
+  openGraph: {
+    type: "website",
+    locale: "pt_PT",
+    siteName: "AutoImport",
+    images: [{ url: "/video/hero-camiao-poster.jpg", alt: "AutoImport" }],
+  },
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({
@@ -36,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt" suppressHydrationWarning>
+    <html lang="pt-PT" suppressHydrationWarning>
       <body className={`${archivo.variable} ${plexSans.variable} ${plexMono.variable}`}>
         <Providers>{children}</Providers>
       </body>

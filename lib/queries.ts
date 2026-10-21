@@ -543,8 +543,8 @@ export async function topOpportunitiesQuery(
   limit: number,
   standId: string | null,
   /** `savings` para a landing, que precisa de leque largo de valores absolutos
-   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). A
-   *  landing continua na poupança de propósito: a página pública não muda. */
+   *  para escolher o exemplo do ISV (ver escolherExemploIsv em lib/data.ts). Só a
+   *  ordem: o número mostrado nos cartões da landing é a margem. */
   sort: "percentagem" | "savings" = "percentagem",
 ): Promise<Listing[]> {
   const rows = await baseSelect(standId)
@@ -936,14 +936,18 @@ export async function landingStatsQuery(): Promise<{
     .select({
       totalListings: sql<number>`(select count(*)::int from ${listings} where deleted_at is null)`,
       activeOpportunities: sql<number>`count(*)::int`,
-      medianSavings: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${opportunities.savings}), 0)::int`,
-      bestSavings: sql<number>`coalesce(max(${opportunities.savings}), 0)::int`,
+      // Margem (como o painel e os cartões), não a poupança antes do IVA: a
+      // landing e a app a mostrarem números diferentes para o mesmo carro era
+      // a primeira coisa que um stand ia estranhar.
+      medianSavings: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${MARGEM}), 0)::int`,
+      bestSavings: sql<number>`coalesce(max(${MARGEM}), 0)::int`,
       lastSeenAt: sql<
         string | null
       >`(select max(last_seen_at)::text from ${listings} where deleted_at is null)`,
     })
     .from(opportunities)
     .innerJoin(listings, eq(listings.id, opportunities.listingId))
+    .leftJoin(importCostEstimates, J_ESTIMATE)
     .where(and(isNull(opportunities.deletedAt), isNull(listings.deletedAt)));
   return row;
 }

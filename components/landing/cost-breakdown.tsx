@@ -53,11 +53,16 @@ export function LandingCostBreakdown({ car }: { car: Listing }) {
   const { cost, ptMarket } = car;
 
   const extras = cost.totalPt - cost.originPrice;
+  // Com IVA dedutível o motor soma o preço SEM IVA; mostrar o preço do anúncio
+  // aqui fazia a lista não bater com o custo final.
+  const dedutivel = cost.vatRegime === "dedutivel" && cost.originPriceNet != null;
+  const margem = cost.grossMargin ?? car.savings;
+  const margemPct = cost.grossMarginPct ?? car.savingsPct;
   const parcelas: Parcela[] = [
     {
       chave: "origem",
-      rotulo: `Preço no anúncio · ${c.name}`,
-      valor: cost.originPrice,
+      rotulo: dedutivel ? `Preço sem IVA · ${c.name}` : `Preço no anúncio · ${c.name}`,
+      valor: dedutivel ? (cost.originPriceNet as number) : cost.originPrice,
       cor: "bg-white/30",
     },
     {
@@ -74,6 +79,27 @@ export function LandingCostBreakdown({ car }: { car: Listing }) {
       valor: cost.legalization,
       cor: "bg-rose-400/50",
     },
+    // Só existem com o motor novo; sem elas a lista não somava o custo final.
+    ...(cost.despachante
+      ? [
+          {
+            chave: "despachante",
+            rotulo: "Despachante",
+            valor: cost.despachante,
+            cor: "bg-teal-400/50",
+          },
+        ]
+      : []),
+    ...(cost.preparation
+      ? [
+          {
+            chave: "preparacao",
+            rotulo: "Preparação e garantia",
+            valor: cost.preparation,
+            cor: "bg-lime-400/40",
+          },
+        ]
+      : []),
   ];
 
   // Comparação: o mercado é a referência e leva a barra cheia; o nosso custo
@@ -224,22 +250,30 @@ export function LandingCostBreakdown({ car }: { car: Listing }) {
 
           <div className="mt-auto rounded-[14px] border border-emerald-400/25 bg-emerald-400/[0.09] p-5">
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-300">
-              Poupança estimada
+              {cost.grossMargin != null ? "Margem bruta estimada" : "Diferença para o mercado PT"}
             </p>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-3">
               <span className="tnum font-display text-4xl font-bold leading-none tracking-[-0.035em] text-emerald-300">
-                {formatEuro(car.savings)}
+                {formatEuro(margem)}
               </span>
               {/* Arredondado: o `savingsPct` vem da base com decimal (−16.8%) e
                   uma casa decimal ao lado de 3567 € e 21 240 € lê-se como
                   precisão a fingir — a estimativa não é precisa a 0,1%. */}
               <span className="tnum text-sm font-semibold text-emerald-300/70">
-                −{Math.round(car.savingsPct)}%
+                {Math.round(margemPct)}%
               </span>
             </p>
             <p className="mt-2.5 text-[13px] leading-relaxed text-white/50">
               contra a mediana de <span className="tnum">{ptMarket.sampleSize}</span> anúncios
-              portugueses do mesmo modelo e ano.
+              portugueses do mesmo modelo e ano
+              {cost.outputVat != null ? (
+                <>
+                  , já descontado o IVA da revenda (
+                  <span className="tnum">{formatEuro(cost.outputVat)}</span>).
+                </>
+              ) : (
+                ", antes do IVA da revenda."
+              )}
             </p>
           </div>
         </div>
