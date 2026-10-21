@@ -71,7 +71,12 @@ export function OpportunityCard({ car }: { car: Listing }) {
           >
             {v.label}
           </span>
-          <span className={cn("tnum text-sm font-bold", v.value)}>+{formatEuro(car.savings)}</span>
+          <span className={cn("tnum text-sm font-bold", v.value)}>
+            <span className="mr-1 text-[10px] font-semibold uppercase tracking-[0.1em] opacity-70">
+              Margem
+            </span>
+            {formatEuro(car.cost.grossMargin ?? car.savings)}
+          </span>
         </div>
       </div>
     </article>

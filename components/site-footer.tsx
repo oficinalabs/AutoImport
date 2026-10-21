@@ -40,6 +40,11 @@ export function SiteFooter() {
                   </Link>
                 </li>
                 <li>
+                  <Link href="/calculadora-isv" className="hover:text-ink">
+                    Calculadora de ISV
+                  </Link>
+                </li>
+                <li>
                   <Link href="/ajuda" className="hover:text-ink">
                     Perguntas frequentes
                   </Link>

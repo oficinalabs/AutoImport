@@ -69,7 +69,8 @@ export function checkPassword(password: string): PasswordCheck {
     return {
       valid: false,
       failed: [...failed, "common"],
-      message: "Essa password é demasiado comum. Escolhe outra.",
+      message:
+        'A password não pode ter palavras óbvias como "stand", "carro" ou "autoimport". Escolhe outra.',
     };
   }
 

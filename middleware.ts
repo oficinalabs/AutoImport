@@ -28,5 +28,6 @@ export const config = {
     "/favoritos/:path*",
     "/alertas/:path*",
     "/stand/:path*",
+    "/calculadora/:path*",
   ],
 };

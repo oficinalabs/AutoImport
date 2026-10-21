@@ -10,6 +10,7 @@ import {
 import { getLandingData } from "@/lib/data";
 import { formatEuro, formatNumber } from "@/lib/format";
 import { CONDICOES } from "@/lib/legal";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 /**
@@ -47,6 +48,17 @@ import Link from "next/link";
  */
 export const revalidate = 3600;
 
+const TITULO = "Importar carros da Europa com ISV calculado · AutoImport";
+const DESCRICAO =
+  "Carros usados da Alemanha, França, Bélgica, Holanda e Espanha com ISV, IUC, transporte e legalização já somados, e a margem estimada para o teu stand. 30 dias grátis.";
+
+export const metadata: Metadata = {
+  title: TITULO,
+  description: DESCRICAO,
+  alternates: { canonical: "/" },
+  openGraph: { title: TITULO, description: DESCRICAO, url: "/" },
+};
+
 const STEPS = [
   {
     n: "Dizes o que procuras",
@@ -54,7 +66,7 @@ const STEPS = [
   },
   {
     n: "Nós fazemos a conta",
-    body: "Todos os dias recalculamos ISV, IUC, transporte e legalização de cada anúncio, e comparamos com o preço praticado em Portugal.",
+    body: "Calculamos ISV, IUC, transporte e legalização de cada anúncio, descontamos o IVA da revenda e comparamos com o preço praticado em Portugal.",
   },
   {
     n: "Vais ao anúncio e compras",
@@ -80,8 +92,8 @@ export default async function LandingPage() {
   const STATS = [
     { value: formatNumber(totalListings), label: "anúncios analisados" },
     { value: formatNumber(activeOpportunities), label: "compensam agora" },
-    { value: formatEuro(medianSavings), label: "poupança mediana" },
-    { value: formatEuro(bestSavings), label: "a melhor de hoje" },
+    { value: formatEuro(medianSavings), label: "margem mediana" },
+    { value: formatEuro(bestSavings), label: "melhor margem hoje" },
   ];
 
   return (
@@ -135,9 +147,10 @@ export default async function LandingPage() {
           </h1>
 
           <p className="animar-entrada atraso-4 mt-7 max-w-[34rem] text-pretty text-[15px] leading-relaxed text-white/65 sm:text-base">
-            Cinco mercados europeus. Custo final já com ISV, IUC, transporte e legalização —{" "}
+            Carros usados para importar de cinco mercados europeus, com o custo final já com ISV,
+            IUC, transporte e legalização —{" "}
             <strong className="font-medium text-white">
-              comparado com o preço a que se vende em Portugal.
+              e a margem que te fica depois do IVA, ao preço a que se vende em Portugal.
             </strong>
           </p>
 
@@ -282,7 +295,7 @@ export default async function LandingPage() {
           <div>
             <p className="mb-5 text-[10px] uppercase tracking-[0.24em] text-[#1a1204]/55">Preço</p>
             <h2 className="font-display text-3xl font-black uppercase leading-[0.92] tracking-[-0.04em] sm:text-[2.5rem]">
-              <span className="tnum">{CONDICOES.precoMensalEuros} €</span> por mês.
+              <span className="tnum">{CONDICOES.precoMensalEuros} €</span> + IVA por mês.
               <br />O primeiro é grátis.
             </h2>
             <p className="mt-4 max-w-[42ch] text-[15px] leading-relaxed text-[#1a1204]/70">
